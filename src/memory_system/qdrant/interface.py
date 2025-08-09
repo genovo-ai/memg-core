@@ -172,8 +172,26 @@ class QdrantInterface:
                 point_id = str(point_id)
 
             point = PointStruct(id=point_id, vector=vector, payload=payload)
-            self.client.upsert(collection_name=collection, points=[point])
-            return True, point_id
+            result = self.client.upsert(collection_name=collection, points=[point])
+
+            # Determine success from returned UpdateResult status when available
+            success = True
+            try:
+                status = getattr(result, "status", None)
+                # status may be an enum; prefer its value/name, fall back to string
+                if status is not None:
+                    status_str = (
+                        getattr(status, "value", None)
+                        or getattr(status, "name", None)
+                        or str(status)
+                    )
+                    status_str = str(status_str).lower()
+                    success = status_str in ("acknowledged", "completed")
+            except Exception:
+                # If anything goes wrong determining status, assume success if no exception raised
+                success = True
+
+            return success, point_id
         except (ConnectionError, TimeoutError) as e:
             log_error(
                 "qdrant_interface",

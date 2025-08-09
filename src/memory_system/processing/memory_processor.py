@@ -523,7 +523,11 @@ class MemoryProcessor:
         )
 
         if not success:
-            raise RuntimeError(f"Failed to store memory {memory.id} in Qdrant")
+            raise ProcessingError(
+                "Qdrant upsert was not acknowledged",
+                operation="store_memory_dual",
+                original_error=None,
+            )
 
         # Store in Kuzu for graph relationships
         kuzu_props = memory.to_kuzu_node()

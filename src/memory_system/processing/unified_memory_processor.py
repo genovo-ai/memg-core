@@ -220,7 +220,7 @@ class UnifiedMemoryProcessor:
             return ProcessingResponse(
                 success=False,
                 memory_id="",
-                final_type="note",
+                final_type=MemoryType.NOTE,
                 ai_verified=False,
                 summary_generated=False,
                 type_changed=False,
@@ -471,6 +471,12 @@ Extract entities and relationships with focus on the above context.
             success, _ = self.qdrant.add_point(
                 vector=embedding, payload=memory_payload, point_id=memory.id
             )
+            if not success:
+                raise ProcessingError(
+                    "Qdrant upsert was not acknowledged",
+                    operation="store_memory_dual",
+                    original_error=None,
+                )
             logger.debug(f"Stored memory in Qdrant: {memory.id}")
 
             # Store in Kuzu

@@ -304,7 +304,7 @@ class MemoryRetriever:
             from ..config import get_config
 
             config = get_config()
-            # Use MEMG configuration (remove legacy mem0 reference)
+            # Use MEMG configuration
             return config.memg.enable_temporal_reasoning
         except Exception:
             # Default to filtering invalid memories if config fails
