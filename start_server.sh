@@ -7,6 +7,9 @@ set -e
 
 echo "🚀 Starting MEMG Core MCP Server via Docker Compose..."
 
+# Usage: ./start_server.sh [--local]
+#   --local  Use local Dockerfile/compose to build from current source (no PyPI)
+
 # Configuration with defaults
 export MEMORY_SYSTEM_MCP_PORT=${MEMORY_SYSTEM_MCP_PORT:-8787}
 export BASE_MEMORY_PATH=${BASE_MEMORY_PATH:-"$HOME/.local/share/memory_system"}
@@ -21,13 +24,31 @@ echo "   Port: ${MEMORY_SYSTEM_MCP_PORT}"
 echo "   Storage: ${STORAGE_DIR}/"
 echo "   Template: ${MEMG_TEMPLATE}"
 
-# Choose compose file (prefer root level, fallback to dockerfiles/)
-COMPOSE_FILE="docker-compose.yml"
-if [[ ! -f "$COMPOSE_FILE" && -f "dockerfiles/docker-compose.yml" ]]; then
-    COMPOSE_FILE="dockerfiles/docker-compose.yml"
-    echo "📁 Using: dockerfiles/docker-compose.yml"
+# Parse flags
+USE_LOCAL=false
+for arg in "$@"; do
+  case $arg in
+    --local)
+      USE_LOCAL=true
+      shift
+      ;;
+    *)
+      ;;
+  esac
+done
+
+# Choose compose file
+if [[ "$USE_LOCAL" == true && -f "dockerfiles/docker-compose.local.yml" ]]; then
+  COMPOSE_FILE="dockerfiles/docker-compose.local.yml"
+  echo "📁 Using local compose: $COMPOSE_FILE"
 else
-    echo "📁 Using: docker-compose.yml"
+  COMPOSE_FILE="docker-compose.yml"
+  if [[ ! -f "$COMPOSE_FILE" && -f "dockerfiles/docker-compose.yml" ]]; then
+      COMPOSE_FILE="dockerfiles/docker-compose.yml"
+      echo "📁 Using: dockerfiles/docker-compose.yml"
+  else
+      echo "📁 Using: docker-compose.yml"
+  fi
 fi
 
 # Ensure .env exists (copy from env.example if needed)
