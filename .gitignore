@@ -217,6 +217,7 @@ __pycache__/
 
 # bandit
 .bandit
+bandit*.json
 
 # Temporary test environments
 test_venv/

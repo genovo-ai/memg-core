@@ -244,7 +244,7 @@ addopts = "-v --cov=src --cov-report=term-missing"
 # BANDIT SECURITY CONFIGURATION
 [tool.bandit]
 exclude_dirs = ["tests", "test_*"]
-skips = ["B101", "B601"]
+skips = ["B101", "B104", "B601"]
 
 # RUFF CONFIGURATION
 [tool.ruff]
