@@ -76,8 +76,8 @@ Issues = "https://github.com/genovo-ai/memg-core/issues"
 include-package-data = false
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+where = ["src"]
+include = ["memory_system*"]
 exclude = [
     "tests*",
     "integration*",
