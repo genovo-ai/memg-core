@@ -27,13 +27,17 @@ class EntityTypeDefinition:
     def __post_init__(self):
         """Validate entity type definition"""
         if not self.name or not self.name.isupper():
-            raise TemplateValidationError(f"Entity type name must be uppercase: {self.name}")
+            raise TemplateValidationError(
+                f"Entity type name must be uppercase: {self.name}"
+            )
         if not re.match(r"^[A-Z][A-Z_]*$", self.name):
             raise TemplateValidationError(
                 f"Entity type name must contain only uppercase letters and underscores: {self.name}"
             )
         if not self.description:
-            raise TemplateValidationError(f"Entity type description is required: {self.name}")
+            raise TemplateValidationError(
+                f"Entity type description is required: {self.name}"
+            )
 
 
 @dataclass
@@ -48,16 +52,22 @@ class RelationshipTypeDefinition:
     def __post_init__(self):
         """Validate relationship type definition"""
         if not self.name or not self.name.isupper():
-            raise TemplateValidationError(f"Relationship type name must be uppercase: {self.name}")
+            raise TemplateValidationError(
+                f"Relationship type name must be uppercase: {self.name}"
+            )
         if not re.match(r"^[A-Z][A-Z_]*$", self.name):
             raise TemplateValidationError(
                 f"Relationship type name must contain only uppercase letters and \
         underscores: {self.name}"
             )
         if not self.description:
-            raise TemplateValidationError(f"Relationship type description is required: {self.name}")
+            raise TemplateValidationError(
+                f"Relationship type description is required: {self.name}"
+            )
         if self.directionality not in ["BIDIRECTIONAL", "DIRECTIONAL"]:
-            raise TemplateValidationError(f"Invalid directionality: {self.directionality}")
+            raise TemplateValidationError(
+                f"Invalid directionality: {self.directionality}"
+            )
 
 
 class MemoryTemplate(BaseModel):
@@ -68,7 +78,9 @@ class MemoryTemplate(BaseModel):
     description: str = Field(..., description="Template description")
     version: str = Field(..., description="Template version")
 
-    entity_types: List[EntityTypeDefinition] = Field(..., description="Entity type definitions")
+    entity_types: List[EntityTypeDefinition] = Field(
+        ..., description="Entity type definitions"
+    )
     relationship_types: List[RelationshipTypeDefinition] = Field(
         ..., description="Relationship type definitions"
     )
@@ -129,7 +141,9 @@ class MemoryTemplate(BaseModel):
                 return et
         return None
 
-    def get_relationship_type_by_name(self, name: str) -> Optional[RelationshipTypeDefinition]:
+    def get_relationship_type_by_name(
+        self, name: str
+    ) -> Optional[RelationshipTypeDefinition]:
         """Get relationship type definition by name"""
         for rt in self.relationship_types:
             if rt.name == name:

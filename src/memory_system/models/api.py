@@ -1,6 +1,5 @@
 """API request and response models"""
 
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,8 +21,12 @@ class CreateMemoryRequest(BaseModel):
     confidence: float = Field(0.8, ge=0.0, le=1.0, description="Storage confidence")
 
     # Optional project scoping
-    project_id: Optional[str] = Field(None, description="Optional project ID for scoping")
-    project_name: Optional[str] = Field(None, description="Optional project name for display")
+    project_id: Optional[str] = Field(
+        None, description="Optional project ID for scoping"
+    )
+    project_name: Optional[str] = Field(
+        None, description="Optional project name for display"
+    )
 
 
 class ProcessingResponse(BaseModel):
@@ -31,14 +34,24 @@ class ProcessingResponse(BaseModel):
 
     success: bool = Field(..., description="Whether operation succeeded")
     memory_id: str = Field(..., description="ID of created/updated memory")
-    final_type: MemoryType = Field(..., description="Final memory type after AI processing")
+    final_type: MemoryType = Field(
+        ..., description="Final memory type after AI processing"
+    )
     ai_verified: bool = Field(..., description="Whether AI verified the type")
-    summary_generated: bool = Field(default=False, description="Whether AI summary was generated")
-    processing_time_ms: float = Field(default=0.0, description="Processing time in milliseconds")
+    summary_generated: bool = Field(
+        default=False, description="Whether AI summary was generated"
+    )
+    processing_time_ms: float = Field(
+        default=0.0, description="Processing time in milliseconds"
+    )
 
     # Optional details
-    type_changed: bool = Field(default=False, description="Whether type was auto-corrected")
-    original_type: Optional[MemoryType] = Field(None, description="Original type if changed")
+    type_changed: bool = Field(
+        default=False, description="Whether type was auto-corrected"
+    )
+    original_type: Optional[MemoryType] = Field(
+        None, description="Original type if changed"
+    )
     word_count: int = Field(default=0, description="Content word count")
 
 
@@ -52,8 +65,12 @@ class SearchRequest(BaseModel):
         default_factory=lambda: [MemoryType.DOCUMENT, MemoryType.NOTE],
         description="Types to search",
     )
-    include_invalid: bool = Field(False, description="Include superseded/invalid memories")
-    score_threshold: float = Field(0.3, ge=0.0, le=1.0, description="Minimum similarity score")
+    include_invalid: bool = Field(
+        False, description="Include superseded/invalid memories"
+    )
+    score_threshold: float = Field(
+        0.3, ge=0.0, le=1.0, description="Minimum similarity score"
+    )
     tags: List[str] = Field(default_factory=list, description="Filter by tags")
 
 
@@ -64,8 +81,12 @@ class SearchResponse(BaseModel):
     total_results: int = Field(0, description="Total number of results found")
     documents_count: int = Field(0, description="Number of document results")
     notes_count: int = Field(0, description="Number of note results")
-    search_time_ms: float = Field(default=0.0, description="Search time in milliseconds")
-    results: List[SearchResult] = Field(default_factory=list, description="Search results")
+    search_time_ms: float = Field(
+        default=0.0, description="Search time in milliseconds"
+    )
+    results: List[SearchResult] = Field(
+        default_factory=list, description="Search results"
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -92,7 +113,9 @@ class CreateMemoryFromMessagePairRequest(BaseModel):
 
     user_id: str = Field(..., description="User ID for memory isolation")
     current_message: str = Field(..., description="Current message content")
-    previous_message: Optional[str] = Field(None, description="Previous message content")
+    previous_message: Optional[str] = Field(
+        None, description="Previous message content"
+    )
     speaker: Optional[str] = Field(None, description="Current message speaker")
     conversation_id: Optional[str] = Field(None, description="Conversation identifier")
     source: str = Field("conversation", description="Memory source")
@@ -145,9 +168,15 @@ class MemoryResultItem(BaseModel):
             source=result.source,
             memory_id=result.memory.id,
             tags=result.memory.tags,
-            word_count=(len(result.memory.content.split()) if result.memory.content else 0),
-            created_at=(result.memory.created_at.isoformat() if result.memory.created_at else ""),
-            memory_type=(result.memory.memory_type.value if result.memory.memory_type else "note"),
+            word_count=(
+                len(result.memory.content.split()) if result.memory.content else 0
+            ),
+            created_at=(
+                result.memory.created_at.isoformat() if result.memory.created_at else ""
+            ),
+            memory_type=(
+                result.memory.memory_type.value if result.memory.memory_type else "note"
+            ),
             summary=result.memory.summary,
         )
 
@@ -155,9 +184,13 @@ class MemoryResultItem(BaseModel):
 class SearchMemoriesResponse(BaseModel):
     """Response for memory search operations"""
 
-    result: List[MemoryResultItem] = Field(default_factory=list, description="Search results")
+    result: List[MemoryResultItem] = Field(
+        default_factory=list, description="Search results"
+    )
     query: str = Field(..., description="Original search query")
     total_results: int = Field(..., ge=0, description="Total number of results")
-    filters_applied: Dict[str, Any] = Field(default_factory=dict, description="Applied filters")
+    filters_applied: Dict[str, Any] = Field(
+        default_factory=dict, description="Applied filters"
+    )
     search_type: str = Field("semantic_search", description="Type of search performed")
     user_id: str = Field(..., description="User ID for memory isolation")

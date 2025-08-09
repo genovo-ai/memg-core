@@ -10,7 +10,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from ..exceptions import DatabaseError, NetworkError, StorageError
-from ..logging_config import get_logger, log_error
+from ..logging_config import log_error
 
 
 class QdrantInterface:
@@ -234,7 +234,9 @@ class QdrantInterface:
             # Ensure collection exists
             if not self.collection_exists(collection):
                 # Auto-create collection with default vector size
-                self.ensure_collection(collection, 768)  # Default to Google AI embedding size
+                self.ensure_collection(
+                    collection, 768
+                )  # Default to Google AI embedding size
 
             # Build query filter combining user_id and additional filters
             query_filter = None
@@ -262,7 +264,9 @@ class QdrantInterface:
                                 )
                             else:
                                 filter_conditions.append(
-                                    FieldCondition(key=key, match=MatchValue(value=value))
+                                    FieldCondition(
+                                        key=key, match=MatchValue(value=value)
+                                    )
                                 )
 
                 # Create combined filter
@@ -276,7 +280,9 @@ class QdrantInterface:
                 with_payload=True,
                 query_filter=query_filter,
             )
-            return [{"id": r.id, "score": r.score, "payload": r.payload} for r in results]
+            return [
+                {"id": r.id, "score": r.score, "payload": r.payload} for r in results
+            ]
         except (ConnectionError, TimeoutError) as e:
             log_error(
                 "qdrant_interface",
@@ -363,7 +369,9 @@ class QdrantInterface:
                 return False
 
             # Update the point payload
-            self.client.set_payload(collection_name=collection, payload=payload, points=[point_id])
+            self.client.set_payload(
+                collection_name=collection, payload=payload, points=[point_id]
+            )
 
             return True
 

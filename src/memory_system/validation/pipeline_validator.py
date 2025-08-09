@@ -119,7 +119,9 @@ class PipelineValidator:
             self._validate_relationships(report, extracted_relationships)
 
         # Step 5: Cross-component validation
-        self._validate_cross_component_consistency(report, memory_extraction_model, memory_objects)
+        self._validate_cross_component_consistency(
+            report, memory_extraction_model, memory_objects
+        )
 
         logger.info(
             f"Pipeline validation complete: {report.error_count} errors, "
@@ -151,7 +153,9 @@ class PipelineValidator:
         )
 
         # Validate AI outputs
-        content_result = self.schema_validator.validate_ai_output(ai_analysis, "content_analysis")
+        content_result = self.schema_validator.validate_ai_output(
+            ai_analysis, "content_analysis"
+        )
         extraction_result = self.schema_validator.validate_ai_output(
             ai_extraction, "memory_extraction"
         )
@@ -161,12 +165,16 @@ class PipelineValidator:
 
         # Validate final memories
         for i, memory in enumerate(final_memories):
-            memory_result = self.schema_validator.validate_database_compatibility(memory, "qdrant")
-            memory_result.component = f"Memory {i+1} (Qdrant)"
+            memory_result = self.schema_validator.validate_database_compatibility(
+                memory, "qdrant"
+            )
+            memory_result.component = f"Memory {i + 1} (Qdrant)"
             report.add_validation_result(memory_result)
 
-            kuzu_result = self.schema_validator.validate_database_compatibility(memory, "kuzu")
-            kuzu_result.component = f"Memory {i+1} (Kuzu)"
+            kuzu_result = self.schema_validator.validate_database_compatibility(
+                memory, "kuzu"
+            )
+            kuzu_result.component = f"Memory {i + 1} (Kuzu)"
             report.add_validation_result(kuzu_result)
 
         return report
@@ -227,17 +235,23 @@ class PipelineValidator:
         """Validate Memory objects for database compatibility."""
         for i, memory in enumerate(memory_objects):
             # Validate Qdrant compatibility
-            qdrant_result = self.schema_validator.validate_database_compatibility(memory, "qdrant")
-            qdrant_result.component = f"Memory {i+1} Qdrant Compatibility"
+            qdrant_result = self.schema_validator.validate_database_compatibility(
+                memory, "qdrant"
+            )
+            qdrant_result.component = f"Memory {i + 1} Qdrant Compatibility"
             report.add_validation_result(qdrant_result)
 
             # Validate Kuzu compatibility
-            kuzu_result = self.schema_validator.validate_database_compatibility(memory, "kuzu")
-            kuzu_result.component = f"Memory {i+1} Kuzu Compatibility"
+            kuzu_result = self.schema_validator.validate_database_compatibility(
+                memory, "kuzu"
+            )
+            kuzu_result.component = f"Memory {i + 1} Kuzu Compatibility"
             report.add_validation_result(kuzu_result)
 
             # Additional memory-specific validations
-            memory_validation = ValidationResult(is_valid=True, component=f"Memory {i+1} Content")
+            memory_validation = ValidationResult(
+                is_valid=True, component=f"Memory {i + 1} Content"
+            )
 
             # Check for empty content
             if not memory.content or not memory.content.strip():
@@ -282,11 +296,15 @@ class PipelineValidator:
 
             report.add_validation_result(memory_validation)
 
-    def _validate_entities(self, report: PipelineValidationReport, entities: List[Entity]):
+    def _validate_entities(
+        self, report: PipelineValidationReport, entities: List[Entity]
+    ):
         """Validate Entity objects."""
         for i, entity in enumerate(entities):
-            entity_result = self.schema_validator.validate_database_compatibility(entity, "kuzu")
-            entity_result.component = f"Entity {i+1} ({entity.name})"
+            entity_result = self.schema_validator.validate_database_compatibility(
+                entity, "kuzu"
+            )
+            entity_result.component = f"Entity {i + 1} ({entity.name})"
             report.add_validation_result(entity_result)
 
     def _validate_relationships(
@@ -297,7 +315,9 @@ class PipelineValidator:
             # Convert to dict for relationship schema validation
             rel_data = relationship.to_kuzu_props()
             rel_result = self.schema_validator.validate_relationship_schema(rel_data)
-            rel_result.component = f"Relationship {i+1} ({relationship.relationship_type})"
+            rel_result.component = (
+                f"Relationship {i + 1} ({relationship.relationship_type})"
+            )
             report.add_validation_result(rel_result)
 
     def _validate_cross_component_consistency(
@@ -340,9 +360,9 @@ class PipelineValidator:
 
     def print_validation_report(self, report: PipelineValidationReport):
         """Print a formatted validation report."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("🔍 PIPELINE VALIDATION REPORT")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Overall Status: {'✅ PASS' if report.pipeline_valid else '❌ FAIL'}")
         print(f"Total Issues: {report.total_issues}")
         print(f"Errors: {report.error_count}")
@@ -355,7 +375,8 @@ class PipelineValidator:
                 for issue in result.issues:
                     icon = (
                         "❌"
-                        if issue.level in [ValidationLevel.ERROR, ValidationLevel.CRITICAL]
+                        if issue.level
+                        in [ValidationLevel.ERROR, ValidationLevel.CRITICAL]
                         else "⚠️"
                     )
                     print(f"  {icon} {issue.message}")
@@ -371,4 +392,4 @@ class PipelineValidator:
             print("🎯 Pipeline validation PASSED! All components are schema-compliant.")
         else:
             print("⚠️ Pipeline validation FAILED! Please address the errors above.")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")

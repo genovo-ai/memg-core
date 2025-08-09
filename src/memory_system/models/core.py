@@ -47,14 +47,20 @@ class Memory(BaseModel):
     content: str = Field(..., description="The actual memory content")
 
     # Optional project scoping
-    project_id: Optional[str] = Field(None, description="Optional project ID for scoping")
-    project_name: Optional[str] = Field(None, description="Optional project name for display")
+    project_id: Optional[str] = Field(
+        None, description="Optional project ID for scoping"
+    )
+    project_name: Optional[str] = Field(
+        None, description="Optional project name for display"
+    )
 
     # Type classification (simple 3-type system)
     memory_type: MemoryType = Field(MemoryType.NOTE, description="Type of memory")
 
     # AI-generated fields (based on type)
-    summary: Optional[str] = Field(None, description="AI-generated summary (for documents)")
+    summary: Optional[str] = Field(
+        None, description="AI-generated summary (for documents)"
+    )
     ai_verified_type: Optional[bool] = Field(
         None, description="AI confirmation of type classification"
     )
@@ -71,24 +77,36 @@ class Memory(BaseModel):
     # Temporal fields (simplified)
     is_valid: bool = Field(True, description="Whether memory is currently valid")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: Optional[datetime] = Field(None, description="Optional expiration for documents")
+    expires_at: Optional[datetime] = Field(
+        None, description="Optional expiration for documents"
+    )
 
     # Version tracking (for document supersession)
     supersedes: Optional[str] = Field(None, description="ID of memory this supersedes")
-    superseded_by: Optional[str] = Field(None, description="ID of memory that supersedes this")
+    superseded_by: Optional[str] = Field(
+        None, description="ID of memory that supersedes this"
+    )
 
     # Task-specific optional fields (only used when memory_type = TASK)
-    task_status: Optional[TaskStatus] = Field(None, description="Task status for TASK memory type")
-    task_priority: Optional[TaskPriority] = Field(None, description="Task priority level")
+    task_status: Optional[TaskStatus] = Field(
+        None, description="Task status for TASK memory type"
+    )
+    task_priority: Optional[TaskPriority] = Field(
+        None, description="Task priority level"
+    )
     assignee: Optional[str] = Field(None, description="Task assignee username/email")
     due_date: Optional[datetime] = Field(None, description="Task due date")
-    story_points: Optional[int] = Field(None, ge=0, le=100, description="Effort estimation")
+    story_points: Optional[int] = Field(
+        None, ge=0, le=100, description="Effort estimation"
+    )
     epic_id: Optional[str] = Field(None, description="Parent epic ID")
     sprint_id: Optional[str] = Field(None, description="Sprint assignment")
 
     # Code linking (for development tasks)
     code_file_path: Optional[str] = Field(None, description="Associated code file path")
-    code_line_range: Optional[str] = Field(None, description="Line range (e.g., '10-25')")
+    code_line_range: Optional[str] = Field(
+        None, description="Line range (e.g., '10-25')"
+    )
     code_signature: Optional[str] = Field(None, description="Function/class signature")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -119,7 +137,9 @@ class Memory(BaseModel):
             payload.update(
                 {
                     "task_status": self.task_status.value if self.task_status else None,
-                    "task_priority": (self.task_priority.value if self.task_priority else None),
+                    "task_priority": (
+                        self.task_priority.value if self.task_priority else None
+                    ),
                     "assignee": self.assignee,
                     "due_date": self.due_date.isoformat() if self.due_date else None,
                     "story_points": self.story_points,
@@ -471,11 +491,19 @@ class MessagePair:
 
         if self.previous_message:
             prev_speaker = (
-                f"{self.previous_message.speaker}: " if self.previous_message.speaker else ""
+                f"{self.previous_message.speaker}: "
+                if self.previous_message.speaker
+                else ""
             )
-            context_parts.append(f"Previous Message: {prev_speaker}{self.previous_message.content}")
+            context_parts.append(
+                f"Previous Message: {prev_speaker}{self.previous_message.content}"
+            )
 
-        curr_speaker = f"{self.current_message.speaker}: " if self.current_message.speaker else ""
-        context_parts.append(f"Current Message: {curr_speaker}{self.current_message.content}")
+        curr_speaker = (
+            f"{self.current_message.speaker}: " if self.current_message.speaker else ""
+        )
+        context_parts.append(
+            f"Current Message: {curr_speaker}{self.current_message.content}"
+        )
 
         return "\n\n".join(context_parts)

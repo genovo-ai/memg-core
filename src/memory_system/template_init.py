@@ -104,7 +104,9 @@ def get_current_template_info() -> dict:
             "entity_types_count": len(current_template.entity_types),
             "relationship_types_count": len(current_template.relationship_types),
             "entity_types": [et.name for et in current_template.entity_types],
-            "relationship_types": [rt.name for rt in current_template.relationship_types],
+            "relationship_types": [
+                rt.name for rt in current_template.relationship_types
+            ],
         }
 
     except Exception as e:

@@ -106,7 +106,9 @@ class SchemaValidator:
             logger.warning("Could not load schemas - validation will be limited")
             return {}
 
-    def validate_ai_output(self, output: Dict[str, Any], schema_name: str) -> ValidationResult:
+    def validate_ai_output(
+        self, output: Dict[str, Any], schema_name: str
+    ) -> ValidationResult:
         """
         Validate AI-generated output against expected JSON schema.
 
@@ -229,7 +231,9 @@ class SchemaValidator:
 
         return result
 
-    def validate_database_compatibility(self, model_obj, database_type: str) -> ValidationResult:
+    def validate_database_compatibility(
+        self, model_obj, database_type: str
+    ) -> ValidationResult:
         """
         Validate model compatibility with database schema.
 
@@ -258,7 +262,9 @@ class SchemaValidator:
 
         return result
 
-    def validate_relationship_schema(self, relationship_data: Dict[str, Any]) -> ValidationResult:
+    def validate_relationship_schema(
+        self, relationship_data: Dict[str, Any]
+    ) -> ValidationResult:
         """
         Validate relationship data for Kuzu compatibility.
 
@@ -282,7 +288,9 @@ class SchemaValidator:
                     actual=type(rel_type).__name__,
                     suggestion="Ensure AI generates string relationship types",
                 )
-            elif " " in rel_type or any(c in rel_type for c in "!@#$%^&*()[]{}+=<>?/|\\-"):
+            elif " " in rel_type or any(
+                c in rel_type for c in "!@#$%^&*()[]{}+=<>?/|\\-"
+            ):
                 result.add_issue(
                     ValidationLevel.ERROR,  # Changed to ERROR since this causes SQL failures
                     "Relationship Type",

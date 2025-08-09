@@ -85,7 +85,10 @@ def _get_current_schemas() -> Dict[str, Any]:
         template_name = current_template.name
 
         # Check if we need to regenerate schemas
-        if template_name != _current_template_name or template_name not in _schema_cache:
+        if (
+            template_name != _current_template_name
+            or template_name not in _schema_cache
+        ):
             logger.info(f"Generating schemas for template: {template_name}")
 
             # Generate schemas for this template

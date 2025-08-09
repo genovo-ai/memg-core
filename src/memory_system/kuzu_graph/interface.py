@@ -150,7 +150,9 @@ class KuzuInterface:
             except Exception as schema_error:
                 if "type" in str(schema_error).lower():
                     # Schema mismatch - drop and recreate table
-                    print(f"🔧 Recreating relationship table {rel_type} due to schema mismatch")
+                    print(
+                        f"🔧 Recreating relationship table {rel_type} due to schema mismatch"
+                    )
                     try:
                         self.conn.execute(f"DROP TABLE {rel_type}")
                         self.conn.execute(create_table_sql)

@@ -168,8 +168,12 @@ class SyncMemorySystem:
             from .exceptions import wrap_exception
             from .logging_config import log_error
 
-            wrapped_error = wrap_exception(e, "add_memory", {"content_length": len(content)})
-            log_error("sync_wrapper", "add_memory", wrapped_error, content_length=len(content))
+            wrapped_error = wrap_exception(
+                e, "add_memory", {"content_length": len(content)}
+            )
+            log_error(
+                "sync_wrapper", "add_memory", wrapped_error, content_length=len(content)
+            )
             return ProcessingResponse(
                 success=False,
                 memory_id="",
@@ -277,7 +281,9 @@ class SyncMemorySystem:
             # Filter by memory types if specified
             if memory_types:
                 type_values = [t.value for t in memory_types]
-                results = [r for r in results if r.memory.memory_type.value in type_values]
+                results = [
+                    r for r in results if r.memory.memory_type.value in type_values
+                ]
 
             # Format results for output
             formatted_results = [
@@ -307,7 +313,9 @@ class SyncMemorySystem:
             from .exceptions import wrap_exception
             from .logging_config import log_error
 
-            wrapped_error = wrap_exception(e, "search_memories", {"query": query, "limit": limit})
+            wrapped_error = wrap_exception(
+                e, "search_memories", {"query": query, "limit": limit}
+            )
             log_error(
                 "sync_wrapper",
                 "search_memories",
@@ -412,7 +420,11 @@ class SyncMemorySystem:
                 content=content,
                 user_id=user_id,
                 source="conversation",
-                tags=([f"conversation:{conversation_id}"] if conversation_id else ["conversation"]),
+                tags=(
+                    [f"conversation:{conversation_id}"]
+                    if conversation_id
+                    else ["conversation"]
+                ),
             )
 
             return result.success

@@ -81,15 +81,20 @@ class MemoryProcessor:
         Returns:
             ProcessingResponse with operation details and success status
         """
-        logger.info(f"Starting g^mem processing for content: {request.content[:100]}...")
+        logger.info(
+            f"Starting g^mem processing for content: {request.content[:100]}..."
+        )
         processing_start = self._get_timestamp_ms()
 
         try:
             # Step 1: AI-based type detection and verification
-            final_type, ai_verified, type_changed, original_type = (
-                await self._detect_and_verify_type(
-                    content=request.content, suggested_type=request.memory_type
-                )
+            (
+                final_type,
+                ai_verified,
+                type_changed,
+                original_type,
+            ) = await self._detect_and_verify_type(
+                content=request.content, suggested_type=request.memory_type
             )
 
             # Step 2: Generate summary for documents (if needed)
@@ -122,7 +127,10 @@ class MemoryProcessor:
                 MemoryType.NOTE,
             ]:
                 try:
-                    entities, relationships = await self._extract_entities_and_relationships(memory)
+                    (
+                        entities,
+                        relationships,
+                    ) = await self._extract_entities_and_relationships(memory)
                     logger.info(
                         f"Extracted {len(entities)} entities, {len(relationships)} relationships"
                     )
@@ -149,7 +157,9 @@ class MemoryProcessor:
 
                     # Step 4.6: Update Qdrant payload with extracted entity types for filtering
                     if entities:
-                        entity_types = list(set([entity.type.value for entity in entities]))
+                        entity_types = list(
+                            set([entity.type.value for entity in entities])
+                        )
 
                         # Update the Qdrant point with entity_types field
                         updated_payload = memory.to_qdrant_payload()
@@ -160,9 +170,13 @@ class MemoryProcessor:
                         )
 
                         if success:
-                            logger.info(f"Updated Qdrant payload with entity types: {entity_types}")
+                            logger.info(
+                                f"Updated Qdrant payload with entity types: {entity_types}"
+                            )
                         else:
-                            logger.warning("Failed to update Qdrant payload with entity types")
+                            logger.warning(
+                                "Failed to update Qdrant payload with entity types"
+                            )
 
                 except Exception as e:
                     logger.warning(f"Entity extraction failed, continuing without: {e}")
@@ -276,11 +290,15 @@ class MemoryProcessor:
 
             elif suggested_type == MemoryType.TASK:
                 # Always respect explicit TASK type - it's intentional from task management
-                logger.info(f"Preserving explicit TASK type (AI suggested: {ai_type.value})")
+                logger.info(
+                    f"Preserving explicit TASK type (AI suggested: {ai_type.value})"
+                )
                 return MemoryType.TASK, True, False, None
             else:
                 # AI disagrees with suggestion, use AI decision
-                logger.info(f"Type correction: {suggested_type.value} -> {ai_type.value}")
+                logger.info(
+                    f"Type correction: {suggested_type.value} -> {ai_type.value}"
+                )
                 return ai_type, True, True, suggested_type
 
         except (NetworkError, ConnectionError, TimeoutError) as e:
@@ -449,15 +467,21 @@ class MemoryProcessor:
             return summary.strip()
 
         except (NetworkError, ConnectionError, TimeoutError) as e:
-            log_error("memory_processor", "summary_generation", e, content_length=len(content))
+            log_error(
+                "memory_processor", "summary_generation", e, content_length=len(content)
+            )
             # Fallback to simple truncation for network issues
             return content[:200] + "..." if len(content) > 200 else content
         except (ValidationError, ValueError) as e:
-            log_error("memory_processor", "summary_generation", e, content_length=len(content))
+            log_error(
+                "memory_processor", "summary_generation", e, content_length=len(content)
+            )
             # Fallback to simple truncation for validation issues
             return content[:200] + "..." if len(content) > 200 else content
         except Exception as e:
-            log_error("memory_processor", "summary_generation", e, content_length=len(content))
+            log_error(
+                "memory_processor", "summary_generation", e, content_length=len(content)
+            )
             # Fallback to simple truncation
             return content[:200] + "..." if len(content) > 200 else content
 
@@ -499,7 +523,9 @@ class MemoryProcessor:
             project_name=request.project_name,
         )
 
-        logger.debug(f"Created memory object: {memory.id[:8]}... (type: {final_type.value})")
+        logger.debug(
+            f"Created memory object: {memory.id[:8]}... (type: {final_type.value})"
+        )
         return memory
 
     async def _store_memory_dual(self, memory: Memory) -> bool:
@@ -624,7 +650,9 @@ class MemoryProcessor:
         config = get_config()
         return config.memg.enable_temporal_reasoning
 
-    async def _extract_entities_and_relationships(self, memory: Memory) -> tuple[List, List]:
+    async def _extract_entities_and_relationships(
+        self, memory: Memory
+    ) -> tuple[List, List]:
         """
         Extract entities and relationships from a memory using GenAI.
 
@@ -649,9 +677,9 @@ class MemoryProcessor:
             # Prepare input
             input_text = f"""
 Memory Content: {memory.content}
-Memory Title: {memory.title or 'N/A'}
+Memory Title: {memory.title or "N/A"}
 Memory Type: {memory.memory_type.value}
-Memory Tags: {', '.join(memory.tags) if memory.tags else 'N/A'}
+Memory Tags: {", ".join(memory.tags) if memory.tags else "N/A"}
 
 Extract entities and relationships from this memory content.
 """
@@ -661,7 +689,9 @@ Extract entities and relationships from this memory content.
                 content=input_text, json_schema=schema_dict
             )
 
-            logger.debug(f"GenAI entity/relationship extraction result: {extraction_result}")
+            logger.debug(
+                f"GenAI entity/relationship extraction result: {extraction_result}"
+            )
 
             # Convert and store entities
             entities = []

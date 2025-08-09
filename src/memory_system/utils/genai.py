@@ -45,7 +45,9 @@ class GenAI:
         self.system_instruction = system_instruction
         self.model = model
 
-    def generate_json(self, content: str, json_schema: str | Dict[str, Any]) -> Dict[str, Any]:
+    def generate_json(
+        self, content: str, json_schema: str | Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Generate structured content based on the input and schema.
 

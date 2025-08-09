@@ -69,7 +69,9 @@ class EntityRelationshipExtraction(BaseModel):
     """Entity and relationship extraction matching entity_relationship_extraction schema"""
 
     entities: List[ExtractedEntity] = Field(..., description="Extracted entities")
-    relationships: List[ExtractedRelationship] = Field(..., description="Extracted relationships")
+    relationships: List[ExtractedRelationship] = Field(
+        ..., description="Extracted relationships"
+    )
 
     # Additional processing metadata
     source_content: Optional[str] = Field(None)
@@ -80,7 +82,9 @@ class EntityRelationshipExtraction(BaseModel):
 class ContentMetadata(BaseModel):
     """Content metadata from schema"""
 
-    complexity: Optional[str] = Field(None, pattern="^(SIMPLE|MODERATE|COMPLEX|EXPERT)$")
+    complexity: Optional[str] = Field(
+        None, pattern="^(SIMPLE|MODERATE|COMPLEX|EXPERT)$"
+    )
     domain: Optional[str] = Field(None)
     priority: Optional[str] = Field(None, pattern="^(LOW|MEDIUM|HIGH|URGENT)$")
 

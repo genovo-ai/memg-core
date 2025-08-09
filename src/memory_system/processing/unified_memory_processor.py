@@ -70,7 +70,9 @@ class UnifiedMemoryProcessor:
         Returns:
             ProcessingResponse with operation details
         """
-        logger.info(f"Starting unified processing for content: {request.content[:100]}...")
+        logger.info(
+            f"Starting unified processing for content: {request.content[:100]}..."
+        )
         processing_start = self._get_timestamp_ms()
 
         try:
@@ -86,16 +88,25 @@ class UnifiedMemoryProcessor:
                 )
                 final_type = MemoryType.TASK
                 # Generate task-specific summary if AI didn't provide one
-                if not content_analysis["summary"] and ai_suggested_type != MemoryType.TASK:
+                if (
+                    not content_analysis["summary"]
+                    and ai_suggested_type != MemoryType.TASK
+                ):
                     summary = (
                         f"Task: {request.content[:100]}"
                         f"{'...' if len(request.content) > 100 else ''}"
                     )
                 else:
-                    summary = content_analysis["summary"] if content_analysis["summary"] else None
+                    summary = (
+                        content_analysis["summary"]
+                        if content_analysis["summary"]
+                        else None
+                    )
             else:
                 final_type = ai_suggested_type
-                summary = content_analysis["summary"] if content_analysis["summary"] else None
+                summary = (
+                    content_analysis["summary"] if content_analysis["summary"] else None
+                )
 
             # Generate embedding (fast, keep separate)
             embedding = self.embedder.get_embedding(request.content)
@@ -184,7 +195,9 @@ class UnifiedMemoryProcessor:
                                     f"{unique_entity_types}"
                                 )
                             else:
-                                logger.warning("Failed to update Qdrant payload with entity types")
+                                logger.warning(
+                                    "Failed to update Qdrant payload with entity types"
+                                )
                 except Exception as e:
                     logger.warning(
                         f"Failed to push entity_types to Qdrant payload for {memory.id}: {e}"
@@ -341,7 +354,7 @@ VULNERABILITY, CONFLICT, PERFORMANCE, ERROR, DEPRECATION, SOLUTION
             # Prepare focused input
             input_text = f"""
 Memory Content: {memory.content}
-Memory Title: {memory.title or 'N/A'}
+Memory Title: {memory.title or "N/A"}
 Memory Type: {memory.memory_type.value}
 
 EXTRACTION FOCUS:
@@ -437,7 +450,9 @@ Extract entities and relationships with focus on the above context.
                     )
                     if success:
                         relationships.append(relationship)
-                        logger.debug(f"Stored relationship: {source_name} -> {target_name}")
+                        logger.debug(
+                            f"Stored relationship: {source_name} -> {target_name}"
+                        )
                 else:
                     logger.warning(
                         f"Skipping relationship {source_name} -> {target_name}: entity not found"
@@ -486,7 +501,9 @@ Extract entities and relationships with focus on the above context.
                 "confidence": memory.confidence,
                 "is_valid": memory.is_valid,
                 "created_at": memory.created_at.isoformat(),
-                "expires_at": (memory.expires_at.isoformat() if memory.expires_at else ""),
+                "expires_at": (
+                    memory.expires_at.isoformat() if memory.expires_at else ""
+                ),
             }
 
             success = self.kuzu.add_node("Memory", memory_props)

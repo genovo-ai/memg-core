@@ -61,7 +61,9 @@ class GenAIEmbedder:
             List of floats representing the embedding vector
         """
         # Use the embedding model to generate embeddings
-        response = self.client.models.embed_content(model="text-embedding-004", contents=text)
+        response = self.client.models.embed_content(
+            model="text-embedding-004", contents=text
+        )
 
         # Return the embedding values from the response
         if response.embeddings and response.embeddings[0]:

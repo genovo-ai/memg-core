@@ -5,7 +5,7 @@ Validates entity storage, coding entities, and relationships in Kuzu
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from ..kuzu_graph.interface import KuzuInterface
 from ..logging_config import get_logger
@@ -123,7 +123,9 @@ class GraphValidator:
         try:
             # Count all relationships
             if user_id:
-                query = "MATCH ()-[r {user_id: $user_id}]->() RETURN count(r) as rel_count"
+                query = (
+                    "MATCH ()-[r {user_id: $user_id}]->() RETURN count(r) as rel_count"
+                )
                 params = {"user_id": user_id}
             else:
                 query = "MATCH ()-[r]->() RETURN count(r) as rel_count"
@@ -139,7 +141,9 @@ class GraphValidator:
             logger.error(f"Relationships validation failed: {e}")
             return {"relationship_count": 0, "error": str(e)}
 
-    def validate_memory_entity_connections(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+    def validate_memory_entity_connections(
+        self, user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Verify memories are properly connected to entities
 
@@ -187,7 +191,9 @@ class GraphValidator:
             total_memories = total_results[0]["total_memories"] if total_results else 0
 
             connection_rate = (
-                (memories_with_entities / total_memories * 100) if total_memories > 0 else 0
+                (memories_with_entities / total_memories * 100)
+                if total_memories > 0
+                else 0
             )
 
             logger.info(
@@ -206,7 +212,9 @@ class GraphValidator:
             logger.error(f"Memory-entity connections validation failed: {e}")
             return {"error": str(e)}
 
-    def run_comprehensive_validation(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+    def run_comprehensive_validation(
+        self, user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Run all validation checks and return comprehensive report
 
@@ -216,7 +224,9 @@ class GraphValidator:
         Returns:
             Complete validation report
         """
-        logger.info(f"Running comprehensive GraphRAG validation for user: {user_id or 'all'}")
+        logger.info(
+            f"Running comprehensive GraphRAG validation for user: {user_id or 'all'}"
+        )
 
         report = {
             "user_id": user_id,
@@ -227,9 +237,15 @@ class GraphValidator:
         }
 
         # Run all validation checks
-        report["validation_results"]["entity_storage"] = self.validate_entity_storage(user_id)
-        report["validation_results"]["coding_entities"] = self.validate_coding_entities(user_id)
-        report["validation_results"]["relationships"] = self.validate_relationships(user_id)
+        report["validation_results"]["entity_storage"] = self.validate_entity_storage(
+            user_id
+        )
+        report["validation_results"]["coding_entities"] = self.validate_coding_entities(
+            user_id
+        )
+        report["validation_results"]["relationships"] = self.validate_relationships(
+            user_id
+        )
         report["validation_results"]["memory_connections"] = (
             self.validate_memory_entity_connections(user_id)
         )
@@ -238,7 +254,9 @@ class GraphValidator:
         health_score = self._calculate_health_score(report["validation_results"])
         report["overall_health_score"] = health_score
 
-        logger.info(f"Comprehensive validation complete. Health score: {health_score}/100")
+        logger.info(
+            f"Comprehensive validation complete. Health score: {health_score}/100"
+        )
         return report
 
     def _calculate_health_score(self, results: Dict[str, Any]) -> int:
@@ -260,7 +278,9 @@ class GraphValidator:
             score += 25
 
         # Coding entities (25 points)
-        coding_entities = results.get("coding_entities", {}).get("total_coding_entities", 0)
+        coding_entities = results.get("coding_entities", {}).get(
+            "total_coding_entities", 0
+        )
         if coding_entities > 0:
             score += 25
 
@@ -270,8 +290,12 @@ class GraphValidator:
             score += 25
 
         # Memory connections (25 points)
-        connection_rate = results.get("memory_connections", {}).get("connection_rate_percent", 0)
+        connection_rate = results.get("memory_connections", {}).get(
+            "connection_rate_percent", 0
+        )
         if connection_rate > 0:
-            score += min(25, int(connection_rate / 4))  # Up to 25 points for 100% connection rate
+            score += min(
+                25, int(connection_rate / 4)
+            )  # Up to 25 points for 100% connection rate
 
         return min(score, max_score)

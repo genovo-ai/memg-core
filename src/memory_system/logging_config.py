@@ -110,7 +110,9 @@ class MemorySystemLogger:
         return cls._loggers.get(logger_name, logging.getLogger(logger_name))
 
     @classmethod
-    def log_operation(cls, component: str, operation: str, level: str = "INFO", **context):
+    def log_operation(
+        cls, component: str, operation: str, level: str = "INFO", **context
+    ):
         """
         Log an operation with structured context.
 
@@ -132,7 +134,9 @@ class MemorySystemLogger:
         log_method(message)
 
     @classmethod
-    def log_performance(cls, component: str, operation: str, duration_ms: float, **context):
+    def log_performance(
+        cls, component: str, operation: str, duration_ms: float, **context
+    ):
         """
         Log performance metrics for operations.
 
@@ -176,7 +180,9 @@ def get_logger(component: str) -> logging.Logger:
     return MemorySystemLogger.get_logger(component)
 
 
-def setup_memory_logging(level: str = "INFO", log_file: Optional[str] = None) -> logging.Logger:
+def setup_memory_logging(
+    level: str = "INFO", log_file: Optional[str] = None
+) -> logging.Logger:
     """Setup memory system logging. Convenience function."""
     return MemorySystemLogger.setup_logging(level=level, log_file=log_file)
 

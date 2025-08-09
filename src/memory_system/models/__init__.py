@@ -42,6 +42,11 @@ __all__ = [
     "ImportanceLevel",
     "RelationshipStrength",
     "RelationshipType",
+    # Legacy/backward compatibility aliases
+    "CoreEntity",
+    "CoreEntityType",
+    "CoreRelationship",
+    "CoreRelationshipType",
     # API models
     "CreateMemoryRequest",
     "CreateMemoryFromMessagePairRequest",

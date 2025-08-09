@@ -10,7 +10,6 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, validator
 
 from ..templates.registry import get_template_registry
-from .core import MemoryType
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,9 @@ class TemplateAwareEntity(BaseModel):
     id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
     user_id: str = Field(..., description="User ID for entity isolation")
     name: str = Field(..., description="Entity name")
-    type: str = Field(..., description="Entity type (validated against current template)")
+    type: str = Field(
+        ..., description="Entity type (validated against current template)"
+    )
     description: str = Field(..., description="Entity description")
     confidence: float = Field(0.8, ge=0.0, le=1.0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -101,7 +102,9 @@ class TemplateAwareRelationship(BaseModel):
     user_id: str = Field(..., description="User ID for relationship isolation")
     source_entity_id: str = Field(..., description="Source entity ID")
     target_entity_id: str = Field(..., description="Target entity ID")
-    type: str = Field(..., description="Relationship type (validated against current template)")
+    type: str = Field(
+        ..., description="Relationship type (validated against current template)"
+    )
     confidence: float = Field(0.8, ge=0.0, le=1.0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -113,7 +116,9 @@ class TemplateAwareRelationship(BaseModel):
     # Template-specific fields
     strength: Optional[str] = Field("MODERATE", description="Relationship strength")
     context: Optional[str] = Field(None, description="Relationship context")
-    directionality: Optional[str] = Field(None, description="Relationship directionality")
+    directionality: Optional[str] = Field(
+        None, description="Relationship directionality"
+    )
 
     @validator("type")
     def validate_relationship_type(cls, v):
@@ -123,7 +128,9 @@ class TemplateAwareRelationship(BaseModel):
             current_template = registry.get_current_template()
 
             if not current_template:
-                logger.warning(f"No current template found, accepting relationship type: {v}")
+                logger.warning(
+                    f"No current template found, accepting relationship type: {v}"
+                )
                 return v
 
             valid_types = current_template.get_relationship_type_names()

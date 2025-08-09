@@ -171,7 +171,9 @@ Your task is to identify entities and relationships from the given content.
         # Add relationship type information
         relationship_info = "\n\nAvailable Relationship Types:\n"
         for relationship_type in self.template.relationship_types:
-            relationship_info += f"- {relationship_type.name}: {relationship_type.description}\n"
+            relationship_info += (
+                f"- {relationship_type.name}: {relationship_type.description}\n"
+            )
 
         # Add requirements
         requirements = """

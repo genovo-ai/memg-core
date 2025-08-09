@@ -45,7 +45,9 @@ class TemplateRegistry:
 
         except Exception as e:
             logger.error(f"Failed to register template {template.name}: {e}")
-            raise TemplateValidationError(f"Failed to register template {template.name}: {e}")
+            raise TemplateValidationError(
+                f"Failed to register template {template.name}: {e}"
+            )
 
     def get_template(self, name: str) -> Optional[MemoryTemplate]:
         """Get template by name"""
@@ -103,22 +105,30 @@ class TemplateRegistry:
 
         except Exception as e:
             logger.error(f"Failed to load template from file {file_path}: {e}")
-            raise TemplateValidationError(f"Failed to load template from file {file_path}: {e}")
+            raise TemplateValidationError(
+                f"Failed to load template from file {file_path}: {e}"
+            )
 
-    def load_template_from_module(self, module_path: str, template_name: str = "TEMPLATE") -> None:
+    def load_template_from_module(
+        self, module_path: str, template_name: str = "TEMPLATE"
+    ) -> None:
         """Load template from Python module"""
         try:
             module = importlib.import_module(module_path)
             template = getattr(module, template_name)
 
             if not isinstance(template, MemoryTemplate):
-                raise TemplateValidationError("Template object must be MemoryTemplate instance")
+                raise TemplateValidationError(
+                    "Template object must be MemoryTemplate instance"
+                )
 
             self.register_template(template)
 
         except Exception as e:
             logger.error(f"Failed to load template from module {module_path}: {e}")
-            raise TemplateValidationError(f"Failed to load template from module {module_path}: {e}")
+            raise TemplateValidationError(
+                f"Failed to load template from module {module_path}: {e}"
+            )
 
     def _dict_to_template(self, data: Dict[str, Any]) -> MemoryTemplate:
         """Convert dictionary to MemoryTemplate"""

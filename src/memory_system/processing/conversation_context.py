@@ -36,7 +36,9 @@ class ConversationContextManager:
             message_window_size: Number of recent messages to maintain (m parameter)
         """
         self.message_window_size = message_window_size
-        self.genai = GenAI(system_instruction="You are a conversation summarization assistant.")
+        self.genai = GenAI(
+            system_instruction="You are a conversation summarization assistant."
+        )
 
         # In-memory storage for now (TODO: persist to database)
         self._conversation_summaries: Dict[str, ConversationSummary] = {}
@@ -82,9 +84,13 @@ class ConversationContextManager:
 
         # Keep only recent messages (sliding window)
         if len(messages) > self.message_window_size * 2:  # Keep some buffer
-            self._conversation_messages[conversation_id] = messages[-self.message_window_size * 2 :]
+            self._conversation_messages[conversation_id] = messages[
+                -self.message_window_size * 2 :
+            ]
 
-        logger.debug(f"Added message to conversation {conversation_id}: {content[:50]}...")
+        logger.debug(
+            f"Added message to conversation {conversation_id}: {content[:50]}..."
+        )
         return message
 
     def get_message_pair(
@@ -109,7 +115,9 @@ class ConversationContextManager:
             MessagePair ready for memory extraction
         """
         # Add current message to history
-        current_msg = self.add_message(conversation_id, current_message, current_speaker)
+        current_msg = self.add_message(
+            conversation_id, current_message, current_speaker
+        )
 
         # Get or create previous message
         messages = self._conversation_messages.get(conversation_id, [])
@@ -132,7 +140,9 @@ class ConversationContextManager:
         summary_text = summary.summary if summary else None
 
         # Get recent messages (excluding current)
-        recent_messages = messages[:-1][-self.message_window_size :] if len(messages) > 1 else []
+        recent_messages = (
+            messages[:-1][-self.message_window_size :] if len(messages) > 1 else []
+        )
 
         message_pair = MessagePair(
             previous_message=previous_msg,
@@ -144,7 +154,9 @@ class ConversationContextManager:
         logger.debug(f"Created message pair for conversation {conversation_id}")
         return message_pair
 
-    def get_conversation_summary(self, conversation_id: str) -> Optional[ConversationSummary]:
+    def get_conversation_summary(
+        self, conversation_id: str
+    ) -> Optional[ConversationSummary]:
         """
         Get conversation summary for a conversation.
 
@@ -156,7 +168,9 @@ class ConversationContextManager:
         """
         return self._conversation_summaries.get(conversation_id)
 
-    async def generate_conversation_summary(self, conversation_id: str) -> ConversationSummary:
+    async def generate_conversation_summary(
+        self, conversation_id: str
+    ) -> ConversationSummary:
         """
         Generate or refresh conversation summary using GenAI.
 
@@ -193,7 +207,9 @@ class ConversationContextManager:
             )
 
             # Extract participants
-            participants = list(set(msg.speaker for msg in messages if msg.speaker is not None))
+            participants = list(
+                set(msg.speaker for msg in messages if msg.speaker is not None)
+            )
 
             # Create summary object
             summary = ConversationSummary(

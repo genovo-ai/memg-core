@@ -49,7 +49,9 @@ class MemoryRetriever:
             or os.getenv("MEMG_ENABLE_GRAPH_SEARCH", "true").lower() == "true"
         )
 
-        logger.info(f"MemoryRetriever initialized (graph_enabled: {self.graph_enabled})")
+        logger.info(
+            f"MemoryRetriever initialized (graph_enabled: {self.graph_enabled})"
+        )
 
     async def search_memories(
         self,
@@ -122,10 +124,12 @@ class MemoryRetriever:
 
             # Convert to SearchResult objects and filter by score
             results = []
-            logger.info(f"Starting to process {len(search_results)} results from Qdrant")
+            logger.info(
+                f"Starting to process {len(search_results)} results from Qdrant"
+            )
             for i, result in enumerate(search_results):
                 logger.debug(
-                    f"Processing result {i+1}/{len(search_results)}: ID={result.get('id')}, "
+                    f"Processing result {i + 1}/{len(search_results)}: ID={result.get('id')}, "
                     f"score={result.get('score', 0.0):.3f}"
                 )
                 logger.debug(
@@ -143,7 +147,9 @@ class MemoryRetriever:
                 payload = result.get("payload", {})
 
                 # Skip invalid memories if temporal reasoning is enabled
-                if self._should_filter_invalid_memories() and not payload.get("is_valid", True):
+                if self._should_filter_invalid_memories() and not payload.get(
+                    "is_valid", True
+                ):
                     logger.debug(
                         f"Filtering out invalid memory: {payload.get('content', '')[:50]}..."
                     )
@@ -166,7 +172,9 @@ class MemoryRetriever:
 
                     memory = Memory(
                         id=result.get("id"),  # ID is in the result, not payload
-                        user_id=payload.get("user_id", "unknown"),  # Should always be present
+                        user_id=payload.get(
+                            "user_id", "unknown"
+                        ),  # Should always be present
                         content=payload.get("content"),
                         memory_type=memory_type,
                         summary=payload.get("summary"),
@@ -216,7 +224,9 @@ class MemoryRetriever:
             # Add relevance categories to metadata
             for i, result in enumerate(results):
                 result.metadata["rank"] = i + 1
-                result.metadata["relevance_tier"] = self._get_relevance_tier(result.score)
+                result.metadata["relevance_tier"] = self._get_relevance_tier(
+                    result.score
+                )
 
             logger.info(f"Retrieved {len(results)} memories for query: '{query}'")
             return results
@@ -259,7 +269,9 @@ class MemoryRetriever:
         """
         # Note: filter_points method not implemented in current Qdrant interface
         # For now, we'll do a broad search and filter results
-        logger.warning("get_memories_by_category using basic search - filters not yet implemented")
+        logger.warning(
+            "get_memories_by_category using basic search - filters not yet implemented"
+        )
 
         # Do a general search with a neutral query
         search_results = await self.search_memories(
@@ -271,7 +283,9 @@ class MemoryRetriever:
 
         # Filter results by category manually
         filtered_memories = [
-            result.memory for result in search_results if result.memory.category == category
+            result.memory
+            for result in search_results
+            if result.memory.category == category
         ]
 
         return filtered_memories
@@ -528,7 +542,11 @@ class MemoryRetriever:
                     memory_type = MemoryType.NOTE
 
                 created_at_raw = result.get("m.created_at")
-                created_at = dt.fromisoformat(created_at_raw) if created_at_raw else dt.now(tz.utc)
+                created_at = (
+                    dt.fromisoformat(created_at_raw)
+                    if created_at_raw
+                    else dt.now(tz.utc)
+                )
 
                 memory = Memory(
                     id=result.get("m.id"),
@@ -538,7 +556,11 @@ class MemoryRetriever:
                     summary=result.get("m.summary"),
                     title=result.get("m.title"),
                     source=result.get("m.source", ""),
-                    tags=(result.get("m.tags", "").split(",") if result.get("m.tags") else []),
+                    tags=(
+                        result.get("m.tags", "").split(",")
+                        if result.get("m.tags")
+                        else []
+                    ),
                     confidence=float(result.get("m.confidence", 0.8)),
                     is_valid=True,
                     created_at=created_at,

@@ -100,13 +100,13 @@ class StandaloneValidator:
                     memory, "qdrant"
                 )
             )
-            qdrant_result.component = f"Memory {i+1} (Qdrant)"
+            qdrant_result.component = f"Memory {i + 1} (Qdrant)"
             report.add_validation_result(qdrant_result)
 
             kuzu_result = self.pipeline_validator.schema_validator.validate_database_compatibility(
                 memory, "kuzu"
             )
-            kuzu_result.component = f"Memory {i+1} (Kuzu)"
+            kuzu_result.component = f"Memory {i + 1} (Kuzu)"
             report.add_validation_result(kuzu_result)
 
         # Validate entities if provided
@@ -117,7 +117,7 @@ class StandaloneValidator:
                         entity, "kuzu"
                     )
                 )
-                entity_result.component = f"Entity {i+1} ({entity.name})"
+                entity_result.component = f"Entity {i + 1} ({entity.name})"
                 report.add_validation_result(entity_result)
 
         # Validate relationships if provided
@@ -127,7 +127,9 @@ class StandaloneValidator:
                 rel_result = self.pipeline_validator.schema_validator.validate_relationship_schema(
                     rel_data
                 )
-                rel_result.component = f"Relationship {i+1} ({relationship.relationship_type})"
+                rel_result.component = (
+                    f"Relationship {i + 1} ({relationship.relationship_type})"
+                )
                 report.add_validation_result(rel_result)
 
         return report
@@ -225,7 +227,9 @@ def validate_ai_output(output: Dict[str, Any], schema_name: str) -> bool:
         True if valid, False if issues found
     """
     validator = create_validator()
-    result = validator.pipeline_validator.schema_validator.validate_ai_output(output, schema_name)
+    result = validator.pipeline_validator.schema_validator.validate_ai_output(
+        output, schema_name
+    )
     return result.is_valid
 
 
