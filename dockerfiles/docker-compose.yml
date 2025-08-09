@@ -1,0 +1,21 @@
+services:
+  # MCP Memory Server (dev) — dynamic storage per port
+  mcp_server:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: mcp_server_internal_${MEMORY_SYSTEM_MCP_PORT}
+    ports:
+      - "${MEMORY_SYSTEM_MCP_PORT}:${MEMORY_SYSTEM_MCP_PORT}"
+    volumes:
+      # Port-scoped persistent storage on host using BASE_MEMORY_PATH
+      - ${BASE_MEMORY_PATH}_${MEMORY_SYSTEM_MCP_PORT}/qdrant:/qdrant
+      - ${BASE_MEMORY_PATH}_${MEMORY_SYSTEM_MCP_PORT}/kuzu:/kuzu
+    env_file:
+      - ../.env
+    environment:
+      # Force in-container fixed paths and port regardless of .env
+      QDRANT_STORAGE_PATH: /qdrant
+      KUZU_DB_PATH: /kuzu/memory_db
+      MEMORY_SYSTEM_MCP_PORT: ${MEMORY_SYSTEM_MCP_PORT}
+    restart: unless-stopped
