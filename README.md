@@ -72,6 +72,38 @@ memory.add_note("Python is great for AI development", user_id="user1")
 results = memory.search("AI development", user_id="user1")
 ```
 
+## Evaluation
+
+Use the built-in scripts to generate a synthetic dataset that covers all entity and memory types, and then run repeatable evaluations each iteration.
+
+### 1) Generate dataset
+```bash
+python scripts/generate_synthetic_dataset.py \
+  --output ./data/memg_synth.jsonl \
+  --num 200 \
+  --user eval_user
+```
+
+This creates JSONL rows containing a `memory` plus associated `entities` and `relationships`, exercising:
+- All `EntityType` values (TECHNOLOGY, DATABASE, COMPONENT, ERROR, SOLUTION, FILE_TYPE, etc.)
+- Multiple `MemoryType`s: document, note, conversation, task
+- Basic `MENTIONS` relationships
+
+### 2) Offline validation (no external services)
+Validates schema and database compatibility quickly without embeddings or storage.
+```bash
+python scripts/evaluate_memg.py --data ./data/memg_synth.jsonl --mode offline
+```
+Output summary includes rows, counts, and error/warning totals to track across iterations.
+
+### 3) Live processing (embeddings + storage)
+Requires environment configured (e.g., `GOOGLE_API_KEY`) and storage reachable. It runs the Unified pipeline and validates the resulting memories.
+```bash
+python scripts/evaluate_memg.py --data ./data/memg_synth.jsonl --mode live
+```
+
+Tip: Commit the dataset and compare results over time in CI to catch regressions.
+
 ## Configuration
 
 Configure via `.env` file (copy from `env.example`):
