@@ -23,8 +23,12 @@ class QdrantInterface:
         # Use .env values or defaults
         self.host = host or os.getenv("QDRANT_HOST", "localhost")
         self.port = port or int(os.getenv("QDRANT_PORT", "6333"))
-        self.collection_name = collection_name or os.getenv(
-            "QDRANT_COLLECTION", "memory_collection"
+        # Prefer explicit arg, then env vars (support both legacy and new names), default "memories"
+        self.collection_name = (
+            collection_name
+            or os.getenv("QDRANT_COLLECTION")
+            or os.getenv("MEMG_QDRANT_COLLECTION")
+            or "memories"
         )
 
         # Use file-based storage - CRASH if no env variable set
