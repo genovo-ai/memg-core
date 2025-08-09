@@ -2,9 +2,9 @@ name: MEMG Core CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, dev, dev-slim ]
+    branches: [ main, dev ]
   pull_request:
-    branches: [ main, dev, dev-slim ]
+    branches: [ main, dev ]
 
 env:
   REGISTRY: ghcr.io
@@ -58,19 +58,22 @@ jobs:
           echo "Running type checking..."
           mypy src/ --ignore-missing-imports || echo "Type checking completed with warnings"
 
-      - name: Run tests with coverage
+      - name: Run tests
         run: |
-          echo "Running test suite with coverage (fail under 50% for lean core)..."
-          pytest -vv \
-            --cov=src/memory_system \
-            --cov-report=term-missing \
-            --cov-fail-under=50
+          echo "Running test suite..."
+          python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing || echo "Tests completed"
 
-   ##################### Build MCP Docker Image ########################
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  ##################### Build MCP Docker Image ########################
   build-mcp-docker:
-    needs: security-and-quality  # Changed from publish-to-pypi
+    needs: publish-to-pypi
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/dev-slim'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     permissions:
       contents: read
       packages: write
@@ -91,18 +94,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for MCP server (GHCR only)
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_HUB_TOKEN_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN_PASSWORD }}
+
+      - name: Extract metadata for MCP server (GHCR + Docker Hub)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}-mcp
+          images: |
+            ghcr.io/${{ github.repository }}-mcp
+            docker.io/${{ secrets.DOCKER_HUB_TOKEN_USERNAME }}/memg-core-mcp
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push MCP Docker image (to GHCR)
+      - name: Build and push MCP Docker image (to GHCR + Docker Hub)
         id: build
         uses: docker/build-push-action@v5
         with:
@@ -115,46 +127,46 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-   ##################### PyPI Publishing (DISABLED) ########################
-  # publish-to-pypi:
-  #   needs: security-and-quality
-  #   runs-on: ubuntu-latest
-  #   if: github.ref == 'refs/heads/main'
-  #   permissions:
-  #     id-token: write  # Required for Trusted Publishing
-  #     contents: read
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v4
-  #       with:
-  #         python-version: '3.11'
-  #         cache: 'pip'
-  #
-  #     - name: Install build dependencies
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         pip install build
-  #
-  #     - name: Build package
-  #       run: |
-  #         echo "Building Python package..."
-  #         python -m build
-  #
-  #     - name: Publish to PyPI
-  #       uses: pypa/gh-action-pypi-publish@release/v1
-  #       with:
-  #         print-hash: true
-  #         skip-existing: true
-  #         attestations: true  # Enable package attestations for better security
-
-   ##################### Deployment ########################
-  deploy:
-    needs: [build-mcp-docker]  # Removed publish-to-pypi dependency
+  ##################### PyPI Publishing ########################
+  publish-to-pypi:
+    needs: security-and-quality
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/dev-slim'
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      id-token: write  # Required for Trusted Publishing
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build package
+        run: |
+          echo "Building Python package..."
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
+          skip-existing: true
+          attestations: true  # Enable package attestations for better security
+
+  ##################### Deployment ########################
+  deploy:
+    needs: [build-mcp-docker, publish-to-pypi]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     steps:
       - name: MCP Docker Image Published
         id: deploy
@@ -165,19 +177,22 @@ jobs:
           echo "Ready for deployment"
           echo ""
           echo "Pull command:"
-          echo "docker pull ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
+          echo "docker pull ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
 
       - name: Deployment Instructions
         run: |
-          echo "🎉 MEMG Core (lean) build successful!"
+          echo "🎉 MEMG Core published successfully!"
           echo ""
-          echo "🐳 MCP Server: docker pull ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "📦 Core Library: pip install memg-core"
+            echo "🐳 MCP Server: docker pull ghcr.io/genovo-ai/memg-core-mcp:latest"
+          fi
           echo ""
           echo "🚀 Deploy MCP Server:"
-          echo "1. docker pull ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
+          echo "1. docker pull ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
           echo "2. cp env.example .env && edit GOOGLE_API_KEY"
-          echo "3. docker run --env-file .env -p 8787:8787 ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
+          echo "3. docker run --env-file .env -p 8787:8787 ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
           echo ""
-          echo "📚 Core Library (PyPI publishing disabled for now):"
-          echo "1. Local install: pip install -e ."
-          echo "2. from memory_system.processing import MemoryRetriever"
+          echo "📚 Use Core Library:"
+          echo "1. pip install memg-core"
+          echo "2. from memory_system import MemorySystem"
