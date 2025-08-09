@@ -6,14 +6,17 @@
 
 **Fastest way to get started:**
 ```bash
-# Run MEMG MCP Server directly
+# 1. Setup configuration
+cp ../env.example ../.env
+# Edit .env and set your GOOGLE_API_KEY
+
+# 2. Run MEMG MCP Server directly
 docker run -d \
   -p 8787:8787 \
-  -e GOOGLE_API_KEY="your-api-key" \
-  -e MEMG_ENABLE_GRAPH=true \
+  --env-file ../.env \
   ghcr.io/genovo-ai/memg-core-mcp:latest
 
-# Test it's working
+# 3. Test it's working
 curl http://localhost:8787/health
 ```
 
@@ -45,10 +48,22 @@ curl http://localhost:8787/health
 
 ## Configuration
 
-Environment variables (set in `.env`):
-- `GOOGLE_API_KEY` - Your Google API key (required)
-- `MEMORY_SYSTEM_MCP_PORT=8787` - Server port
-- `MEMG_TEMPLATE=software_development` - Memory template
+Key settings in `.env` file:
+```bash
+# Required
+GOOGLE_API_KEY=your_google_api_key_here
+
+# Core settings
+GEMINI_MODEL=gemini-2.0-flash
+MEMORY_SYSTEM_MCP_PORT=8787
+MEMG_TEMPLATE=software_development
+
+# Storage & Performance
+BASE_MEMORY_PATH=$HOME/.local/share/memory_system
+QDRANT_COLLECTION=memories
+MEMG_VECTOR_DIMENSION=768
+MEMORY_SYSTEM_DEBUG=false
+```
 
 ## Usage
 

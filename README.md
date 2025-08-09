@@ -14,14 +14,17 @@
 
 ### Option 1: Docker (Recommended)
 ```bash
-# Run MEMG MCP Server (359MB)
+# 1. Create configuration
+cp env.example .env
+# Edit .env and set your GOOGLE_API_KEY
+
+# 2. Run MEMG MCP Server (359MB)
 docker run -d \
   -p 8787:8787 \
-  -e GOOGLE_API_KEY="your-api-key" \
-  -e MEMG_ENABLE_GRAPH=true \
+  --env-file .env \
   ghcr.io/genovo-ai/memg-core-mcp:latest
 
-# Test it's working
+# 3. Test it's working
 curl http://localhost:8787/health
 ```
 
@@ -30,8 +33,8 @@ curl http://localhost:8787/health
 pip install memg-core
 
 # Set up environment
-export GOOGLE_API_KEY="your-api-key"
-export MEMG_ENABLE_GRAPH=true
+cp env.example .env
+# Edit .env and set your GOOGLE_API_KEY
 
 # Start MCP server
 python -m memory_system.mcp_server
@@ -54,12 +57,22 @@ results = memory.search("AI development", user_id="user1")
 
 ## Configuration
 
-Configure via environment variables:
+Configure via `.env` file (copy from `env.example`):
 
-- `GOOGLE_API_KEY`: Required for AI processing
-- `MEMG_ENABLE_GRAPH`: Enable graph storage (default: false)
-- `QDRANT_STORAGE_PATH`: Vector database path
-- `KUZU_DB_PATH`: Graph database path
+```bash
+# Required
+GOOGLE_API_KEY=your_google_api_key_here
+
+# Core settings
+GEMINI_MODEL=gemini-2.0-flash
+MEMORY_SYSTEM_MCP_PORT=8787
+MEMG_TEMPLATE=software_development
+
+# Storage
+BASE_MEMORY_PATH=$HOME/.local/share/memory_system
+QDRANT_COLLECTION=memories
+MEMG_VECTOR_DIMENSION=768
+```
 
 ## Requirements
 
