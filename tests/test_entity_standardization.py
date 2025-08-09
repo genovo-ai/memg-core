@@ -22,7 +22,7 @@ from memory_system.models.core import (
     MemoryType,
     Relationship,
 )
-from memory_system.processing.memory_processor import MemoryProcessor
+# MemoryProcessor moved to _stash - test core functionality only
 from memory_system.processing.memory_retriever import MemoryRetriever
 
 
@@ -137,11 +137,7 @@ class TestMigrationLogic:
 class TestIntegrationPipeline:
     """Integration tests for entity creation and retrieval pipelines."""
 
-    @pytest.fixture
-    def mock_memory_processor(self):
-        """Create a mock MemoryProcessor for testing."""
-        processor = Mock(spec=MemoryProcessor)
-        return processor
+    # MemoryProcessor moved to _stash - removed mock
 
     @pytest.fixture
     def mock_memory_retriever(self):
