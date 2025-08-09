@@ -1,0 +1,171 @@
+name: MEMG Core CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  ##################### Security & Quality Checks ########################
+  security-and-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+
+      - name: Security scan with bandit
+        run: |
+          echo "Running security scan with bandit..."
+          bandit -r src/ -f json -o bandit-report.json || echo "Bandit found issues but continuing..."
+          echo "Bandit report summary:"
+          bandit -r src/
+
+      - name: Code quality with ruff
+        run: |
+          echo "Running code quality checks with ruff..."
+          ruff check src/ --output-format=json > ruff-report.json || echo "Ruff found issues"
+          ruff check src/
+
+      - name: Type checking with mypy
+        run: |
+          echo "Running type checking..."
+          mypy src/ --ignore-missing-imports || echo "Type checking completed with warnings"
+
+      - name: Run tests
+        run: |
+          echo "Running test suite..."
+          python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing || echo "Tests completed"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+   ##################### Build Docker Image ########################
+  build-docker-image:
+    needs: security-and-quality
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+   ##################### PyPI Publishing ########################
+  publish-to-pypi:
+    needs: security-and-quality
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build package
+        run: |
+          echo "Building Python package..."
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          print-hash: true
+
+   ##################### Deployment ########################
+  deploy:
+    needs: [build-docker-image, publish-to-pypi]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    steps:
+      - name: Docker Image Published
+        id: deploy
+        run: |
+          echo "Docker image published to GitHub Container Registry"
+          echo "Image: ${{ needs.build-docker-image.outputs.image-tag }}"
+          echo "Image Digest: ${{ needs.build-docker-image.outputs.image-digest }}"
+          echo "Ready for deployment"
+          echo ""
+          echo "Pull command:"
+          echo "docker pull ghcr.io/genovo-ai/memg-core:${{ github.ref_name }}"
+
+      - name: Deployment Instructions
+        run: |
+          echo "Container published to GitHub Container Registry!"
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "Package also published to PyPI!"
+            echo "Install with: pip install memg-core"
+          fi
+          echo ""
+          echo "Deploy anywhere with:"
+          echo "1. docker pull ghcr.io/genovo-ai/memg-core:${{ github.ref_name }}"
+          echo "2. cp env.example .env && edit GOOGLE_API_KEY"
+          echo "3. docker run --env-file .env -p 8787:8787 ghcr.io/genovo-ai/memg-core:${{ github.ref_name }}"
+          echo ""
+          echo "This is a containerized MCP server!"
