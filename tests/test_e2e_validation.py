@@ -283,8 +283,8 @@ class TestSystemReadiness:
         assert env_example.exists(), "env.example missing"
 
 
-class TestPerformanceReadiness:
-    """Test system is ready for performance benchmarking."""
+class TestSystemReadiness:
+    """Test system is ready for production use."""
 
     def test_raspberry_pi_compatibility_imports(self):
         """Test all imports work (indicating lightweight dependencies)."""
