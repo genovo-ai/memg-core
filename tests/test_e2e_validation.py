@@ -115,18 +115,18 @@ class TestE2EValidation:
         except ImportError as e:
             pytest.skip(f"Migration script not available in test environment: {e}")
 
-    def test_memory_processor_imports_correctly(self):
-        """Test MemoryProcessor can import EntityType successfully."""
+    def test_core_processing_imports_correctly(self):
+        """Test core processing components can import EntityType successfully."""
         try:
             from memory_system.models import EntityType as ImportedEntityType
-            from memory_system.processing.memory_processor import MemoryProcessor
+            from memory_system.processing.memory_retriever import MemoryRetriever
 
             # Verify EntityType is available
             assert ImportedEntityType.TECHNOLOGY == EntityType.TECHNOLOGY
             assert ImportedEntityType.DATABASE == EntityType.DATABASE
 
         except ImportError as e:
-            pytest.fail(f"MemoryProcessor import failed: {e}")
+            pytest.fail(f"Core processing import failed: {e}")
 
     def test_memory_retriever_imports_correctly(self):
         """Test MemoryRetriever can import and use EntityType."""
@@ -203,20 +203,18 @@ class TestE2EValidation:
         except ImportError as e:
             pytest.fail(f"QdrantInterface import failed: {e}")
 
-    def test_validation_tools_importable(self):
-        """Test validation tools can be imported for graph validation."""
+    def test_core_interfaces_importable(self):
+        """Test core interfaces can be imported (validation moved to _stash)."""
         try:
-            from memory_system.validation.graph_validator import GraphValidator
-            from memory_system.validation.pipeline_validator import PipelineValidator
-            from memory_system.validation.schema_validator import SchemaValidator
+            from memory_system.kuzu_graph.interface import KuzuInterface
+            from memory_system.qdrant.interface import QdrantInterface
 
             # Test classes are importable
-            assert GraphValidator is not None
-            assert PipelineValidator is not None
-            assert SchemaValidator is not None
+            assert KuzuInterface is not None
+            assert QdrantInterface is not None
 
         except ImportError as e:
-            pytest.fail(f"Validation tools import failed: {e}")
+            pytest.fail(f"Core interfaces import failed: {e}")
 
     def test_genai_integration_importable(self):
         """Test GenAI integration for entity extraction."""
@@ -286,21 +284,20 @@ class TestSystemReadiness:
 class TestSystemReadiness:
     """Test system is ready for production use."""
 
-    def test_raspberry_pi_compatibility_imports(self):
-        """Test all imports work (indicating lightweight dependencies)."""
+    def test_lightweight_core_imports(self):
+        """Test core imports work without heavy dependencies."""
         try:
             # Test core system imports
             from memory_system.kuzu_graph.interface import KuzuInterface
             from memory_system.models.core import Entity, EntityType, Memory
-            from memory_system.processing.memory_processor import MemoryProcessor
             from memory_system.processing.memory_retriever import MemoryRetriever
             from memory_system.qdrant.interface import QdrantInterface
 
-            # If all imports succeed, the dependency footprint is reasonable
+            # If all core imports succeed, we have a lean core
             assert True
 
         except ImportError as e:
-            pytest.fail(f"Heavy dependency detected - not Raspberry Pi compatible: {e}")
+            pytest.fail(f"Core import failed: {e}")
 
     def test_memory_model_efficiency(self):
         """Test Memory model is efficient for storage."""

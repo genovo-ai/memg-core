@@ -225,3 +225,5 @@ test_venv/
 
 .local*
 integration/*
+_stash/
+artifacts/
