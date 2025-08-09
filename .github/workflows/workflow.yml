@@ -59,9 +59,9 @@ jobs:
           file: ./coverage.xml
           fail_ci_if_error: false
 
-   ##################### Build Docker Image ########################
-  build-docker-image:
-    needs: security-and-quality
+   ##################### Build MCP Docker Image ########################
+  build-mcp-docker:
+    needs: publish-to-pypi
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     permissions:
@@ -84,22 +84,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Extract metadata for MCP server
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mcp
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
+      - name: Build and push MCP Docker image
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: dockerfiles/Dockerfile.mcp
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -140,32 +141,35 @@ jobs:
 
    ##################### Deployment ########################
   deploy:
-    needs: [build-docker-image, publish-to-pypi]
+    needs: [build-mcp-docker, publish-to-pypi]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     steps:
-      - name: Docker Image Published
+      - name: MCP Docker Image Published
         id: deploy
         run: |
-          echo "Docker image published to GitHub Container Registry"
-          echo "Image: ${{ needs.build-docker-image.outputs.image-tag }}"
-          echo "Image Digest: ${{ needs.build-docker-image.outputs.image-digest }}"
+          echo "MCP Docker image published to GitHub Container Registry"
+          echo "Image: ${{ needs.build-mcp-docker.outputs.image-tag }}"
+          echo "Image Digest: ${{ needs.build-mcp-docker.outputs.image-digest }}"
           echo "Ready for deployment"
           echo ""
           echo "Pull command:"
-          echo "docker pull ghcr.io/genovo-ai/memg-core:${{ github.ref_name }}"
+          echo "docker pull ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
 
       - name: Deployment Instructions
         run: |
-          echo "Container published to GitHub Container Registry!"
+          echo "🎉 MEMG Core published successfully!"
+          echo ""
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "Package also published to PyPI!"
-            echo "Install with: pip install memg-core"
+            echo "📦 Core Library: pip install memg-core"
+            echo "🐳 MCP Server: docker pull ghcr.io/genovo-ai/memg-core-mcp:latest"
           fi
           echo ""
-          echo "Deploy anywhere with:"
-          echo "1. docker pull ghcr.io/genovo-ai/memg-core:${{ github.ref_name }}"
+          echo "🚀 Deploy MCP Server:"
+          echo "1. docker pull ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
           echo "2. cp env.example .env && edit GOOGLE_API_KEY"
-          echo "3. docker run --env-file .env -p 8787:8787 ghcr.io/genovo-ai/memg-core:${{ github.ref_name }}"
+          echo "3. docker run --env-file .env -p 8787:8787 ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
           echo ""
-          echo "This is a containerized MCP server!"
+          echo "📚 Use Core Library:"
+          echo "1. pip install memg-core"
+          echo "2. from memory_system import MemorySystem"

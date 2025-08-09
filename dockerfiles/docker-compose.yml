@@ -3,7 +3,7 @@ services:
   memg-mcp-server:
     build:
       context: ..
-      dockerfile: integration/mcp/Dockerfile
+      dockerfile: dockerfiles/Dockerfile.mcp
     container_name: memg-mcp-server-${MEMORY_SYSTEM_MCP_PORT:-8787}
     ports:
       - "${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787}"

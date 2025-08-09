@@ -1,0 +1,35 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install the published MEMG core package
+RUN pip install --no-cache-dir memg-core
+
+# Copy MCP integration code
+COPY ../integration/mcp/ /app/integration/mcp/
+COPY ../integration/__init__.py /app/integration/
+
+# Install MCP server dependencies
+RUN pip install --no-cache-dir \
+    fastmcp>=0.2.0 \
+    uvicorn>=0.30.0 \
+    pydantic>=2.0.0
+
+# Create directories for persistent storage
+RUN mkdir -p /qdrant /kuzu
+
+# Expose the default port
+EXPOSE 8787
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health || exit 1
+
+# Run the MCP server
+CMD ["python", "-m", "integration.mcp.mcp_server"]

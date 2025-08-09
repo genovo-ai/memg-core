@@ -1,51 +1,53 @@
-FROM python:3.11-slim
+# Multi-stage Dockerfile for CI/CD build and publishing
+FROM python:3.11-slim AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for graph databases
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
+    git \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-## Build and install package wheel for clean runtime
-COPY pyproject.toml README.md ./
-COPY src ./src/
-RUN pip install --no-cache-dir build && \
-    python -m build --wheel && \
-    pip install --no-cache-dir dist/*.whl && \
-    rm -rf src dist
+# Install Python build tools
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel build twine
 
-# Set essential runtime environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app/src
+# Copy source code
+COPY src/ /app/src/
+COPY pyproject.toml /app/
+COPY README.md /app/
+COPY LICENSE /app/
 
-ENV MEMORY_SYSTEM_MCP_PORT=8787
-ENV MEMORY_SYSTEM_MCP_HOST=0.0.0.0
-ENV MEMORY_SYSTEM_LOG_LEVEL=INFO
-ENV MEMG_VECTOR_DIMENSION=768
-ENV EMBEDDING_DIMENSION_LEN=768
-ENV GEMINI_MODEL=gemini-2.0-flash
+# Build the package
+RUN python -m build
 
-ENV QDRANT_STORAGE_PATH=/qdrant
-ENV KUZU_DB_PATH=/kuzu/memory_db
+# Verify the package can be installed
+RUN pip install dist/*.whl
 
-# SECURITY: API keys MUST be provided at runtime via env-file
-ENV GOOGLE_API_KEY=""
+# Test stage
+FROM builder AS test
 
+# Install test dependencies
+RUN pip install --no-cache-dir pytest pytest-cov
 
+# Copy tests
+COPY tests/ /app/tests/
 
+# Run tests
+RUN python -m pytest tests/ -v
 
+# Final stage for publishing
+FROM python:3.11-slim AS publisher
 
+# Install publishing tools
+RUN pip install --no-cache-dir twine
 
+# Copy built packages from builder stage
+COPY --from=builder /app/dist/ /app/dist/
 
+# Set working directory
+WORKDIR /app
 
-
-
-
-# Expose default MCP port (can still map differently via compose)
-EXPOSE 8787
-
-# Run the installed package entrypoint
-CMD ["python", "-m", "memory_system.mcp_server"]
+# Default command for publishing (requires PYPI_API_TOKEN)
+CMD ["python", "-m", "twine", "upload", "--non-interactive", "dist/*"]
