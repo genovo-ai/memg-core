@@ -3,14 +3,14 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "memg"
-version = "0.4.0"
-description = "Personal memory system using Qdrant + Kuzu + Google Gemini"
+name = "memg-core"
+version = "1.0.0"
+description = "Core memory system library with dual storage (Qdrant + Kuzu) and AI integration"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
- {name = "MEMG Contributors", email = "memg@example.com"},
+ {name = "Genovo AI", email = "dev@genovo.ai"},
 ]
 classifiers = [
  "Development Status :: 4 - Beta",
@@ -22,15 +22,13 @@ classifiers = [
  "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
- # Core runtime dependencies (FastMCP server only)
- "fastmcp>=2.10.6",
+ # Core memory system dependencies (no MCP server)
  "qdrant-client>=1.14.0",
  "kuzu==0.11.1",
  "pydantic>=2.11.7,<3.0.0",
  "pydantic-core>=2.33.0,<3.0.0",
  "python-dotenv>=1.0.1",
- "google-genai>=1.0.0", # CORRECT: Modern Google GenAI SDK (NOT google-generativeai!)
- "uvicorn[standard]>=0.32.1",
+ "google-genai>=1.0.0", # Modern Google GenAI SDK
  "typing-extensions>=4.12.0",
  "httpx>=0.28.0",
 ]
@@ -49,9 +47,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/genovo-ai/memg"
-Repository = "https://github.com/genovo-ai/memg"
-Issues = "https://github.com/genovo-ai/memg/issues"
+Homepage = "https://github.com/genovo-ai/memg-core"
+Repository = "https://github.com/genovo-ai/memg-core"
+Issues = "https://github.com/genovo-ai/memg-core/issues"
 
 # PYLINT CONFIGURATION - PREVENT GOOGLE-GENAI CONFUSION
 [tool.pylint.main]

@@ -1,21 +1,28 @@
 services:
-  # MCP Memory Server (dev) — dynamic storage per port
-  mcp_server:
+  # MEMG MCP Server
+  memg-mcp-server:
     build:
       context: ..
-      dockerfile: Dockerfile
-    container_name: mcp_server_internal_${MEMORY_SYSTEM_MCP_PORT}
+      dockerfile: integration/mcp/Dockerfile
+    container_name: memg-mcp-server-${MEMORY_SYSTEM_MCP_PORT:-8787}
     ports:
-      - "${MEMORY_SYSTEM_MCP_PORT}:${MEMORY_SYSTEM_MCP_PORT}"
+      - "${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787}"
     volumes:
-      # Port-scoped persistent storage on host using BASE_MEMORY_PATH
-      - ${BASE_MEMORY_PATH}_${MEMORY_SYSTEM_MCP_PORT}/qdrant:/qdrant
-      - ${BASE_MEMORY_PATH}_${MEMORY_SYSTEM_MCP_PORT}/kuzu:/kuzu
+      # Persistent storage for memory data
+      - ${BASE_MEMORY_PATH:-$HOME/.local/share/memory_system}_${MEMORY_SYSTEM_MCP_PORT:-8787}/qdrant:/qdrant
+      - ${BASE_MEMORY_PATH:-$HOME/.local/share/memory_system}_${MEMORY_SYSTEM_MCP_PORT:-8787}/kuzu:/kuzu
     env_file:
-      - ../.env
+      - ../env.example
     environment:
-      # Force in-container fixed paths and port regardless of .env
+      # Override with container-specific paths
       QDRANT_STORAGE_PATH: /qdrant
       KUZU_DB_PATH: /kuzu/memory_db
-      MEMORY_SYSTEM_MCP_PORT: ${MEMORY_SYSTEM_MCP_PORT}
+      MEMORY_SYSTEM_MCP_PORT: ${MEMORY_SYSTEM_MCP_PORT:-8787}
+      MEMG_TEMPLATE: ${MEMG_TEMPLATE:-software_development}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
