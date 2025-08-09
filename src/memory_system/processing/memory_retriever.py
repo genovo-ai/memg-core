@@ -8,6 +8,7 @@ import logging
 import os
 
 from ..kuzu_graph.interface import KuzuInterface
+from ..templates.registry import get_template_registry
 from ..models import Memory, SearchResult
 from ..models.core import MemoryType
 from ..qdrant.interface import QdrantInterface
@@ -352,13 +353,25 @@ class MemoryRetriever:
             return []
 
         try:
-            # Build query with optional user filtering
+            # Determine technology-like entity types dynamically from template categories
+            try:
+                registry = get_template_registry()
+                template = registry.get_current_template()
+                tech_types = [
+                    et.name
+                    for et in (template.entity_types if template else [])
+                    if (et.category or "").upper() == "TECHNOLOGY"
+                ]
+            except Exception:
+                tech_types = []
+
+            # Build query with optional user filtering and dynamic entity types
             query = """
             MATCH (m:Memory)-[:MENTIONS]->(e:Entity)
-            WHERE e.type IN ['TECHNOLOGY', 'DATABASE', 'LIBRARY', 'TOOL']
-                AND toLower(e.name) CONTAINS toLower($tech_name)
+            WHERE toLower(e.name) CONTAINS toLower($tech_name)
+              AND (size($entity_types) = 0 OR e.type IN $entity_types)
             """
-            params = {"tech_name": tech_name, "limit": limit}
+            params = {"tech_name": tech_name, "limit": limit, "entity_types": tech_types}
 
             if user_id:
                 query += " AND m.user_id = $user_id"
@@ -398,21 +411,49 @@ class MemoryRetriever:
             return []
 
         try:
-            # First, find memories with error-related entities
+            # Determine error-like and solution-like types from template categories
+            try:
+                registry = get_template_registry()
+                template = registry.get_current_template()
+                error_types = [
+                    et.name
+                    for et in (template.entity_types if template else [])
+                    if (et.category or "").upper() == "CRITICAL"
+                ]
+                solution_types = [
+                    et.name
+                    for et in (template.entity_types if template else [])
+                    if (et.category or "").upper() == "SOLUTION"
+                ]
+            except Exception:
+                error_types = []
+                solution_types = []
+
+            # First, find memories with relevant entities
             error_query = """
             MATCH (m:Memory)-[:MENTIONS]->(e:Entity)
-            WHERE (e.type IN ['ERROR', 'ISSUE'] AND toLower(e.name) CONTAINS toLower($error_description))
-            OR (e.type IN ['SOLUTION', 'WORKAROUND'] AND toLower(m.content) CONTAINS toLower($error_description))
+            WHERE (
+                    (size($error_types) = 0 OR e.type IN $error_types)
+                    AND toLower(e.name) CONTAINS toLower($error_description)
+                  )
+               OR (
+                    (size($solution_types) = 0 OR e.type IN $solution_types)
+                    AND toLower(m.content) CONTAINS toLower($error_description)
+                  )
             """
-            params = {"error_description": error_description, "limit": limit}
+            params = {
+                "error_description": error_description,
+                "limit": limit,
+                "error_types": error_types,
+                "solution_types": solution_types,
+            }
 
             if user_id:
                 error_query += " AND m.user_id = $user_id"
                 params["user_id"] = user_id
 
             error_query += """
-            RETURN DISTINCT m.id,
-        m.user_id, m.content, m.title, m.memory_type, m.created_at, e.confidence
+            RETURN DISTINCT m.id, m.user_id, m.content, m.title, m.memory_type, m.created_at, e.confidence
             ORDER BY e.confidence DESC, m.created_at DESC
             LIMIT $limit
             """
@@ -475,12 +516,28 @@ class MemoryRetriever:
             return []
 
         try:
+            # Determine system-like types from template categories
+            try:
+                registry = get_template_registry()
+                template = registry.get_current_template()
+                system_types = [
+                    et.name
+                    for et in (template.entity_types if template else [])
+                    if (et.category or "").upper() == "SYSTEM"
+                ]
+            except Exception:
+                system_types = []
+
             query = """
             MATCH (m:Memory)-[:MENTIONS]->(e:Entity)
-            WHERE e.type IN ['COMPONENT', 'SERVICE', 'ARCHITECTURE']
-                AND toLower(e.name) CONTAINS toLower($component_name)
+            WHERE toLower(e.name) CONTAINS toLower($component_name)
+              AND (size($entity_types) = 0 OR e.type IN $entity_types)
             """
-            params = {"component_name": component_name, "limit": limit}
+            params = {
+                "component_name": component_name,
+                "limit": limit,
+                "entity_types": system_types,
+            }
 
             if user_id:
                 query += " AND m.user_id = $user_id"

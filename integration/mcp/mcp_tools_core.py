@@ -239,58 +239,75 @@ def register_core_tools(app: FastMCP) -> None:
 
     @app.tool("get_memory_schema")
     def get_memory_schema(user_id: str = None, include_stats: bool = True):
-        """Get comprehensive schema information for intelligent AI filtering and discovery."""
+        """Return schema derived dynamically from active template and enums (no hardcoding)."""
         memory = get_memory_system()
         if not memory:
             return {"result": "❌ Memory system not initialized"}
 
         try:
+            # Core enums that remain stable
             from memory_system.models.core import (
-                EntityType,
                 ImportanceLevel,
                 MemoryType,
                 RelationshipStrength,
-                RelationshipType,
             )
+            # Template system for dynamic entity/relationship types
+            from memory_system.templates.registry import get_template_registry
+            from memory_system.version import __version__ as core_version
 
-            schema_info = {
+            registry = get_template_registry()
+            template = registry.get_current_template()
+
+            # Fallbacks if template is missing for any reason
+            entity_types_available: list[str] = []
+            entity_categories: dict[str, list[str]] = {}
+            relationship_types_available: list[str] = []
+            relationship_descriptions: dict[str, str] = {}
+            relationship_directionality: dict[str, str] = {}
+            template_name = None
+            template_version = None
+
+            if template is not None:
+                # Entity types and categories from template
+                entity_types_available = template.get_entity_type_names()
+                for et in template.entity_types:
+                    cat_key = (et.category or "GENERAL").lower()
+                    entity_categories.setdefault(cat_key, []).append(et.name)
+
+                # Relationship types from template
+                relationship_types_available = template.get_relationship_type_names()
+                for rt in template.relationship_types:
+                    relationship_descriptions[rt.name] = rt.description
+                    relationship_directionality[rt.name] = rt.directionality
+
+                template_name = template.name
+                template_version = template.version
+
+            schema_info: dict = {
                 "memory_types": {
                     "available_types": [t.value for t in MemoryType],
+                    # Keep concise, non-domain-specific descriptions
                     "descriptions": {
-                        "document": "Technical documentation, articles, guides with AI summary",
-                        "note": "Brief notes, observations, ideas",
-                        "conversation": "Chat messages, dialogue",
+                        "document": "Long-form content with optional AI summary",
+                        "note": "Short-form content, quick facts or observations",
+                        "conversation": "Dialog turns or chat transcripts",
+                        "task": "Actionable work items with optional status",
                     },
                 },
                 "entity_types": {
-                    "available_types": [t.value for t in EntityType],
-                    "categories": {
-                        "technology": ["TECHNOLOGY", "DATABASE", "LIBRARY", "TOOL"],
-                        "system": ["COMPONENT", "SERVICE", "ARCHITECTURE", "PROTOCOL"],
-                        "problem_solution": [
-                            "ERROR",
-                            "ISSUE",
-                            "SOLUTION",
-                            "WORKAROUND",
-                        ],
-                        "domain": ["CONCEPT", "METHOD", "CONFIGURATION", "FILE_TYPE"],
-                    },
-                    "total_count": len(EntityType),
+                    "available_types": entity_types_available,
+                    "categories": entity_categories,
+                    "total_count": len(entity_types_available),
                 },
                 "relationship_types": {
-                    "available_types": [t.value for t in RelationshipType],
-                    "descriptions": {
-                        "MENTIONED_IN": "Entity is mentioned in a memory",
-                        "RELATES_TO": "General relationship between entities",
-                        "USED_IN": "Entity is used within another context",
-                        "WORKS_WITH": "Entities work together",
-                        "PART_OF": "Entity is part of a larger system",
-                        "SIMILAR_TO": "Entities have similar characteristics",
-                    },
+                    "available_types": relationship_types_available,
+                    "descriptions": relationship_descriptions,
+                    "directionality": relationship_directionality,
                 },
                 "relationship_strengths": [s.value for s in RelationshipStrength],
                 "importance_levels": [i.value for i in ImportanceLevel],
                 "filterable_fields": {
+                    # Keep filter set generic and template-agnostic
                     "memory_filters": [
                         "memory_type",
                         "project_id",
@@ -312,12 +329,10 @@ def register_core_tools(app: FastMCP) -> None:
                 },
             }
 
-            # Add usage statistics if requested
+            # Optional usage statistics from graph store
             if include_stats:
                 try:
                     kuzu = memory.processor.kuzu
-
-                    # Get basic stats
                     if user_id:
                         entity_stats = kuzu.query(
                             "MATCH (e:Entity) WHERE e.user_id = $user_id RETURN e.type as entity_type, COUNT(*) as count ORDER BY count DESC",
@@ -342,24 +357,23 @@ def register_core_tools(app: FastMCP) -> None:
                         "memory_type_distribution": memory_stats,
                         "user_scoped": user_id is not None,
                     }
-                except Exception as e:
+                except Exception as stats_error:
                     schema_info["usage_statistics"] = {
-                        "error": f"Could not retrieve stats: {str(e)}"
+                        "error": f"Could not retrieve stats: {str(stats_error)}"
                     }
 
+            # Metadata
             schema_info["schema_metadata"] = {
-                "version": "v0.4.0",
-                "last_updated": "2025-01-16",
+                "version": core_version,
+                "template": template_name,
+                "template_version": template_version,
                 "supports_user_isolation": True,
                 "supports_project_scoping": True,
                 "primary_search_engine": "qdrant",
                 "relationship_engine": "kuzu",
             }
 
-            return {
-                "result": "✅ Memory schema retrieved successfully",
-                "schema": schema_info,
-            }
+            return {"result": "✅ Memory schema retrieved successfully", "schema": schema_info}
 
         except Exception as e:
             log_error("mcp_tools_core", "get_memory_schema", e, user_id=user_id)

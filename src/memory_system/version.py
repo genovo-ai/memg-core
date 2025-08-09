@@ -1,3 +1,3 @@
-"""Version information for Personal Memory System"""
+"""Version information for memg-core (PyPI library)"""
 
-__version__ = "0.4.0"
+__version__ = "0.1.0"
