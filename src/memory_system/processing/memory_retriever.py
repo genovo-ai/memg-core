@@ -11,7 +11,6 @@ from ..kuzu_graph.interface import KuzuInterface
 from ..models import Memory, SearchResult
 from ..models.core import MemoryType
 from ..qdrant.interface import QdrantInterface
-from ..templates.registry import get_template_registry
 from ..utils.embeddings import GenAIEmbedder
 
 logger = logging.getLogger(__name__)
@@ -350,21 +349,8 @@ class MemoryRetriever:
             return []
 
         try:
-            # Determine technology-like entity types dynamically from template categories
-            try:
-                registry = get_template_registry()
-                template = registry.get_current_template()
-                tech_types = [
-                    et.name
-                    for et in (template.entity_types if template else [])
-                    if (et.category or "").upper() == "TECHNOLOGY"
-                ]
-            except Exception:
-                tech_types = []
-
-            # Always include standardized technology-related types for visibility
-            standard_tech_types = ["TECHNOLOGY", "DATABASE", "LIBRARY", "TOOL", "FRAMEWORK"]
-            tech_types = list(dict.fromkeys(tech_types + standard_tech_types))
+            # Use core technology types without template dependency
+            tech_types = ["TECHNOLOGY", "DATABASE", "LIBRARY", "TOOL", "FRAMEWORK"]
 
             # Inline type conditions for test visibility
             type_conditions = " OR ".join([f"e.type = '{t}'" for t in tech_types])
@@ -413,27 +399,9 @@ class MemoryRetriever:
             return []
 
         try:
-            # Determine error-like and solution-like types from template categories
-            try:
-                registry = get_template_registry()
-                template = registry.get_current_template()
-                error_types = [
-                    et.name
-                    for et in (template.entity_types if template else [])
-                    if (et.category or "").upper() == "CRITICAL"
-                ]
-                solution_types = [
-                    et.name
-                    for et in (template.entity_types if template else [])
-                    if (et.category or "").upper() == "SOLUTION"
-                ]
-            except Exception:
-                error_types = []
-                solution_types = []
-
-            # Always include standardized error/solution types for visibility
-            error_types = list(dict.fromkeys(error_types + ["ERROR", "ISSUE"]))
-            solution_types = list(dict.fromkeys(solution_types + ["SOLUTION", "WORKAROUND"]))
+            # Use core error/solution types without template dependency
+            error_types = ["ERROR", "ISSUE"]
+            solution_types = ["SOLUTION", "WORKAROUND"]
 
             # First, find memories with relevant entities; inline type conditions for test visibility
             error_type_conditions = " OR ".join([f"e.type = '{t}'" for t in error_types]) or "true"
@@ -524,22 +492,8 @@ class MemoryRetriever:
             return []
 
         try:
-            # Determine system-like types from template categories
-            try:
-                registry = get_template_registry()
-                template = registry.get_current_template()
-                system_types = [
-                    et.name
-                    for et in (template.entity_types if template else [])
-                    if (et.category or "").upper() == "SYSTEM"
-                ]
-            except Exception:
-                system_types = []
-
-            # Always include standardized system-related types for visibility
-            system_types = list(
-                dict.fromkeys(system_types + ["COMPONENT", "SERVICE", "ARCHITECTURE", "PROTOCOL"])
-            )
+            # Use core system types without template dependency
+            system_types = ["COMPONENT", "SERVICE", "ARCHITECTURE", "PROTOCOL"]
 
             type_conditions = " OR ".join([f"e.type = '{t}'" for t in system_types])
             query = f"""

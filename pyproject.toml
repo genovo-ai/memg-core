@@ -33,6 +33,7 @@ dependencies = [
  "pydantic-core>=2.33.0,<3.0.0",
  "python-dotenv>=1.0.1",
  "google-genai>=1.0.0", # Modern Google GenAI SDK
+  "pyyaml>=6.0.0",
  "typing-extensions>=4.12.0",
  "httpx>=0.28.0",
 ]
@@ -76,8 +77,8 @@ Issues = "https://github.com/genovo-ai/memg-core/issues"
 include-package-data = false
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+where = ["src"]
+include = ["memory_system*"]
 exclude = [
     "tests*",
     "integration*",
