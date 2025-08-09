@@ -7,7 +7,7 @@ import logging
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from ..templates.registry import get_template_registry
 
@@ -35,7 +35,8 @@ class TemplateAwareEntity(BaseModel):
     context: str | None = Field(None, description="Entity context information")
     category: str | None = Field(None, description="Entity category")
 
-    @validator("type")
+    @field_validator("type")
+    @classmethod
     def validate_entity_type(cls, v):
         """Validate entity type against current template"""
         try:
@@ -114,7 +115,8 @@ class TemplateAwareRelationship(BaseModel):
     context: str | None = Field(None, description="Relationship context")
     directionality: str | None = Field(None, description="Relationship directionality")
 
-    @validator("type")
+    @field_validator("type")
+    @classmethod
     def validate_relationship_type(cls, v):
         """Validate relationship type against current template"""
         try:

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import re
 from typing import Any
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TemplateValidationError(Exception):
@@ -63,6 +63,8 @@ class RelationshipTypeDefinition:
 class MemoryTemplate(BaseModel):
     """Complete template definition for a use case"""
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(..., description="Template name (lowercase with underscores)")
     display_name: str = Field(..., description="Human-readable template name")
     description: str = Field(..., description="Template description")
@@ -84,19 +86,22 @@ class MemoryTemplate(BaseModel):
         default_factory=dict, description="Additional template metadata"
     )
 
-    @validator("name")
+    @field_validator("name")
+    @classmethod
     def validate_name(cls, v):
         if not re.match(r"^[a-z][a-z_]*$", v):
             raise ValueError("Template name must be lowercase with underscores")
         return v
 
-    @validator("version")
+    @field_validator("version")
+    @classmethod
     def validate_version(cls, v):
         if not re.match(r"^\d+\.\d+\.\d+$", v):
             raise ValueError("Version must follow semantic versioning (x.y.z)")
         return v
 
-    @validator("entity_types")
+    @field_validator("entity_types")
+    @classmethod
     def validate_entity_types(cls, v):
         if not v:
             raise ValueError("Template must define at least one entity type")
@@ -105,7 +110,8 @@ class MemoryTemplate(BaseModel):
             raise ValueError("Entity type names must be unique")
         return v
 
-    @validator("relationship_types")
+    @field_validator("relationship_types")
+    @classmethod
     def validate_relationship_types(cls, v):
         if not v:
             raise ValueError("Template must define at least one relationship type")
