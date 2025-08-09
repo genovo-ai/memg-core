@@ -5,7 +5,7 @@ This module defines specific exceptions to replace broad 'except Exception'
 patterns throughout the codebase, providing better error handling and debugging.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class MemorySystemError(Exception):
@@ -18,9 +18,9 @@ class MemorySystemError(Exception):
     def __init__(
         self,
         message: str,
-        operation: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
-        original_error: Optional[Exception] = None,
+        operation: str | None = None,
+        context: dict[str, Any] | None = None,
+        original_error: Exception | None = None,
     ):
         self.message = message
         self.operation = operation
@@ -140,7 +140,7 @@ class MCPError(MemorySystemError):
 
 
 def wrap_exception(
-    original_error: Exception, operation: str, context: Optional[Dict[str, Any]] = None
+    original_error: Exception, operation: str, context: dict[str, Any] | None = None
 ) -> MemorySystemError:
     """
     Wrap a generic exception in an appropriate MemorySystemError subclass.

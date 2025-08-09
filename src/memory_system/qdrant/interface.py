@@ -2,8 +2,8 @@
 """Simple Qdrant interface wrapper"""
 
 import os
+from typing import Any
 import uuid
-from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
@@ -152,8 +152,8 @@ class QdrantInterface:
 
     def add_point(
         self,
-        vector: List[float],
-        payload: Dict[str, Any],
+        vector: list[float],
+        payload: dict[str, Any],
         point_id: str = None,
         collection: str = None,
     ) -> tuple[bool, str]:
@@ -220,12 +220,12 @@ class QdrantInterface:
 
     def search_points(
         self,
-        vector: List[float],
+        vector: list[float],
         limit: int = 5,
         collection: str = None,
         user_id: str = None,
-        filters: Dict[str, Any] = None,
-    ) -> List[Dict[str, Any]]:
+        filters: dict[str, Any] = None,
+    ) -> list[dict[str, Any]]:
         """Search for similar points with optional user_id filtering"""
         try:
             # Use default collection if not specified
@@ -234,9 +234,7 @@ class QdrantInterface:
             # Ensure collection exists
             if not self.collection_exists(collection):
                 # Auto-create collection with default vector size
-                self.ensure_collection(
-                    collection, 768
-                )  # Default to Google AI embedding size
+                self.ensure_collection(collection, 768)  # Default to Google AI embedding size
 
             # Build query filter combining user_id and additional filters
             query_filter = None
@@ -264,9 +262,7 @@ class QdrantInterface:
                                 )
                             else:
                                 filter_conditions.append(
-                                    FieldCondition(
-                                        key=key, match=MatchValue(value=value)
-                                    )
+                                    FieldCondition(key=key, match=MatchValue(value=value))
                                 )
 
                 # Create combined filter
@@ -280,9 +276,7 @@ class QdrantInterface:
                 with_payload=True,
                 query_filter=query_filter,
             )
-            return [
-                {"id": r.id, "score": r.score, "payload": r.payload} for r in results
-            ]
+            return [{"id": r.id, "score": r.score, "payload": r.payload} for r in results]
         except (ConnectionError, TimeoutError) as e:
             log_error(
                 "qdrant_interface",
@@ -327,7 +321,7 @@ class QdrantInterface:
                 original_error=e,
             )
 
-    def get_stats(self, collection: str = None) -> Dict[str, Any]:
+    def get_stats(self, collection: str = None) -> dict[str, Any]:
         """Get collection statistics"""
         try:
             # Use default collection if not specified
@@ -358,7 +352,7 @@ class QdrantInterface:
             )
 
     def update_point_payload(
-        self, point_id: str, payload: Dict[str, Any], collection: str = None
+        self, point_id: str, payload: dict[str, Any], collection: str = None
     ) -> bool:
         """Update the payload of an existing point"""
         try:
@@ -369,9 +363,7 @@ class QdrantInterface:
                 return False
 
             # Update the point payload
-            self.client.set_payload(
-                collection_name=collection, payload=payload, points=[point_id]
-            )
+            self.client.set_payload(collection_name=collection, payload=payload, points=[point_id])
 
             return True
 

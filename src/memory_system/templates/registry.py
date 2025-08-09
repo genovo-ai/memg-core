@@ -5,7 +5,7 @@ Template registry system for MEMG - Dynamic template loading and management
 import importlib
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base import MemoryTemplate, TemplateValidationError
 from .default import DEFAULT_TEMPLATE
@@ -17,8 +17,8 @@ class TemplateRegistry:
     """Registry for managing memory templates"""
 
     def __init__(self):
-        self._templates: Dict[str, MemoryTemplate] = {}
-        self._current_template: Optional[str] = None
+        self._templates: dict[str, MemoryTemplate] = {}
+        self._current_template: str | None = None
         self._load_built_in_templates()
 
     def _load_built_in_templates(self) -> None:
@@ -45,19 +45,17 @@ class TemplateRegistry:
 
         except Exception as e:
             logger.error(f"Failed to register template {template.name}: {e}")
-            raise TemplateValidationError(
-                f"Failed to register template {template.name}: {e}"
-            )
+            raise TemplateValidationError(f"Failed to register template {template.name}: {e}")
 
-    def get_template(self, name: str) -> Optional[MemoryTemplate]:
+    def get_template(self, name: str) -> MemoryTemplate | None:
         """Get template by name"""
         return self._templates.get(name)
 
-    def list_templates(self) -> List[str]:
+    def list_templates(self) -> list[str]:
         """List all available template names"""
         return list(self._templates.keys())
 
-    def get_template_info(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_template_info(self, name: str) -> dict[str, Any] | None:
         """Get template information"""
         template = self.get_template(name)
         if not template:
@@ -83,20 +81,20 @@ class TemplateRegistry:
         logger.info(f"Set current template to: {name}")
         return True
 
-    def get_current_template(self) -> Optional[MemoryTemplate]:
+    def get_current_template(self) -> MemoryTemplate | None:
         """Get the current active template"""
         if not self._current_template:
             return None
         return self._templates.get(self._current_template)
 
-    def get_current_template_name(self) -> Optional[str]:
+    def get_current_template_name(self) -> str | None:
         """Get the current active template name"""
         return self._current_template
 
     def load_template_from_file(self, file_path: str) -> None:
         """Load template from JSON file"""
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 template_data = json.load(f)
 
             # Convert data to template
@@ -105,32 +103,24 @@ class TemplateRegistry:
 
         except Exception as e:
             logger.error(f"Failed to load template from file {file_path}: {e}")
-            raise TemplateValidationError(
-                f"Failed to load template from file {file_path}: {e}"
-            )
+            raise TemplateValidationError(f"Failed to load template from file {file_path}: {e}")
 
-    def load_template_from_module(
-        self, module_path: str, template_name: str = "TEMPLATE"
-    ) -> None:
+    def load_template_from_module(self, module_path: str, template_name: str = "TEMPLATE") -> None:
         """Load template from Python module"""
         try:
             module = importlib.import_module(module_path)
             template = getattr(module, template_name)
 
             if not isinstance(template, MemoryTemplate):
-                raise TemplateValidationError(
-                    "Template object must be MemoryTemplate instance"
-                )
+                raise TemplateValidationError("Template object must be MemoryTemplate instance")
 
             self.register_template(template)
 
         except Exception as e:
             logger.error(f"Failed to load template from module {module_path}: {e}")
-            raise TemplateValidationError(
-                f"Failed to load template from module {module_path}: {e}"
-            )
+            raise TemplateValidationError(f"Failed to load template from module {module_path}: {e}")
 
-    def _dict_to_template(self, data: Dict[str, Any]) -> MemoryTemplate:
+    def _dict_to_template(self, data: dict[str, Any]) -> MemoryTemplate:
         """Convert dictionary to MemoryTemplate"""
         # This would need more sophisticated conversion logic
         # For now, assume the data structure matches MemoryTemplate
@@ -153,7 +143,7 @@ class TemplateRegistry:
             logger.error(f"Failed to export template {name}: {e}")
             raise TemplateValidationError(f"Failed to export template {name}: {e}")
 
-    def validate_all_templates(self) -> Dict[str, bool]:
+    def validate_all_templates(self) -> dict[str, bool]:
         """Validate all registered templates"""
         results = {}
         for name, template in self._templates.items():
@@ -167,7 +157,7 @@ class TemplateRegistry:
 
 
 # Global template registry instance
-_template_registry: Optional[TemplateRegistry] = None
+_template_registry: TemplateRegistry | None = None
 
 
 def get_template_registry() -> TemplateRegistry:
@@ -178,7 +168,7 @@ def get_template_registry() -> TemplateRegistry:
     return _template_registry
 
 
-def initialize_template_system(template_name: Optional[str] = None) -> TemplateRegistry:
+def initialize_template_system(template_name: str | None = None) -> TemplateRegistry:
     """Initialize the template system with optional template selection"""
     registry = get_template_registry()
 

@@ -3,13 +3,12 @@ Prompt loading utilities for the memory system.
 """
 
 from pathlib import Path
-from typing import Dict, Optional
 
 
 class PromptLoader:
     """Utility class for loading prompts from files."""
 
-    def __init__(self, prompts_dir: Optional[str] = None):
+    def __init__(self, prompts_dir: str | None = None):
         """
         Initialize the prompt loader.
 
@@ -22,7 +21,7 @@ class PromptLoader:
             prompts_dir = module_root / "prompts"
 
         self.prompts_dir = Path(prompts_dir)
-        self._prompt_cache: Dict[str, str] = {}
+        self._prompt_cache: dict[str, str] = {}
 
     def load_prompt(self, prompt_path: str) -> str:
         """
@@ -45,7 +44,7 @@ class PromptLoader:
         if not full_path.exists():
             raise FileNotFoundError(f"Prompt file not found: {full_path}")
 
-        with open(full_path, "r", encoding="utf-8") as f:
+        with open(full_path, encoding="utf-8") as f:
             content = f.read().strip()
 
         self._prompt_cache[prompt_path] = content

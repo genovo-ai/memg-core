@@ -4,7 +4,7 @@ Pipeline Validator - Validates the entire memory processing pipeline end-to-end.
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -21,7 +21,7 @@ class PipelineValidationReport(BaseModel):
     total_issues: int
     error_count: int
     warning_count: int
-    validation_results: List[ValidationResult] = Field(default_factory=list)
+    validation_results: list[ValidationResult] = Field(default_factory=list)
 
     @property
     def has_critical_issues(self) -> bool:
@@ -63,14 +63,14 @@ class PipelineValidator:
 
     def validate_complete_pipeline(
         self,
-        ai_content_analysis: Dict[str, Any],
-        ai_memory_extraction: Dict[str, Any],
-        ai_entity_extraction: Optional[Dict[str, Any]],
+        ai_content_analysis: dict[str, Any],
+        ai_memory_extraction: dict[str, Any],
+        ai_entity_extraction: dict[str, Any] | None,
         content_analysis_model: ContentAnalysis,
         memory_extraction_model: MemoryExtraction,
-        memory_objects: List[Memory],
-        extracted_entities: List[Entity] = None,
-        extracted_relationships: List[Relationship] = None,
+        memory_objects: list[Memory],
+        extracted_entities: list[Entity] = None,
+        extracted_relationships: list[Relationship] = None,
     ) -> PipelineValidationReport:
         """
         Validate the complete memory processing pipeline.
@@ -119,9 +119,7 @@ class PipelineValidator:
             self._validate_relationships(report, extracted_relationships)
 
         # Step 5: Cross-component validation
-        self._validate_cross_component_consistency(
-            report, memory_extraction_model, memory_objects
-        )
+        self._validate_cross_component_consistency(report, memory_extraction_model, memory_objects)
 
         logger.info(
             f"Pipeline validation complete: {report.error_count} errors, "
@@ -132,9 +130,9 @@ class PipelineValidator:
     def validate_memory_creation_flow(
         self,
         content: str,
-        ai_analysis: Dict[str, Any],
-        ai_extraction: Dict[str, Any],
-        final_memories: List[Memory],
+        ai_analysis: dict[str, Any],
+        ai_extraction: dict[str, Any],
+        final_memories: list[Memory],
     ) -> PipelineValidationReport:
         """
         Simplified validation for just the memory creation flow.
@@ -153,9 +151,7 @@ class PipelineValidator:
         )
 
         # Validate AI outputs
-        content_result = self.schema_validator.validate_ai_output(
-            ai_analysis, "content_analysis"
-        )
+        content_result = self.schema_validator.validate_ai_output(ai_analysis, "content_analysis")
         extraction_result = self.schema_validator.validate_ai_output(
             ai_extraction, "memory_extraction"
         )
@@ -165,15 +161,11 @@ class PipelineValidator:
 
         # Validate final memories
         for i, memory in enumerate(final_memories):
-            memory_result = self.schema_validator.validate_database_compatibility(
-                memory, "qdrant"
-            )
+            memory_result = self.schema_validator.validate_database_compatibility(memory, "qdrant")
             memory_result.component = f"Memory {i + 1} (Qdrant)"
             report.add_validation_result(memory_result)
 
-            kuzu_result = self.schema_validator.validate_database_compatibility(
-                memory, "kuzu"
-            )
+            kuzu_result = self.schema_validator.validate_database_compatibility(memory, "kuzu")
             kuzu_result.component = f"Memory {i + 1} (Kuzu)"
             report.add_validation_result(kuzu_result)
 
@@ -182,9 +174,9 @@ class PipelineValidator:
     def _validate_ai_outputs(
         self,
         report: PipelineValidationReport,
-        ai_content_analysis: Dict[str, Any],
-        ai_memory_extraction: Dict[str, Any],
-        ai_entity_extraction: Optional[Dict[str, Any]],
+        ai_content_analysis: dict[str, Any],
+        ai_memory_extraction: dict[str, Any],
+        ai_entity_extraction: dict[str, Any] | None,
     ):
         """Validate all AI outputs against schemas."""
 
@@ -210,8 +202,8 @@ class PipelineValidator:
     def _validate_model_conversions(
         self,
         report: PipelineValidationReport,
-        ai_content_analysis: Dict[str, Any],
-        ai_memory_extraction: Dict[str, Any],
+        ai_content_analysis: dict[str, Any],
+        ai_memory_extraction: dict[str, Any],
         content_analysis_model: ContentAnalysis,
         memory_extraction_model: MemoryExtraction,
     ):
@@ -230,28 +222,22 @@ class PipelineValidator:
         report.add_validation_result(extraction_conversion)
 
     def _validate_memory_objects(
-        self, report: PipelineValidationReport, memory_objects: List[Memory]
+        self, report: PipelineValidationReport, memory_objects: list[Memory]
     ):
         """Validate Memory objects for database compatibility."""
         for i, memory in enumerate(memory_objects):
             # Validate Qdrant compatibility
-            qdrant_result = self.schema_validator.validate_database_compatibility(
-                memory, "qdrant"
-            )
+            qdrant_result = self.schema_validator.validate_database_compatibility(memory, "qdrant")
             qdrant_result.component = f"Memory {i + 1} Qdrant Compatibility"
             report.add_validation_result(qdrant_result)
 
             # Validate Kuzu compatibility
-            kuzu_result = self.schema_validator.validate_database_compatibility(
-                memory, "kuzu"
-            )
+            kuzu_result = self.schema_validator.validate_database_compatibility(memory, "kuzu")
             kuzu_result.component = f"Memory {i + 1} Kuzu Compatibility"
             report.add_validation_result(kuzu_result)
 
             # Additional memory-specific validations
-            memory_validation = ValidationResult(
-                is_valid=True, component=f"Memory {i + 1} Content"
-            )
+            memory_validation = ValidationResult(is_valid=True, component=f"Memory {i + 1} Content")
 
             # Check for empty content
             if not memory.content or not memory.content.strip():
@@ -296,35 +282,29 @@ class PipelineValidator:
 
             report.add_validation_result(memory_validation)
 
-    def _validate_entities(
-        self, report: PipelineValidationReport, entities: List[Entity]
-    ):
+    def _validate_entities(self, report: PipelineValidationReport, entities: list[Entity]):
         """Validate Entity objects."""
         for i, entity in enumerate(entities):
-            entity_result = self.schema_validator.validate_database_compatibility(
-                entity, "kuzu"
-            )
+            entity_result = self.schema_validator.validate_database_compatibility(entity, "kuzu")
             entity_result.component = f"Entity {i + 1} ({entity.name})"
             report.add_validation_result(entity_result)
 
     def _validate_relationships(
-        self, report: PipelineValidationReport, relationships: List[Relationship]
+        self, report: PipelineValidationReport, relationships: list[Relationship]
     ):
         """Validate Relationship objects."""
         for i, relationship in enumerate(relationships):
             # Convert to dict for relationship schema validation
             rel_data = relationship.to_kuzu_props()
             rel_result = self.schema_validator.validate_relationship_schema(rel_data)
-            rel_result.component = (
-                f"Relationship {i + 1} ({relationship.relationship_type})"
-            )
+            rel_result.component = f"Relationship {i + 1} ({relationship.relationship_type})"
             report.add_validation_result(rel_result)
 
     def _validate_cross_component_consistency(
         self,
         report: PipelineValidationReport,
         memory_extraction: MemoryExtraction,
-        memory_objects: List[Memory],
+        memory_objects: list[Memory],
     ):
         """Validate consistency across components."""
         consistency_result = ValidationResult(
@@ -375,8 +355,7 @@ class PipelineValidator:
                 for issue in result.issues:
                     icon = (
                         "❌"
-                        if issue.level
-                        in [ValidationLevel.ERROR, ValidationLevel.CRITICAL]
+                        if issue.level in [ValidationLevel.ERROR, ValidationLevel.CRITICAL]
                         else "⚠️"
                     )
                     print(f"  {icon} {issue.message}")

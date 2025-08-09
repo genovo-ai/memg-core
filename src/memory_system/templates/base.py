@@ -2,9 +2,9 @@
 Base template system for MEMG - Core classes for template definitions
 """
 
-import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any
 
 from pydantic import BaseModel, Field, validator
 
@@ -22,22 +22,18 @@ class EntityTypeDefinition:
     name: str
     description: str
     category: str = "GENERAL"
-    extraction_hints: Optional[List[str]] = None
+    extraction_hints: list[str] | None = None
 
     def __post_init__(self):
         """Validate entity type definition"""
         if not self.name or not self.name.isupper():
-            raise TemplateValidationError(
-                f"Entity type name must be uppercase: {self.name}"
-            )
+            raise TemplateValidationError(f"Entity type name must be uppercase: {self.name}")
         if not re.match(r"^[A-Z][A-Z_]*$", self.name):
             raise TemplateValidationError(
                 f"Entity type name must contain only uppercase letters and underscores: {self.name}"
             )
         if not self.description:
-            raise TemplateValidationError(
-                f"Entity type description is required: {self.name}"
-            )
+            raise TemplateValidationError(f"Entity type description is required: {self.name}")
 
 
 @dataclass
@@ -47,27 +43,21 @@ class RelationshipTypeDefinition:
     name: str
     description: str
     directionality: str = "BIDIRECTIONAL"  # BIDIRECTIONAL, DIRECTIONAL
-    strength_levels: Optional[List[str]] = None
+    strength_levels: list[str] | None = None
 
     def __post_init__(self):
         """Validate relationship type definition"""
         if not self.name or not self.name.isupper():
-            raise TemplateValidationError(
-                f"Relationship type name must be uppercase: {self.name}"
-            )
+            raise TemplateValidationError(f"Relationship type name must be uppercase: {self.name}")
         if not re.match(r"^[A-Z][A-Z_]*$", self.name):
             raise TemplateValidationError(
                 f"Relationship type name must contain only uppercase letters and \
         underscores: {self.name}"
             )
         if not self.description:
-            raise TemplateValidationError(
-                f"Relationship type description is required: {self.name}"
-            )
+            raise TemplateValidationError(f"Relationship type description is required: {self.name}")
         if self.directionality not in ["BIDIRECTIONAL", "DIRECTIONAL"]:
-            raise TemplateValidationError(
-                f"Invalid directionality: {self.directionality}"
-            )
+            raise TemplateValidationError(f"Invalid directionality: {self.directionality}")
 
 
 class MemoryTemplate(BaseModel):
@@ -78,21 +68,19 @@ class MemoryTemplate(BaseModel):
     description: str = Field(..., description="Template description")
     version: str = Field(..., description="Template version")
 
-    entity_types: List[EntityTypeDefinition] = Field(
-        ..., description="Entity type definitions"
-    )
-    relationship_types: List[RelationshipTypeDefinition] = Field(
+    entity_types: list[EntityTypeDefinition] = Field(..., description="Entity type definitions")
+    relationship_types: list[RelationshipTypeDefinition] = Field(
         ..., description="Relationship type definitions"
     )
 
-    extraction_prompts: Dict[str, str] = Field(
+    extraction_prompts: dict[str, str] = Field(
         default_factory=dict, description="Custom AI prompts"
     )
-    search_filters: Dict[str, Any] = Field(
+    search_filters: dict[str, Any] = Field(
         default_factory=dict, description="Template-specific search configurations"
     )
 
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional template metadata"
     )
 
@@ -126,24 +114,22 @@ class MemoryTemplate(BaseModel):
             raise ValueError("Relationship type names must be unique")
         return v
 
-    def get_entity_type_names(self) -> List[str]:
+    def get_entity_type_names(self) -> list[str]:
         """Get list of entity type names"""
         return [et.name for et in self.entity_types]
 
-    def get_relationship_type_names(self) -> List[str]:
+    def get_relationship_type_names(self) -> list[str]:
         """Get list of relationship type names"""
         return [rt.name for rt in self.relationship_types]
 
-    def get_entity_type_by_name(self, name: str) -> Optional[EntityTypeDefinition]:
+    def get_entity_type_by_name(self, name: str) -> EntityTypeDefinition | None:
         """Get entity type definition by name"""
         for et in self.entity_types:
             if et.name == name:
                 return et
         return None
 
-    def get_relationship_type_by_name(
-        self, name: str
-    ) -> Optional[RelationshipTypeDefinition]:
+    def get_relationship_type_by_name(self, name: str) -> RelationshipTypeDefinition | None:
         """Get relationship type definition by name"""
         for rt in self.relationship_types:
             if rt.name == name:

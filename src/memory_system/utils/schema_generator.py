@@ -3,7 +3,7 @@ Dynamic JSON schema generation from templates for MEMG
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from ..templates.base import MemoryTemplate
 
@@ -16,7 +16,7 @@ class SchemaGenerator:
     def __init__(self, template: MemoryTemplate):
         self.template = template
 
-    def generate_entity_relationship_extraction_schema(self) -> Dict[str, Any]:
+    def generate_entity_relationship_extraction_schema(self) -> dict[str, Any]:
         """Generate the entity_relationship_extraction schema from template"""
 
         # Get entity type names from template
@@ -84,7 +84,7 @@ class SchemaGenerator:
 
         return schema
 
-    def generate_all_schemas(self) -> Dict[str, Any]:
+    def generate_all_schemas(self) -> dict[str, Any]:
         """Generate all schemas for the template"""
 
         # Start with the base schemas that don't change
@@ -135,14 +135,14 @@ class SchemaGenerator:
 
         return base_schemas
 
-    def get_entity_type_descriptions(self) -> Dict[str, str]:
+    def get_entity_type_descriptions(self) -> dict[str, str]:
         """Get entity type descriptions for AI prompts"""
         descriptions = {}
         for entity_type in self.template.entity_types:
             descriptions[entity_type.name] = entity_type.description
         return descriptions
 
-    def get_relationship_type_descriptions(self) -> Dict[str, str]:
+    def get_relationship_type_descriptions(self) -> dict[str, str]:
         """Get relationship type descriptions for AI prompts"""
         descriptions = {}
         for relationship_type in self.template.relationship_types:
@@ -171,9 +171,7 @@ Your task is to identify entities and relationships from the given content.
         # Add relationship type information
         relationship_info = "\n\nAvailable Relationship Types:\n"
         for relationship_type in self.template.relationship_types:
-            relationship_info += (
-                f"- {relationship_type.name}: {relationship_type.description}\n"
-            )
+            relationship_info += f"- {relationship_type.name}: {relationship_type.description}\n"
 
         # Add requirements
         requirements = """

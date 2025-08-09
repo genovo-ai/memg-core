@@ -2,11 +2,11 @@
 Schema Validator - Validates schemas across the entire memory processing pipeline.
 """
 
-import json
-import logging
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+import json
+import logging
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -27,11 +27,11 @@ class ValidationIssue(BaseModel):
 
     level: ValidationLevel
     component: str = Field(..., description="Component being validated")
-    field: Optional[str] = Field(None, description="Specific field with issue")
+    field: str | None = Field(None, description="Specific field with issue")
     message: str = Field(..., description="Description of the issue")
-    expected: Optional[str] = Field(None, description="Expected value/type")
-    actual: Optional[str] = Field(None, description="Actual value/type")
-    suggestion: Optional[str] = Field(None, description="How to fix")
+    expected: str | None = Field(None, description="Expected value/type")
+    actual: str | None = Field(None, description="Actual value/type")
+    suggestion: str | None = Field(None, description="How to fix")
 
 
 class ValidationResult(BaseModel):
@@ -39,7 +39,7 @@ class ValidationResult(BaseModel):
 
     is_valid: bool
     component: str
-    issues: List[ValidationIssue] = Field(default_factory=list)
+    issues: list[ValidationIssue] = Field(default_factory=list)
     validated_at: datetime = Field(default_factory=datetime.now)
 
     @property
@@ -96,7 +96,7 @@ class SchemaValidator:
         self.known_schemas = self._load_known_schemas()
         logger.info("SchemaValidator initialized")
 
-    def _load_known_schemas(self) -> Dict[str, Dict]:
+    def _load_known_schemas(self) -> dict[str, dict]:
         """Load known JSON schemas for validation."""
         try:
             from ..utils.schemas import SCHEMAS
@@ -106,9 +106,7 @@ class SchemaValidator:
             logger.warning("Could not load schemas - validation will be limited")
             return {}
 
-    def validate_ai_output(
-        self, output: Dict[str, Any], schema_name: str
-    ) -> ValidationResult:
+    def validate_ai_output(self, output: dict[str, Any], schema_name: str) -> ValidationResult:
         """
         Validate AI-generated output against expected JSON schema.
 
@@ -173,7 +171,7 @@ class SchemaValidator:
         return result
 
     def validate_model_conversion(
-        self, source_data: Dict, target_model_class, converted_obj
+        self, source_data: dict, target_model_class, converted_obj
     ) -> ValidationResult:
         """
         Validate conversion from raw data to Pydantic model.
@@ -231,9 +229,7 @@ class SchemaValidator:
 
         return result
 
-    def validate_database_compatibility(
-        self, model_obj, database_type: str
-    ) -> ValidationResult:
+    def validate_database_compatibility(self, model_obj, database_type: str) -> ValidationResult:
         """
         Validate model compatibility with database schema.
 
@@ -262,9 +258,7 @@ class SchemaValidator:
 
         return result
 
-    def validate_relationship_schema(
-        self, relationship_data: Dict[str, Any]
-    ) -> ValidationResult:
+    def validate_relationship_schema(self, relationship_data: dict[str, Any]) -> ValidationResult:
         """
         Validate relationship data for Kuzu compatibility.
 
@@ -288,9 +282,7 @@ class SchemaValidator:
                     actual=type(rel_type).__name__,
                     suggestion="Ensure AI generates string relationship types",
                 )
-            elif " " in rel_type or any(
-                c in rel_type for c in "!@#$%^&*()[]{}+=<>?/|\\-"
-            ):
+            elif " " in rel_type or any(c in rel_type for c in "!@#$%^&*()[]{}+=<>?/|\\-"):
                 result.add_issue(
                     ValidationLevel.ERROR,  # Changed to ERROR since this causes SQL failures
                     "Relationship Type",
@@ -331,7 +323,7 @@ class SchemaValidator:
         """Validate compatibility with Qdrant vector database."""
         # Check for vector field
         if hasattr(model_obj, "vector"):
-            vector = getattr(model_obj, "vector")
+            vector = model_obj.vector
             if vector is not None:
                 if not isinstance(vector, list):
                     result.add_issue(
@@ -401,16 +393,15 @@ class SchemaValidator:
         """Get type name for validation."""
         if isinstance(value, list):
             return "array"
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             return "object"
-        elif isinstance(value, str):
+        if isinstance(value, str):
             return "string"
-        elif isinstance(value, bool):
+        if isinstance(value, bool):
             return "boolean"
-        elif isinstance(value, (int, float)):
+        if isinstance(value, (int, float)):
             return "number"
-        else:
-            return type(value).__name__
+        return type(value).__name__
 
     def _types_compatible(self, expected: str, actual: str, value) -> bool:
         """Check if types are compatible."""
@@ -428,8 +419,8 @@ class SchemaValidator:
         self,
         result: ValidationResult,
         field: str,
-        array_value: List,
-        field_schema: Dict,
+        array_value: list,
+        field_schema: dict,
     ):
         """Validate array items against schema."""
         items_schema = field_schema.get("items")

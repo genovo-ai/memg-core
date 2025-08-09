@@ -133,7 +133,6 @@ class TestE2EValidation:
                 patch("memory_system.processing.memory_retriever.GenAIEmbedder"),
                 patch("memory_system.processing.memory_retriever.KuzuInterface"),
             ):
-
                 retriever = MemoryRetriever()
                 assert retriever is not None
 
@@ -314,9 +313,7 @@ class TestPerformanceReadiness:
         duration = end - start
 
         # Should be able to create and serialize 100 memories in under 1 second
-        assert (
-            duration < 1.0
-        ), f"Memory operations too slow: {duration}s for 100 operations"
+        assert duration < 1.0, f"Memory operations too slow: {duration}s for 100 operations"
 
     def test_entity_model_efficiency(self):
         """Test Entity model is efficient."""
@@ -339,9 +336,7 @@ class TestPerformanceReadiness:
         duration = end - start
 
         # Should be fast
-        assert (
-            duration < 1.0
-        ), f"Entity operations too slow: {duration}s for 100 operations"
+        assert duration < 1.0, f"Entity operations too slow: {duration}s for 100 operations"
 
 
 if __name__ == "__main__":

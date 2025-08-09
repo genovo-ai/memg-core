@@ -1,9 +1,9 @@
 """Core data models for memory system"""
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -47,71 +47,53 @@ class Memory(BaseModel):
     content: str = Field(..., description="The actual memory content")
 
     # Optional project scoping
-    project_id: Optional[str] = Field(
-        None, description="Optional project ID for scoping"
-    )
-    project_name: Optional[str] = Field(
-        None, description="Optional project name for display"
-    )
+    project_id: str | None = Field(None, description="Optional project ID for scoping")
+    project_name: str | None = Field(None, description="Optional project name for display")
 
     # Type classification (simple 3-type system)
     memory_type: MemoryType = Field(MemoryType.NOTE, description="Type of memory")
 
     # AI-generated fields (based on type)
-    summary: Optional[str] = Field(
-        None, description="AI-generated summary (for documents)"
-    )
-    ai_verified_type: Optional[bool] = Field(
+    summary: str | None = Field(None, description="AI-generated summary (for documents)")
+    ai_verified_type: bool | None = Field(
         None, description="AI confirmation of type classification"
     )
 
     # Metadata (minimal but flexible)
-    title: Optional[str] = Field(None, description="Optional title")
+    title: str | None = Field(None, description="Optional title")
     source: str = Field("user", description="Source of memory")
-    tags: List[str] = Field(default_factory=list, description="Flexible tagging")
+    tags: list[str] = Field(default_factory=list, description="Flexible tagging")
 
     # Processing metadata
     confidence: float = Field(0.8, ge=0.0, le=1.0, description="Storage confidence")
-    vector: Optional[List[float]] = Field(None, description="Embedding vector")
+    vector: list[float] | None = Field(None, description="Embedding vector")
 
     # Temporal fields (simplified)
     is_valid: bool = Field(True, description="Whether memory is currently valid")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: Optional[datetime] = Field(
-        None, description="Optional expiration for documents"
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime | None = Field(None, description="Optional expiration for documents")
 
     # Version tracking (for document supersession)
-    supersedes: Optional[str] = Field(None, description="ID of memory this supersedes")
-    superseded_by: Optional[str] = Field(
-        None, description="ID of memory that supersedes this"
-    )
+    supersedes: str | None = Field(None, description="ID of memory this supersedes")
+    superseded_by: str | None = Field(None, description="ID of memory that supersedes this")
 
     # Task-specific optional fields (only used when memory_type = TASK)
-    task_status: Optional[TaskStatus] = Field(
-        None, description="Task status for TASK memory type"
-    )
-    task_priority: Optional[TaskPriority] = Field(
-        None, description="Task priority level"
-    )
-    assignee: Optional[str] = Field(None, description="Task assignee username/email")
-    due_date: Optional[datetime] = Field(None, description="Task due date")
-    story_points: Optional[int] = Field(
-        None, ge=0, le=100, description="Effort estimation"
-    )
-    epic_id: Optional[str] = Field(None, description="Parent epic ID")
-    sprint_id: Optional[str] = Field(None, description="Sprint assignment")
+    task_status: TaskStatus | None = Field(None, description="Task status for TASK memory type")
+    task_priority: TaskPriority | None = Field(None, description="Task priority level")
+    assignee: str | None = Field(None, description="Task assignee username/email")
+    due_date: datetime | None = Field(None, description="Task due date")
+    story_points: int | None = Field(None, ge=0, le=100, description="Effort estimation")
+    epic_id: str | None = Field(None, description="Parent epic ID")
+    sprint_id: str | None = Field(None, description="Sprint assignment")
 
     # Code linking (for development tasks)
-    code_file_path: Optional[str] = Field(None, description="Associated code file path")
-    code_line_range: Optional[str] = Field(
-        None, description="Line range (e.g., '10-25')"
-    )
-    code_signature: Optional[str] = Field(None, description="Function/class signature")
+    code_file_path: str | None = Field(None, description="Associated code file path")
+    code_line_range: str | None = Field(None, description="Line range (e.g., '10-25')")
+    code_signature: str | None = Field(None, description="Function/class signature")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def to_qdrant_payload(self) -> Dict[str, Any]:
+    def to_qdrant_payload(self) -> dict[str, Any]:
         """Convert memory to Qdrant point payload"""
         payload = {
             "user_id": self.user_id,
@@ -137,9 +119,7 @@ class Memory(BaseModel):
             payload.update(
                 {
                     "task_status": self.task_status.value if self.task_status else None,
-                    "task_priority": (
-                        self.task_priority.value if self.task_priority else None
-                    ),
+                    "task_priority": (self.task_priority.value if self.task_priority else None),
                     "assignee": self.assignee,
                     "due_date": self.due_date.isoformat() if self.due_date else None,
                     "story_points": self.story_points,
@@ -154,7 +134,7 @@ class Memory(BaseModel):
 
         return payload
 
-    def to_kuzu_node(self) -> Dict[str, Any]:
+    def to_kuzu_node(self) -> dict[str, Any]:
         """Convert memory to Kuzu node properties"""
         return {
             "id": self.id,
@@ -207,10 +187,10 @@ class Memory(BaseModel):
             return False
 
         # Handle timezone comparison
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         due_date = self.due_date
         if due_date.tzinfo is None:
-            due_date = due_date.replace(tzinfo=timezone.utc)
+            due_date = due_date.replace(tzinfo=UTC)
 
         return due_date < now and self.task_status not in [
             TaskStatus.DONE,
@@ -300,22 +280,22 @@ class EntityType(str, Enum):
 class Entity(BaseModel):
     """Entity extracted from memories"""
 
-    id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
+    id: str | None = Field(default_factory=lambda: str(uuid4()))
     user_id: str = Field(..., description="User ID for entity isolation")
     name: str = Field(..., description="Entity name")
     type: EntityType = Field(..., description="Standardized entity type")
     description: str = Field(..., description="Entity description")
     confidence: float = Field(0.8, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_valid: bool = Field(True)
-    source_memory_id: Optional[str] = Field(None, description="Source memory ID")
+    source_memory_id: str | None = Field(None, description="Source memory ID")
 
     # Optional metadata
-    importance: Optional[ImportanceLevel] = Field(None)
-    context: Optional[str] = Field(None)
+    importance: ImportanceLevel | None = Field(None)
+    context: str | None = Field(None)
 
-    def to_kuzu_node(self) -> Dict[str, Any]:
+    def to_kuzu_node(self) -> dict[str, Any]:
         """Convert to Kuzu node properties"""
         return {
             "id": self.id,
@@ -337,12 +317,12 @@ class Project(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     user_id: str = Field(..., description="Owner user ID")
     name: str = Field(..., description="Project name")
-    description: Optional[str] = Field(None, description="Optional project description")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_used: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    description: str | None = Field(None, description="Optional project description")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_used: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_active: bool = Field(True, description="Whether project is active")
 
-    def to_kuzu_node(self) -> Dict[str, Any]:
+    def to_kuzu_node(self) -> dict[str, Any]:
         """Convert to Kuzu node properties"""
         return {
             "id": self.id,
@@ -358,21 +338,21 @@ class Project(BaseModel):
 class Relationship(BaseModel):
     """Relationship between entities or memories"""
 
-    id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
+    id: str | None = Field(default_factory=lambda: str(uuid4()))
     user_id: str = Field(..., description="User ID for relationship isolation")
     source_id: str = Field(..., description="Source node ID")
     target_id: str = Field(..., description="Target node ID")
     relationship_type: str = Field(..., description="Type of relationship")
     confidence: float = Field(0.8, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_valid: bool = Field(True)
 
     # Optional metadata
-    strength: Optional[RelationshipStrength] = Field(None)
-    context: Optional[str] = Field(None)
-    source_memory_id: Optional[str] = Field(None)
+    strength: RelationshipStrength | None = Field(None)
+    context: str | None = Field(None)
+    source_memory_id: str | None = Field(None)
 
-    def to_kuzu_props(self) -> Dict[str, Any]:
+    def to_kuzu_props(self) -> dict[str, Any]:
         """Convert to Kuzu relationship properties"""
         return {
             "user_id": self.user_id,
@@ -387,8 +367,8 @@ class MemoryPoint(BaseModel):
     """Memory with embedding vector for Qdrant"""
 
     memory: Memory
-    vector: List[float] = Field(..., description="Embedding vector")
-    point_id: Optional[str] = Field(None, description="Qdrant point ID")
+    vector: list[float] = Field(..., description="Embedding vector")
+    point_id: str | None = Field(None, description="Qdrant point ID")
 
     @field_validator("vector")
     @classmethod
@@ -403,9 +383,9 @@ class SearchResult(BaseModel):
 
     memory: Memory
     score: float = Field(..., ge=0.0, le=1.0, description="Similarity score")
-    distance: Optional[float] = Field(None, description="Vector distance")
+    distance: float | None = Field(None, description="Vector distance")
     source: str = Field(..., description="Search source (qdrant/kuzu/hybrid)")
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -414,11 +394,11 @@ class ProcessingResult(BaseModel):
     """Result from memory processing pipeline"""
 
     success: bool
-    memories_created: List[Memory] = Field(default_factory=list)
-    entities_created: List[Entity] = Field(default_factory=list)
-    relationships_created: List[Relationship] = Field(default_factory=list)
-    errors: List[str] = Field(default_factory=list)
-    processing_time_ms: Optional[float] = Field(None)
+    memories_created: list[Memory] = Field(default_factory=list)
+    entities_created: list[Entity] = Field(default_factory=list)
+    relationships_created: list[Relationship] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    processing_time_ms: float | None = Field(None)
 
     @property
     def total_created(self) -> int:
@@ -436,7 +416,7 @@ class ConversationSummary:
     summary: str
     last_updated: datetime
     message_count: int = 0
-    participants: List[str] = field(default_factory=list)
+    participants: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
@@ -454,7 +434,7 @@ class Message:
 
     content: str
     timestamp: datetime
-    speaker: Optional[str] = None
+    speaker: str | None = None
     message_type: str = "user"  # user, assistant, system
 
     def to_dict(self) -> dict:
@@ -471,10 +451,10 @@ class Message:
 class MessagePair:
     """Message pair for MEM0-style processing (m_t-1, m_t)"""
 
-    previous_message: Optional[Message]
+    previous_message: Message | None
     current_message: Message
-    conversation_summary: Optional[str] = None
-    recent_messages: List[Message] = field(default_factory=list)
+    conversation_summary: str | None = None
+    recent_messages: list[Message] = field(default_factory=list)
 
     def to_extraction_context(self) -> str:
         """Convert to context string for memory extraction"""
@@ -491,19 +471,11 @@ class MessagePair:
 
         if self.previous_message:
             prev_speaker = (
-                f"{self.previous_message.speaker}: "
-                if self.previous_message.speaker
-                else ""
+                f"{self.previous_message.speaker}: " if self.previous_message.speaker else ""
             )
-            context_parts.append(
-                f"Previous Message: {prev_speaker}{self.previous_message.content}"
-            )
+            context_parts.append(f"Previous Message: {prev_speaker}{self.previous_message.content}")
 
-        curr_speaker = (
-            f"{self.current_message.speaker}: " if self.current_message.speaker else ""
-        )
-        context_parts.append(
-            f"Current Message: {curr_speaker}{self.current_message.content}"
-        )
+        curr_speaker = f"{self.current_message.speaker}: " if self.current_message.speaker else ""
+        context_parts.append(f"Current Message: {curr_speaker}{self.current_message.content}")
 
         return "\n\n".join(context_parts)

@@ -2,11 +2,10 @@
 Memory Retrieval - Search and retrieve memories using semantic search.
 """
 
+from datetime import UTC
+from datetime import datetime as dt
 import logging
 import os
-from datetime import datetime as dt
-from datetime import timezone as tz
-from typing import List, Optional
 
 from ..kuzu_graph.interface import KuzuInterface
 from ..models import Memory, SearchResult
@@ -29,9 +28,9 @@ class MemoryRetriever:
 
     def __init__(
         self,
-        qdrant_interface: Optional[QdrantInterface] = None,
-        embedder: Optional[GenAIEmbedder] = None,
-        kuzu_interface: Optional[KuzuInterface] = None,
+        qdrant_interface: QdrantInterface | None = None,
+        embedder: GenAIEmbedder | None = None,
+        kuzu_interface: KuzuInterface | None = None,
     ):
         """
         Initialize the Memory Retriever.
@@ -49,18 +48,16 @@ class MemoryRetriever:
             or os.getenv("MEMG_ENABLE_GRAPH_SEARCH", "true").lower() == "true"
         )
 
-        logger.info(
-            f"MemoryRetriever initialized (graph_enabled: {self.graph_enabled})"
-        )
+        logger.info(f"MemoryRetriever initialized (graph_enabled: {self.graph_enabled})")
 
     async def search_memories(
         self,
         query: str,
         user_id: str,
-        filters: Optional[dict] = None,
+        filters: dict | None = None,
         limit: int = 10,
         score_threshold: float = 0.0,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """
         Search for memories using semantic similarity with optional metadata filtering.
 
@@ -96,9 +93,9 @@ class MemoryRetriever:
                 for key, value in filters.items():
                     if key == "days_back" and isinstance(value, int):
                         # Convert days_back to timestamp filter
-                        from datetime import datetime, timedelta, timezone
+                        from datetime import datetime, timedelta
 
-                        cutoff = datetime.now(timezone.utc) - timedelta(days=value)
+                        cutoff = datetime.now(UTC) - timedelta(days=value)
                         qdrant_filters["created_at"] = cutoff.isoformat()
                     elif value is not None:
                         # Direct mapping for all other filters
@@ -124,9 +121,7 @@ class MemoryRetriever:
 
             # Convert to SearchResult objects and filter by score
             results = []
-            logger.info(
-                f"Starting to process {len(search_results)} results from Qdrant"
-            )
+            logger.info(f"Starting to process {len(search_results)} results from Qdrant")
             for i, result in enumerate(search_results):
                 logger.debug(
                     f"Processing result {i + 1}/{len(search_results)}: ID={result.get('id')}, "
@@ -147,9 +142,7 @@ class MemoryRetriever:
                 payload = result.get("payload", {})
 
                 # Skip invalid memories if temporal reasoning is enabled
-                if self._should_filter_invalid_memories() and not payload.get(
-                    "is_valid", True
-                ):
+                if self._should_filter_invalid_memories() and not payload.get("is_valid", True):
                     logger.debug(
                         f"Filtering out invalid memory: {payload.get('content', '')[:50]}..."
                     )
@@ -172,9 +165,7 @@ class MemoryRetriever:
 
                     memory = Memory(
                         id=result.get("id"),  # ID is in the result, not payload
-                        user_id=payload.get(
-                            "user_id", "unknown"
-                        ),  # Should always be present
+                        user_id=payload.get("user_id", "unknown"),  # Should always be present
                         content=payload.get("content"),
                         memory_type=memory_type,
                         summary=payload.get("summary"),
@@ -186,7 +177,7 @@ class MemoryRetriever:
                         vector=None,  # Don't need full vector for display
                         is_valid=payload.get("is_valid", True),
                         created_at=dt.fromisoformat(
-                            payload.get("created_at", dt.now(tz.utc).isoformat())
+                            payload.get("created_at", dt.now(UTC).isoformat())
                         ),
                         expires_at=(
                             dt.fromisoformat(payload["expires_at"])
@@ -224,9 +215,7 @@ class MemoryRetriever:
             # Add relevance categories to metadata
             for i, result in enumerate(results):
                 result.metadata["rank"] = i + 1
-                result.metadata["relevance_tier"] = self._get_relevance_tier(
-                    result.score
-                )
+                result.metadata["relevance_tier"] = self._get_relevance_tier(result.score)
 
             logger.info(f"Retrieved {len(results)} memories for query: '{query}'")
             return results
@@ -236,7 +225,7 @@ class MemoryRetriever:
                 f"CRITICAL: Memory search failed - database connection or query error: {str(e)}"
             ) from e
 
-    async def get_memory_by_id(self, memory_id: str) -> Optional[Memory]:
+    async def get_memory_by_id(self, memory_id: str) -> Memory | None:
         """
         Retrieve a specific memory by ID.
 
@@ -255,7 +244,7 @@ class MemoryRetriever:
 
     async def get_memories_by_category(
         self, category: str, user_id: str, limit: int = 20
-    ) -> List[Memory]:
+    ) -> list[Memory]:
         """
         Get all memories in a specific category.
 
@@ -269,9 +258,7 @@ class MemoryRetriever:
         """
         # Note: filter_points method not implemented in current Qdrant interface
         # For now, we'll do a broad search and filter results
-        logger.warning(
-            "get_memories_by_category using basic search - filters not yet implemented"
-        )
+        logger.warning("get_memories_by_category using basic search - filters not yet implemented")
 
         # Do a general search with a neutral query
         search_results = await self.search_memories(
@@ -283,9 +270,7 @@ class MemoryRetriever:
 
         # Filter results by category manually
         filtered_memories = [
-            result.memory
-            for result in search_results
-            if result.memory.category == category
+            result.memory for result in search_results if result.memory.category == category
         ]
 
         return filtered_memories
@@ -339,19 +324,18 @@ class MemoryRetriever:
         """
         if score >= 0.9:
             return "highly_relevant"
-        elif score >= 0.7:
+        if score >= 0.7:
             return "relevant"
-        elif score >= 0.5:
+        if score >= 0.5:
             return "moderately_relevant"
-        elif score >= 0.3:
+        if score >= 0.3:
             return "low_relevance"
-        else:
-            return "minimal_relevance"
+        return "minimal_relevance"
 
     # Graph-based search methods for Stage 2
     async def search_by_technology(
-        self, tech_name: str, limit: int = 10, user_id: Optional[str] = None
-    ) -> List[SearchResult]:
+        self, tech_name: str, limit: int = 10, user_id: str | None = None
+    ) -> list[SearchResult]:
         """
         Find memories that mention specific technologies using graph relationships.
 
@@ -396,8 +380,8 @@ class MemoryRetriever:
             return []
 
     async def find_error_solutions(
-        self, error_description: str, limit: int = 10, user_id: Optional[str] = None
-    ) -> List[SearchResult]:
+        self, error_description: str, limit: int = 10, user_id: str | None = None
+    ) -> list[SearchResult]:
         """
         Find memories containing solutions to similar errors using hybrid search.
 
@@ -473,8 +457,8 @@ class MemoryRetriever:
             return []
 
     async def search_by_component(
-        self, component_name: str, limit: int = 10, user_id: Optional[str] = None
-    ) -> List[SearchResult]:
+        self, component_name: str, limit: int = 10, user_id: str | None = None
+    ) -> list[SearchResult]:
         """
         Find memories that mention specific components or libraries.
 
@@ -518,8 +502,8 @@ class MemoryRetriever:
             return []
 
     async def _convert_kuzu_to_search_results(
-        self, kuzu_results: List[dict], source: str = "graph_search"
-    ) -> List[SearchResult]:
+        self, kuzu_results: list[dict], source: str = "graph_search"
+    ) -> list[SearchResult]:
         """
         Convert Kuzu query results to SearchResult objects.
 
@@ -542,11 +526,7 @@ class MemoryRetriever:
                     memory_type = MemoryType.NOTE
 
                 created_at_raw = result.get("m.created_at")
-                created_at = (
-                    dt.fromisoformat(created_at_raw)
-                    if created_at_raw
-                    else dt.now(tz.utc)
-                )
+                created_at = dt.fromisoformat(created_at_raw) if created_at_raw else dt.now(UTC)
 
                 memory = Memory(
                     id=result.get("m.id"),
@@ -556,11 +536,7 @@ class MemoryRetriever:
                     summary=result.get("m.summary"),
                     title=result.get("m.title"),
                     source=result.get("m.source", ""),
-                    tags=(
-                        result.get("m.tags", "").split(",")
-                        if result.get("m.tags")
-                        else []
-                    ),
+                    tags=(result.get("m.tags", "").split(",") if result.get("m.tags") else []),
                     confidence=float(result.get("m.confidence", 0.8)),
                     is_valid=True,
                     created_at=created_at,

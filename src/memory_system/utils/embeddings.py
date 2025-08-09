@@ -1,5 +1,4 @@
 import os
-from typing import List, Optional
 
 from dotenv import load_dotenv
 
@@ -18,10 +17,10 @@ class GenAIEmbedder:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        project: Optional[str] = None,
-        location: Optional[str] = None,
-        use_vertex_ai: Optional[bool] = None,
+        api_key: str | None = None,
+        project: str | None = None,
+        location: str | None = None,
+        use_vertex_ai: bool | None = None,
     ):
         """
         Initialize the GenAIEmbedder client using provided API key.
@@ -50,7 +49,7 @@ class GenAIEmbedder:
             # Use API key mode (simpler setup)
             self.client = genai.Client(vertexai=False)
 
-    def get_embedding(self, text: str) -> List[float]:
+    def get_embedding(self, text: str) -> list[float]:
         """
         Generate embedding vector for text using Google GenAI.
 
@@ -61,9 +60,7 @@ class GenAIEmbedder:
             List of floats representing the embedding vector
         """
         # Use the embedding model to generate embeddings
-        response = self.client.models.embed_content(
-            model="text-embedding-004", contents=text
-        )
+        response = self.client.models.embed_content(model="text-embedding-004", contents=text)
 
         # Return the embedding values from the response
         if response.embeddings and response.embeddings[0]:

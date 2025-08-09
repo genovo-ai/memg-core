@@ -38,7 +38,7 @@ Set these environment variables:
 ## Available MCP Tools
 
 - `mcp_gmem_add_memory` - Add new memories
-- `mcp_gmem_search_memories` - Search existing memories  
+- `mcp_gmem_search_memories` - Search existing memories
 - `mcp_gmem_graph_search` - Graph-based memory search
 - `mcp_gmem_validate_graph` - Validate memory graph
 - `mcp_gmem_get_memory_schema` - Get memory schema info

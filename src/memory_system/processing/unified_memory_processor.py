@@ -6,9 +6,9 @@ Reduces AI calls from 4 to 2:
 2. Focused Entity & Relationship Extraction (using analysis results)
 """
 
+from datetime import UTC, datetime
 import os
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..exceptions import ProcessingError, ValidationError
 from ..kuzu_graph.interface import KuzuInterface
@@ -39,11 +39,11 @@ class UnifiedMemoryProcessor:
 
     def __init__(
         self,
-        qdrant: Optional[QdrantInterface] = None,
-        kuzu: Optional[KuzuInterface] = None,
-        embedder: Optional[GenAIEmbedder] = None,
-        validator: Optional[PipelineValidator] = None,
-        genai_client: Optional[GenAI] = None,
+        qdrant: QdrantInterface | None = None,
+        kuzu: KuzuInterface | None = None,
+        embedder: GenAIEmbedder | None = None,
+        validator: PipelineValidator | None = None,
+        genai_client: GenAI | None = None,
     ):
         self.qdrant = qdrant or QdrantInterface()
         self.kuzu = kuzu or KuzuInterface()
@@ -55,7 +55,7 @@ class UnifiedMemoryProcessor:
 
     def _get_timestamp_ms(self) -> int:
         """Get current timestamp in milliseconds"""
-        return int(datetime.now(timezone.utc).timestamp() * 1000)
+        return int(datetime.now(UTC).timestamp() * 1000)
 
     async def process_memory(
         self,
@@ -70,9 +70,7 @@ class UnifiedMemoryProcessor:
         Returns:
             ProcessingResponse with operation details
         """
-        logger.info(
-            f"Starting unified processing for content: {request.content[:100]}..."
-        )
+        logger.info(f"Starting unified processing for content: {request.content[:100]}...")
         processing_start = self._get_timestamp_ms()
 
         try:
@@ -88,25 +86,16 @@ class UnifiedMemoryProcessor:
                 )
                 final_type = MemoryType.TASK
                 # Generate task-specific summary if AI didn't provide one
-                if (
-                    not content_analysis["summary"]
-                    and ai_suggested_type != MemoryType.TASK
-                ):
+                if not content_analysis["summary"] and ai_suggested_type != MemoryType.TASK:
                     summary = (
                         f"Task: {request.content[:100]}"
                         f"{'...' if len(request.content) > 100 else ''}"
                     )
                 else:
-                    summary = (
-                        content_analysis["summary"]
-                        if content_analysis["summary"]
-                        else None
-                    )
+                    summary = content_analysis["summary"] if content_analysis["summary"] else None
             else:
                 final_type = ai_suggested_type
-                summary = (
-                    content_analysis["summary"] if content_analysis["summary"] else None
-                )
+                summary = content_analysis["summary"] if content_analysis["summary"] else None
 
             # Generate embedding (fast, keep separate)
             embedding = self.embedder.get_embedding(request.content)
@@ -122,7 +111,7 @@ class UnifiedMemoryProcessor:
                 tags=request.tags or [],
                 project_id=request.project_id,
                 source=request.source,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
 
             # Store in dual databases
@@ -195,9 +184,7 @@ class UnifiedMemoryProcessor:
                                     f"{unique_entity_types}"
                                 )
                             else:
-                                logger.warning(
-                                    "Failed to update Qdrant payload with entity types"
-                                )
+                                logger.warning("Failed to update Qdrant payload with entity types")
                 except Exception as e:
                     logger.warning(
                         f"Failed to push entity_types to Qdrant payload for {memory.id}: {e}"
@@ -242,7 +229,7 @@ class UnifiedMemoryProcessor:
                 relationships_created=0,
             )
 
-    async def _unified_content_analysis(self, content: str) -> Dict[str, Any]:
+    async def _unified_content_analysis(self, content: str) -> dict[str, Any]:
         """
         CALL 1: Unified content analysis - type, summary, themes, critical issues
 
@@ -262,7 +249,7 @@ class UnifiedMemoryProcessor:
                 "unified_analysis",
                 "content_analysis.md",
             )
-            with open(prompt_path, "r", encoding="utf-8") as f:
+            with open(prompt_path, encoding="utf-8") as f:
                 system_prompt = f.read()
 
             genai_client = GenAI(system_instruction=system_prompt)
@@ -307,8 +294,8 @@ Provide complete analysis following the schema.
             }
 
     async def _focused_entity_extraction(
-        self, memory: Memory, content_analysis: Dict[str, Any]
-    ) -> Tuple[List[Entity], List]:
+        self, memory: Memory, content_analysis: dict[str, Any]
+    ) -> tuple[list[Entity], list]:
         """
         CALL 2: Focused entity extraction using content analysis results
 
@@ -450,9 +437,7 @@ Extract entities and relationships with focus on the above context.
                     )
                     if success:
                         relationships.append(relationship)
-                        logger.debug(
-                            f"Stored relationship: {source_name} -> {target_name}"
-                        )
+                        logger.debug(f"Stored relationship: {source_name} -> {target_name}")
                 else:
                     logger.warning(
                         f"Skipping relationship {source_name} -> {target_name}: entity not found"
@@ -464,7 +449,7 @@ Extract entities and relationships with focus on the above context.
             log_error("unified_memory_processor", "focused_entity_extraction", e)
             return [], []
 
-    async def _store_memory_dual(self, memory: Memory, embedding: List[float]) -> None:
+    async def _store_memory_dual(self, memory: Memory, embedding: list[float]) -> None:
         """Store memory in both Qdrant and Kuzu"""
         try:
             # Store in Qdrant
@@ -501,9 +486,7 @@ Extract entities and relationships with focus on the above context.
                 "confidence": memory.confidence,
                 "is_valid": memory.is_valid,
                 "created_at": memory.created_at.isoformat(),
-                "expires_at": (
-                    memory.expires_at.isoformat() if memory.expires_at else ""
-                ),
+                "expires_at": (memory.expires_at.isoformat() if memory.expires_at else ""),
             }
 
             success = self.kuzu.add_node("Memory", memory_props)

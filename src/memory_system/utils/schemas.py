@@ -6,7 +6,7 @@ Now supports dynamic schema generation from templates while maintaining backward
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ..templates.registry import get_template_registry
 from .schema_generator import SchemaGenerator
@@ -66,11 +66,11 @@ _STATIC_SCHEMAS = {
 }
 
 # Cache for dynamically generated schemas
-_schema_cache: Dict[str, Dict[str, Any]] = {}
-_current_template_name: Optional[str] = None
+_schema_cache: dict[str, dict[str, Any]] = {}
+_current_template_name: str | None = None
 
 
-def _get_current_schemas() -> Dict[str, Any]:
+def _get_current_schemas() -> dict[str, Any]:
     """Get schemas for the current template, using cache when possible"""
     global _schema_cache, _current_template_name
 
@@ -85,10 +85,7 @@ def _get_current_schemas() -> Dict[str, Any]:
         template_name = current_template.name
 
         # Check if we need to regenerate schemas
-        if (
-            template_name != _current_template_name
-            or template_name not in _schema_cache
-        ):
+        if template_name != _current_template_name or template_name not in _schema_cache:
             logger.info(f"Generating schemas for template: {template_name}")
 
             # Generate schemas for this template
@@ -111,12 +108,12 @@ def _get_current_schemas() -> Dict[str, Any]:
         return _STATIC_SCHEMAS.copy()
 
 
-def get_schemas() -> Dict[str, Any]:
+def get_schemas() -> dict[str, Any]:
     """Get all available schemas for the current template"""
     return _get_current_schemas()
 
 
-def get_schema(schema_name: str) -> Optional[Dict[str, Any]]:
+def get_schema(schema_name: str) -> dict[str, Any] | None:
     """Get a specific schema by name"""
     schemas = get_schemas()
     return schemas.get(schema_name)
@@ -134,13 +131,13 @@ def clear_schema_cache() -> None:
 class DynamicSchemasDict:
     """A dictionary-like object that dynamically returns schemas based on current template"""
 
-    def __getitem__(self, key: str) -> Dict[str, Any]:
+    def __getitem__(self, key: str) -> dict[str, Any]:
         schema = get_schema(key)
         if schema is None:
             raise KeyError(f"Schema not found: {key}")
         return schema
 
-    def get(self, key: str, default=None) -> Dict[str, Any]:
+    def get(self, key: str, default=None) -> dict[str, Any]:
         schema = get_schema(key)
         return schema if schema is not None else default
 

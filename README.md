@@ -146,7 +146,7 @@ pytest            # Run tests
 
 Pre-commit hooks are **mandatory** and will automatically:
 - Format code with `black` and `ruff`
-- Check imports with `isort`  
+- Check imports with `isort`
 - Run `pylint` with minimum score of 8.5/10
 - Run `mypy` type checking
 - Security scan with `bandit`

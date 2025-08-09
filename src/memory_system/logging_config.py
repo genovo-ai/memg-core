@@ -7,9 +7,8 @@ replacing print() statements and providing structured logging.
 
 import logging
 import os
-import sys
 from pathlib import Path
-from typing import Dict, Optional
+import sys
 
 
 class MemorySystemLogger:
@@ -23,16 +22,16 @@ class MemorySystemLogger:
     - Component-specific loggers
     """
 
-    _loggers: Dict[str, logging.Logger] = {}
+    _loggers: dict[str, logging.Logger] = {}
     _configured = False
 
     @classmethod
     def setup_logging(
         cls,
         level: str = "INFO",
-        log_file: Optional[str] = None,
+        log_file: str | None = None,
         console_output: bool = True,
-        file_level: Optional[str] = None,
+        file_level: str | None = None,
     ) -> logging.Logger:
         """
         Configure centralized logging for the entire memory system.
@@ -110,9 +109,7 @@ class MemorySystemLogger:
         return cls._loggers.get(logger_name, logging.getLogger(logger_name))
 
     @classmethod
-    def log_operation(
-        cls, component: str, operation: str, level: str = "INFO", **context
-    ):
+    def log_operation(cls, component: str, operation: str, level: str = "INFO", **context):
         """
         Log an operation with structured context.
 
@@ -134,9 +131,7 @@ class MemorySystemLogger:
         log_method(message)
 
     @classmethod
-    def log_performance(
-        cls, component: str, operation: str, duration_ms: float, **context
-    ):
+    def log_performance(cls, component: str, operation: str, duration_ms: float, **context):
         """
         Log performance metrics for operations.
 
@@ -180,9 +175,7 @@ def get_logger(component: str) -> logging.Logger:
     return MemorySystemLogger.get_logger(component)
 
 
-def setup_memory_logging(
-    level: str = "INFO", log_file: Optional[str] = None
-) -> logging.Logger:
+def setup_memory_logging(level: str = "INFO", log_file: str | None = None) -> logging.Logger:
     """Setup memory system logging. Convenience function."""
     return MemorySystemLogger.setup_logging(level=level, log_file=log_file)
 

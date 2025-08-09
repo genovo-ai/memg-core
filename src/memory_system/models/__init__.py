@@ -12,14 +12,19 @@ from .api import (
 # Template-aware models with backward compatibility
 # Keep original models available for legacy code
 from .core import Entity as CoreEntity
-from .core import EntityType
+from .core import (
+    EntityType,
+    ImportanceLevel,
+    Memory,
+    MemoryType,
+    ProcessingResult,
+    RelationshipStrength,
+    RelationshipType,
+    SearchResult,
+)
 from .core import EntityType as CoreEntityType
-from .core import ImportanceLevel, Memory, MemoryType, ProcessingResult
 from .core import Relationship as CoreRelationship
-from .core import RelationshipStrength
-from .core import RelationshipType
 from .core import RelationshipType as CoreRelationshipType
-from .core import SearchResult
 from .extraction import (
     ContentAnalysis,
     EntityRelationshipExtraction,

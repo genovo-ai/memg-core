@@ -57,7 +57,7 @@ Issues = "https://github.com/genovo-ai/memg-core/issues"
 [tool.pylint.main]
 # Add all required packages to recognized imports
 extension-pkg-allow-list = [
-    "google.genai", 
+    "google.genai",
     "google",
     "kuzu",
     "qdrant_client",
@@ -86,7 +86,7 @@ sys.path.insert(0, os.getcwd())
 # Enable import checking but with proper configuration
 disable = [
  "too-many-arguments",
- "too-many-instance-attributes", 
+ "too-many-instance-attributes",
  "too-few-public-methods",
  "duplicate-code",
  "too-many-locals",
@@ -122,10 +122,10 @@ fail-under = 9.5
 [tool.pylint.imports]
 # Declare all third-party packages
 known-third-party = [
-    "google", 
+    "google",
     "google.genai",
     "kuzu",
-    "qdrant_client", 
+    "qdrant_client",
     "pydantic",
     "dotenv",
     "httpx",
@@ -185,3 +185,94 @@ addopts = "-v --cov=src --cov-report=term-missing"
 [tool.bandit]
 exclude_dirs = ["tests", "test_*"]
 skips = ["B101", "B601"]
+
+# RUFF CONFIGURATION
+[tool.ruff]
+# Target Python 3.11+
+target-version = "py311"
+
+# Include source directories
+include = ["src/**/*.py", "tests/**/*.py", "integration/**/*.py"]
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "node_modules",
+]
+
+# Line length to match pylint
+line-length = 100
+
+# Enable specific rule sets
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "PIE",  # flake8-pie
+    "SIM",  # flake8-simplify
+    "RET",  # flake8-return
+    "TCH",  # flake8-type-checking
+    "PTH",  # flake8-use-pathlib
+]
+
+# Ignore specific rules that conflict with our codebase or are too strict
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+    "B008",   # Do not perform function calls in argument defaults
+    "B904",   # Within except clause, raise exceptions with raise ... from err
+    "N805",   # First argument of a method should be named `self` (conflicts with Pydantic validators)
+    "N806",   # Variable in function should be lowercase
+    "UP007",  # Use X | Y for type annotations (keep Union for compatibility)
+    "UP038",  # Use X | Y in isinstance call instead of (X, Y) - keep for readability
+    "RET504", # Unnecessary variable assignment before return
+    "SIM102", # Use a single if statement instead of nested if
+    "SIM103", # Return the condition directly
+    "SIM108", # Use ternary operator instead of if-else
+    "SIM118", # Use key in dict instead of key in dict.keys()
+    "PIE790", # Unnecessary pass statement
+    "PTH103", # os.makedirs() should be replaced by Path.mkdir()
+    "PTH118", # os.path.join() should be replaced by Path with / operator
+    "PTH120", # os.path.dirname() should be replaced by Path.parent
+    "PTH123", # open() should be replaced by Path.open()
+    "TC001",  # Move application import into TYPE_CHECKING block
+    "TC002",  # Move third-party import into TYPE_CHECKING block
+    "TC003",  # Move standard library import into TYPE_CHECKING block
+    "C401",   # Unnecessary generator (rewrite as set comprehension)
+    "C403",   # Unnecessary list comprehension (rewrite as set comprehension)
+]
+
+# Allow unused variables when they start with underscore
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can use assert statements and have longer lines
+"tests/**/*.py" = ["S101", "E501"]
+# Init files can have unused imports
+"**/__init__.py" = ["F401"]
+
+[tool.ruff.format]
+# Use double quotes for strings
+quote-style = "double"
+# Use trailing commas in multi-line structures
+skip-magic-trailing-comma = false
+# Respect existing line endings
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+# Organize imports
+known-first-party = ["memory_system"]
+force-single-line = false
+force-sort-within-sections = true

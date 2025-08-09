@@ -12,7 +12,7 @@ Usage:
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..models import Entity, Memory, Relationship
 from .pipeline_validator import PipelineValidationReport, PipelineValidator
@@ -32,9 +32,9 @@ class StandaloneValidator:
 
     def validate_ai_outputs(
         self,
-        content_analysis_output: Dict[str, Any],
-        memory_extraction_output: Dict[str, Any],
-        entity_extraction_output: Optional[Dict[str, Any]] = None,
+        content_analysis_output: dict[str, Any],
+        memory_extraction_output: dict[str, Any],
+        entity_extraction_output: dict[str, Any] | None = None,
     ) -> PipelineValidationReport:
         """
         Validate raw AI outputs against schemas.
@@ -74,9 +74,9 @@ class StandaloneValidator:
 
     def validate_memory_objects(
         self,
-        memories: List[Memory],
-        entities: Optional[List[Entity]] = None,
-        relationships: Optional[List[Relationship]] = None,
+        memories: list[Memory],
+        entities: list[Entity] | None = None,
+        relationships: list[Relationship] | None = None,
     ) -> PipelineValidationReport:
         """
         Validate Memory, Entity, and Relationship objects for database compatibility.
@@ -95,8 +95,10 @@ class StandaloneValidator:
 
         # Validate memories
         for i, memory in enumerate(memories):
-            qdrant_result = self.pipeline_validator.schema_validator.validate_database_compatibility(
-                memory, "qdrant"
+            qdrant_result = (
+                self.pipeline_validator.schema_validator.validate_database_compatibility(
+                    memory, "qdrant"
+                )
             )
             qdrant_result.component = f"Memory {i + 1} (Qdrant)"
             report.add_validation_result(qdrant_result)
@@ -110,8 +112,10 @@ class StandaloneValidator:
         # Validate entities if provided
         if entities:
             for i, entity in enumerate(entities):
-                entity_result = self.pipeline_validator.schema_validator.validate_database_compatibility(
-                    entity, "kuzu"
+                entity_result = (
+                    self.pipeline_validator.schema_validator.validate_database_compatibility(
+                        entity, "kuzu"
+                    )
                 )
                 entity_result.component = f"Entity {i + 1} ({entity.name})"
                 report.add_validation_result(entity_result)
@@ -123,9 +127,7 @@ class StandaloneValidator:
                 rel_result = self.pipeline_validator.schema_validator.validate_relationship_schema(
                     rel_data
                 )
-                rel_result.component = (
-                    f"Relationship {i + 1} ({relationship.relationship_type})"
-                )
+                rel_result.component = f"Relationship {i + 1} ({relationship.relationship_type})"
                 report.add_validation_result(rel_result)
 
         return report
@@ -133,12 +135,12 @@ class StandaloneValidator:
     def validate_complete_flow(
         self,
         original_content: str,
-        ai_content_analysis: Dict[str, Any],
-        ai_memory_extraction: Dict[str, Any],
-        final_memories: List[Memory],
-        ai_entity_extraction: Optional[Dict[str, Any]] = None,
-        extracted_entities: Optional[List[Entity]] = None,
-        extracted_relationships: Optional[List[Relationship]] = None,
+        ai_content_analysis: dict[str, Any],
+        ai_memory_extraction: dict[str, Any],
+        final_memories: list[Memory],
+        ai_entity_extraction: dict[str, Any] | None = None,
+        extracted_entities: list[Entity] | None = None,
+        extracted_relationships: list[Relationship] | None = None,
     ) -> PipelineValidationReport:
         """
         Validate the complete memory processing flow end-to-end.
@@ -211,7 +213,7 @@ def create_validator() -> StandaloneValidator:
 
 
 # Convenience functions for common validation tasks
-def validate_ai_output(output: Dict[str, Any], schema_name: str) -> bool:
+def validate_ai_output(output: dict[str, Any], schema_name: str) -> bool:
     """
     Quick validation of AI output against schema.
 
@@ -223,13 +225,11 @@ def validate_ai_output(output: Dict[str, Any], schema_name: str) -> bool:
         True if valid, False if issues found
     """
     validator = create_validator()
-    result = validator.pipeline_validator.schema_validator.validate_ai_output(
-        output, schema_name
-    )
+    result = validator.pipeline_validator.schema_validator.validate_ai_output(output, schema_name)
     return result.is_valid
 
 
-def validate_memory_list(memories: List[Memory]) -> bool:
+def validate_memory_list(memories: list[Memory]) -> bool:
     """
     Quick validation of a list of Memory objects.
 

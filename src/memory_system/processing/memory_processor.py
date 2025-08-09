@@ -9,7 +9,6 @@ This module handles the end-to-end processing for documents and notes:
 """
 
 import os
-from typing import List, Optional, Tuple
 
 from ..exceptions import NetworkError, ProcessingError, ValidationError
 from ..kuzu_graph.interface import KuzuInterface
@@ -44,10 +43,10 @@ class MemoryProcessor:
 
     def __init__(
         self,
-        qdrant_interface: Optional[QdrantInterface] = None,
-        kuzu_interface: Optional[KuzuInterface] = None,
-        genai_client: Optional[GenAI] = None,
-        embedder: Optional[GenAIEmbedder] = None,
+        qdrant_interface: QdrantInterface | None = None,
+        kuzu_interface: KuzuInterface | None = None,
+        genai_client: GenAI | None = None,
+        embedder: GenAIEmbedder | None = None,
     ):
         """
         Initialize the Memory Processor with required interfaces.
@@ -81,9 +80,7 @@ class MemoryProcessor:
         Returns:
             ProcessingResponse with operation details and success status
         """
-        logger.info(
-            f"Starting g^mem processing for content: {request.content[:100]}..."
-        )
+        logger.info(f"Starting g^mem processing for content: {request.content[:100]}...")
         processing_start = self._get_timestamp_ms()
 
         try:
@@ -157,9 +154,7 @@ class MemoryProcessor:
 
                     # Step 4.6: Update Qdrant payload with extracted entity types for filtering
                     if entities:
-                        entity_types = list(
-                            set([entity.type.value for entity in entities])
-                        )
+                        entity_types = list(set([entity.type.value for entity in entities]))
 
                         # Update the Qdrant point with entity_types field
                         updated_payload = memory.to_qdrant_payload()
@@ -170,13 +165,9 @@ class MemoryProcessor:
                         )
 
                         if success:
-                            logger.info(
-                                f"Updated Qdrant payload with entity types: {entity_types}"
-                            )
+                            logger.info(f"Updated Qdrant payload with entity types: {entity_types}")
                         else:
-                            logger.warning(
-                                "Failed to update Qdrant payload with entity types"
-                            )
+                            logger.warning("Failed to update Qdrant payload with entity types")
 
                 except Exception as e:
                     logger.warning(f"Entity extraction failed, continuing without: {e}")
@@ -258,8 +249,8 @@ class MemoryProcessor:
             )
 
     async def _detect_and_verify_type(
-        self, content: str, suggested_type: Optional[MemoryType]
-    ) -> Tuple[MemoryType, bool, bool, Optional[MemoryType]]:
+        self, content: str, suggested_type: MemoryType | None
+    ) -> tuple[MemoryType, bool, bool, MemoryType | None]:
         """
         AI-based type detection and verification with word count heuristics.
 
@@ -284,22 +275,17 @@ class MemoryProcessor:
                 # No suggestion, use AI detection
                 return ai_type, True, False, None
 
-            elif suggested_type == ai_type:
+            if suggested_type == ai_type:
                 # Suggestion matches AI, all good
                 return ai_type, True, False, None
 
-            elif suggested_type == MemoryType.TASK:
+            if suggested_type == MemoryType.TASK:
                 # Always respect explicit TASK type - it's intentional from task management
-                logger.info(
-                    f"Preserving explicit TASK type (AI suggested: {ai_type.value})"
-                )
+                logger.info(f"Preserving explicit TASK type (AI suggested: {ai_type.value})")
                 return MemoryType.TASK, True, False, None
-            else:
-                # AI disagrees with suggestion, use AI decision
-                logger.info(
-                    f"Type correction: {suggested_type.value} -> {ai_type.value}"
-                )
-                return ai_type, True, True, suggested_type
+            # AI disagrees with suggestion, use AI decision
+            logger.info(f"Type correction: {suggested_type.value} -> {ai_type.value}")
+            return ai_type, True, True, suggested_type
 
         except (NetworkError, ConnectionError, TimeoutError) as e:
             log_error(
@@ -353,7 +339,7 @@ class MemoryProcessor:
                 ]
             ):
                 return MemoryType.DOCUMENT
-            elif any(
+            if any(
                 keyword in content.lower()
                 for keyword in [
                     "task",
@@ -374,7 +360,7 @@ class MemoryProcessor:
                 return MemoryType.TASK
             return MemoryType.NOTE
 
-        elif word_count > 200:
+        if word_count > 200:
             # Long content: likely a document unless clearly a brief record
             if any(
                 keyword in content.lower()
@@ -404,10 +390,9 @@ class MemoryProcessor:
             response_lower = response.strip().lower()
             if "task" in response_lower:
                 return MemoryType.TASK
-            elif "document" in response_lower:
+            if "document" in response_lower:
                 return MemoryType.DOCUMENT
-            else:
-                return MemoryType.NOTE
+            return MemoryType.NOTE
 
         except (NetworkError, ConnectionError, TimeoutError) as e:
             log_error(
@@ -467,21 +452,15 @@ class MemoryProcessor:
             return summary.strip()
 
         except (NetworkError, ConnectionError, TimeoutError) as e:
-            log_error(
-                "memory_processor", "summary_generation", e, content_length=len(content)
-            )
+            log_error("memory_processor", "summary_generation", e, content_length=len(content))
             # Fallback to simple truncation for network issues
             return content[:200] + "..." if len(content) > 200 else content
         except (ValidationError, ValueError) as e:
-            log_error(
-                "memory_processor", "summary_generation", e, content_length=len(content)
-            )
+            log_error("memory_processor", "summary_generation", e, content_length=len(content))
             # Fallback to simple truncation for validation issues
             return content[:200] + "..." if len(content) > 200 else content
         except Exception as e:
-            log_error(
-                "memory_processor", "summary_generation", e, content_length=len(content)
-            )
+            log_error("memory_processor", "summary_generation", e, content_length=len(content))
             # Fallback to simple truncation
             return content[:200] + "..." if len(content) > 200 else content
 
@@ -489,7 +468,7 @@ class MemoryProcessor:
         self,
         request: CreateMemoryRequest,
         final_type: MemoryType,
-        summary: Optional[str],
+        summary: str | None,
         ai_verified: bool,
     ) -> Memory:
         """
@@ -523,9 +502,7 @@ class MemoryProcessor:
             project_name=request.project_name,
         )
 
-        logger.debug(
-            f"Created memory object: {memory.id[:8]}... (type: {final_type.value})"
-        )
+        logger.debug(f"Created memory object: {memory.id[:8]}... (type: {final_type.value})")
         return memory
 
     async def _store_memory_dual(self, memory: Memory) -> bool:
@@ -567,8 +544,8 @@ class MemoryProcessor:
     async def invalidate_memory(
         self,
         memory_id: str,
-        invalidated_by: Optional[str] = None,
-        reason: Optional[str] = None,
+        invalidated_by: str | None = None,
+        reason: str | None = None,
     ) -> bool:
         """
         Mark a memory as invalid instead of deleting it (temporal reasoning).
@@ -607,7 +584,7 @@ class MemoryProcessor:
             return False
 
     async def invalidate_conflicting_memories(
-        self, new_memory: Memory, conflict_ids: List[str]
+        self, new_memory: Memory, conflict_ids: list[str]
     ) -> int:
         """
         Invalidate memories that conflict with a new memory.
@@ -650,9 +627,7 @@ class MemoryProcessor:
         config = get_config()
         return config.memg.enable_temporal_reasoning
 
-    async def _extract_entities_and_relationships(
-        self, memory: Memory
-    ) -> tuple[List, List]:
+    async def _extract_entities_and_relationships(self, memory: Memory) -> tuple[list, list]:
         """
         Extract entities and relationships from a memory using GenAI.
 
@@ -689,15 +664,11 @@ Extract entities and relationships from this memory content.
                 content=input_text, json_schema=schema_dict
             )
 
-            logger.debug(
-                f"GenAI entity/relationship extraction result: {extraction_result}"
-            )
+            logger.debug(f"GenAI entity/relationship extraction result: {extraction_result}")
 
             # Convert and store entities
             entities = []
-            entity_name_to_id = (
-                {}
-            )  # Map entity names to UUIDs for relationship creation
+            entity_name_to_id = {}  # Map entity names to UUIDs for relationship creation
 
             for entity_data in extraction_result.get("entities", []):
                 try:

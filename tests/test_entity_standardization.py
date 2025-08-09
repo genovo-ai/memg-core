@@ -149,11 +149,8 @@ class TestIntegrationPipeline:
         with (
             patch("memory_system.processing.memory_retriever.QdrantInterface"),
             patch("memory_system.processing.memory_retriever.GenAIEmbedder"),
-            patch(
-                "memory_system.processing.memory_retriever.KuzuInterface"
-            ) as mock_kuzu,
+            patch("memory_system.processing.memory_retriever.KuzuInterface") as mock_kuzu,
         ):
-
             retriever = MemoryRetriever()
 
             # Mock the query method to capture the query string
@@ -163,18 +160,14 @@ class TestIntegrationPipeline:
             import asyncio
 
             try:
-                asyncio.run(
-                    retriever.search_by_technology("docker", user_id="test_user")
-                )
+                asyncio.run(retriever.search_by_technology("docker", user_id="test_user"))
             except Exception:
                 pass  # We expect this to fail due to mocking, but we want to check the query
 
             # Verify the query was called with correct EntityTypes
             if mock_kuzu.return_value.query.called:
                 call_args = mock_kuzu.return_value.query.call_args
-                query_string = call_args[0][
-                    0
-                ]  # First argument should be the query string
+                query_string = call_args[0][0]  # First argument should be the query string
 
                 # Check that the query contains the correct entity types for technology search
                 assert "TECHNOLOGY" in query_string
@@ -189,20 +182,15 @@ class TestIntegrationPipeline:
         with (
             patch("memory_system.processing.memory_retriever.QdrantInterface"),
             patch("memory_system.processing.memory_retriever.GenAIEmbedder"),
-            patch(
-                "memory_system.processing.memory_retriever.KuzuInterface"
-            ) as mock_kuzu,
+            patch("memory_system.processing.memory_retriever.KuzuInterface") as mock_kuzu,
         ):
-
             retriever = MemoryRetriever()
             mock_kuzu.return_value.query.return_value = []
 
             import asyncio
 
             try:
-                asyncio.run(
-                    retriever.search_by_component("api-service", user_id="test_user")
-                )
+                asyncio.run(retriever.search_by_component("api-service", user_id="test_user"))
             except Exception:
                 pass
 
@@ -222,11 +210,8 @@ class TestIntegrationPipeline:
         with (
             patch("memory_system.processing.memory_retriever.QdrantInterface"),
             patch("memory_system.processing.memory_retriever.GenAIEmbedder"),
-            patch(
-                "memory_system.processing.memory_retriever.KuzuInterface"
-            ) as mock_kuzu,
+            patch("memory_system.processing.memory_retriever.KuzuInterface") as mock_kuzu,
         ):
-
             retriever = MemoryRetriever()
             mock_kuzu.return_value.query.return_value = []
 
@@ -234,9 +219,7 @@ class TestIntegrationPipeline:
 
             try:
                 asyncio.run(
-                    retriever.find_error_solutions(
-                        "connection failed", user_id="test_user"
-                    )
+                    retriever.find_error_solutions("connection failed", user_id="test_user")
                 )
             except Exception:
                 pass
@@ -261,9 +244,7 @@ class TestMemoryCreation:
         )
         assert memory.memory_type == MemoryType.DOCUMENT
 
-        memory2 = Memory(
-            user_id="test_user", content="Test note", memory_type=MemoryType.NOTE
-        )
+        memory2 = Memory(user_id="test_user", content="Test note", memory_type=MemoryType.NOTE)
         assert memory2.memory_type == MemoryType.NOTE
 
     def test_memory_serialization_preserves_types(self):

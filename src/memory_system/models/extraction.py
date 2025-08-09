@@ -1,7 +1,6 @@
 """Data models for AI extraction and analysis"""
 
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -11,25 +10,25 @@ class TextAnalysis(BaseModel):
 
     title: str = Field(..., description="Generated title")
     summary: str = Field(..., description="Content summary")
-    topics: List[str] = Field(..., description="Identified topics")
-    key_concepts: List[str] = Field(default_factory=list)
+    topics: list[str] = Field(..., description="Identified topics")
+    key_concepts: list[str] = Field(default_factory=list)
 
     # Additional metadata not in schema
     confidence: float = Field(0.8, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class MemoryExtraction(BaseModel):
     """Memory extraction result matching memory_extraction schema"""
 
-    memories: List[str] = Field(..., description="Extracted memory facts")
-    confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
-    extraction_context: Optional[str] = Field(None)
+    memories: list[str] = Field(..., description="Extracted memory facts")
+    confidence: float | None = Field(None, ge=0.0, le=1.0)
+    extraction_context: str | None = Field(None)
 
     # Additional processing metadata
-    source_content: Optional[str] = Field(None)
+    source_content: str | None = Field(None)
     processing_method: str = Field("ai_extraction")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @field_validator("memories")
     @classmethod
@@ -48,8 +47,8 @@ class ExtractedEntity(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0)
 
     # Optional fields from schema
-    importance: Optional[str] = Field(None, pattern="^(LOW|MEDIUM|HIGH|CRITICAL)$")
-    context: Optional[str] = Field(None)
+    importance: str | None = Field(None, pattern="^(LOW|MEDIUM|HIGH|CRITICAL)$")
+    context: str | None = Field(None)
 
 
 class ExtractedRelationship(BaseModel):
@@ -61,47 +60,43 @@ class ExtractedRelationship(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0)
 
     # Optional fields from schema
-    strength: Optional[str] = Field(None, pattern="^(WEAK|MODERATE|STRONG|ESSENTIAL)$")
-    context: Optional[str] = Field(None)
+    strength: str | None = Field(None, pattern="^(WEAK|MODERATE|STRONG|ESSENTIAL)$")
+    context: str | None = Field(None)
 
 
 class EntityRelationshipExtraction(BaseModel):
     """Entity and relationship extraction matching entity_relationship_extraction schema"""
 
-    entities: List[ExtractedEntity] = Field(..., description="Extracted entities")
-    relationships: List[ExtractedRelationship] = Field(
-        ..., description="Extracted relationships"
-    )
+    entities: list[ExtractedEntity] = Field(..., description="Extracted entities")
+    relationships: list[ExtractedRelationship] = Field(..., description="Extracted relationships")
 
     # Additional processing metadata
-    source_content: Optional[str] = Field(None)
+    source_content: str | None = Field(None)
     processing_method: str = Field("ai_extraction")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ContentMetadata(BaseModel):
     """Content metadata from schema"""
 
-    complexity: Optional[str] = Field(
-        None, pattern="^(SIMPLE|MODERATE|COMPLEX|EXPERT)$"
-    )
-    domain: Optional[str] = Field(None)
-    priority: Optional[str] = Field(None, pattern="^(LOW|MEDIUM|HIGH|URGENT)$")
+    complexity: str | None = Field(None, pattern="^(SIMPLE|MODERATE|COMPLEX|EXPERT)$")
+    domain: str | None = Field(None)
+    priority: str | None = Field(None, pattern="^(LOW|MEDIUM|HIGH|URGENT)$")
 
 
 class ContentAnalysis(BaseModel):
     """Content analysis result matching content_analysis schema"""
 
     content_type: str = Field(..., description="Type of content")
-    main_themes: List[str] = Field(..., description="Main themes")
-    key_insights: List[str] = Field(default_factory=list)
-    actionable_items: List[str] = Field(default_factory=list)
-    metadata: Optional[ContentMetadata] = Field(None)
+    main_themes: list[str] = Field(..., description="Main themes")
+    key_insights: list[str] = Field(default_factory=list)
+    actionable_items: list[str] = Field(default_factory=list)
+    metadata: ContentMetadata | None = Field(None)
 
     # Additional processing metadata
-    source_content: Optional[str] = Field(None)
+    source_content: str | None = Field(None)
     processing_method: str = Field("ai_analysis")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ExtractionContext(BaseModel):
@@ -122,9 +117,9 @@ class ExtractionContext(BaseModel):
     max_relationships: int = Field(100, ge=1, le=500)
 
     # Metadata
-    source: Optional[str] = Field(None)
-    user_id: Optional[str] = Field(None)
-    session_id: Optional[str] = Field(None)
+    source: str | None = Field(None)
+    user_id: str | None = Field(None)
+    session_id: str | None = Field(None)
 
 
 class ExtractionResult(BaseModel):
@@ -133,20 +128,20 @@ class ExtractionResult(BaseModel):
     success: bool
 
     # Extracted data
-    text_analysis: Optional[TextAnalysis] = Field(None)
-    memory_extraction: Optional[MemoryExtraction] = Field(None)
-    entity_extraction: Optional[EntityRelationshipExtraction] = Field(None)
-    content_analysis: Optional[ContentAnalysis] = Field(None)
+    text_analysis: TextAnalysis | None = Field(None)
+    memory_extraction: MemoryExtraction | None = Field(None)
+    entity_extraction: EntityRelationshipExtraction | None = Field(None)
+    content_analysis: ContentAnalysis | None = Field(None)
 
     # Processing metadata
     processing_time_ms: float
-    errors: List[str] = Field(default_factory=list)
-    warnings: List[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
     # Context
     source_content_length: int
     extraction_method: str = Field("ai_pipeline")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def has_extractions(self) -> bool:

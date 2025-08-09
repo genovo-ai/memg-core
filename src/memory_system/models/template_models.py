@@ -2,9 +2,9 @@
 Template-aware models for MEMG - Dynamic entity and relationship types
 """
 
+from datetime import UTC, datetime
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, validator
@@ -17,25 +17,23 @@ logger = logging.getLogger(__name__)
 class TemplateAwareEntity(BaseModel):
     """Template-aware entity that validates against current template"""
 
-    id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
+    id: str | None = Field(default_factory=lambda: str(uuid4()))
     user_id: str = Field(..., description="User ID for entity isolation")
     name: str = Field(..., description="Entity name")
-    type: str = Field(
-        ..., description="Entity type (validated against current template)"
-    )
+    type: str = Field(..., description="Entity type (validated against current template)")
     description: str = Field(..., description="Entity description")
     confidence: float = Field(0.8, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Backward compatibility fields
     is_valid: bool = Field(True)
-    source_memory_id: Optional[str] = Field(None, description="Source memory ID")
+    source_memory_id: str | None = Field(None, description="Source memory ID")
 
     # Template-specific fields
-    importance: Optional[str] = Field("MEDIUM", description="Entity importance level")
-    context: Optional[str] = Field(None, description="Entity context information")
-    category: Optional[str] = Field(None, description="Entity category")
+    importance: str | None = Field("MEDIUM", description="Entity importance level")
+    context: str | None = Field(None, description="Entity context information")
+    category: str | None = Field(None, description="Entity category")
 
     @validator("type")
     def validate_entity_type(cls, v):
@@ -76,7 +74,7 @@ class TemplateAwareEntity(BaseModel):
             logger.error(f"Error getting type definition for '{self.type}': {e}")
             return None
 
-    def to_kuzu_node(self) -> Dict[str, Any]:
+    def to_kuzu_node(self) -> dict[str, Any]:
         """Convert to Kuzu node properties"""
         return {
             "id": self.id,
@@ -98,27 +96,23 @@ class TemplateAwareEntity(BaseModel):
 class TemplateAwareRelationship(BaseModel):
     """Template-aware relationship that validates against current template"""
 
-    id: Optional[str] = Field(default_factory=lambda: str(uuid4()))
+    id: str | None = Field(default_factory=lambda: str(uuid4()))
     user_id: str = Field(..., description="User ID for relationship isolation")
     source_entity_id: str = Field(..., description="Source entity ID")
     target_entity_id: str = Field(..., description="Target entity ID")
-    type: str = Field(
-        ..., description="Relationship type (validated against current template)"
-    )
+    type: str = Field(..., description="Relationship type (validated against current template)")
     confidence: float = Field(0.8, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Backward compatibility fields
     is_valid: bool = Field(True)
-    source_memory_id: Optional[str] = Field(None, description="Source memory ID")
+    source_memory_id: str | None = Field(None, description="Source memory ID")
 
     # Template-specific fields
-    strength: Optional[str] = Field("MODERATE", description="Relationship strength")
-    context: Optional[str] = Field(None, description="Relationship context")
-    directionality: Optional[str] = Field(
-        None, description="Relationship directionality"
-    )
+    strength: str | None = Field("MODERATE", description="Relationship strength")
+    context: str | None = Field(None, description="Relationship context")
+    directionality: str | None = Field(None, description="Relationship directionality")
 
     @validator("type")
     def validate_relationship_type(cls, v):
@@ -128,9 +122,7 @@ class TemplateAwareRelationship(BaseModel):
             current_template = registry.get_current_template()
 
             if not current_template:
-                logger.warning(
-                    f"No current template found, accepting relationship type: {v}"
-                )
+                logger.warning(f"No current template found, accepting relationship type: {v}")
                 return v
 
             valid_types = current_template.get_relationship_type_names()
@@ -161,7 +153,7 @@ class TemplateAwareRelationship(BaseModel):
             logger.error(f"Error getting type definition for '{self.type}': {e}")
             return None
 
-    def to_kuzu_props(self) -> Dict[str, Any]:
+    def to_kuzu_props(self) -> dict[str, Any]:
         """Convert to Kuzu relationship properties"""
         return {
             "user_id": self.user_id,
@@ -207,7 +199,7 @@ def validate_relationship_type(relationship_type: str) -> bool:
         return True  # Default to accepting in case of error
 
 
-def get_valid_entity_types() -> List[str]:
+def get_valid_entity_types() -> list[str]:
     """Get list of valid entity types for current template"""
     try:
         registry = get_template_registry()
@@ -222,7 +214,7 @@ def get_valid_entity_types() -> List[str]:
         return []
 
 
-def get_valid_relationship_types() -> List[str]:
+def get_valid_relationship_types() -> list[str]:
     """Get list of valid relationship types for current template"""
     try:
         registry = get_template_registry()
@@ -246,13 +238,12 @@ class DynamicEntityType:
         """Convert string to validated entity type"""
         if validate_entity_type(value):
             return value
-        else:
-            # For backward compatibility, still return the value but log warning
-            logger.warning(f"Entity type '{value}' not found in current template")
-            return value
+        # For backward compatibility, still return the value but log warning
+        logger.warning(f"Entity type '{value}' not found in current template")
+        return value
 
     @classmethod
-    def values(cls) -> List[str]:
+    def values(cls) -> list[str]:
         """Get all valid entity type values"""
         return get_valid_entity_types()
 
@@ -265,13 +256,12 @@ class DynamicRelationshipType:
         """Convert string to validated relationship type"""
         if validate_relationship_type(value):
             return value
-        else:
-            # For backward compatibility, still return the value but log warning
-            logger.warning(f"Relationship type '{value}' not found in current template")
-            return value
+        # For backward compatibility, still return the value but log warning
+        logger.warning(f"Relationship type '{value}' not found in current template")
+        return value
 
     @classmethod
-    def values(cls) -> List[str]:
+    def values(cls) -> list[str]:
         """Get all valid relationship type values"""
         return get_valid_relationship_types()
 

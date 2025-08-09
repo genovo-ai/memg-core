@@ -5,9 +5,9 @@ Simplified configuration focusing on core document/note processing
 with minimal, essential parameters for the g^mem system.
 """
 
-import os
 from dataclasses import dataclass, field
-from typing import Any, Dict
+import os
+from typing import Any
 
 
 @dataclass
@@ -25,13 +25,9 @@ class MemGConfig:
     high_similarity_threshold: float = 0.9  # For duplicate detection (future use)
 
     # Processing settings
-    max_summary_tokens: int = (
-        750  # Max tokens for document summarization (latency control)
-    )
+    max_summary_tokens: int = 750  # Max tokens for document summarization (latency control)
     enable_ai_type_verification: bool = True  # AI-based type detection
-    enable_temporal_reasoning: bool = (
-        False  # Enable temporal reasoning for memory updates
-    )
+    enable_temporal_reasoning: bool = False  # Enable temporal reasoning for memory updates
 
     # Performance settings
     vector_dimension: int = 768  # Embedding dimension
@@ -55,7 +51,7 @@ class MemGConfig:
         if self.max_summary_tokens < 100:
             raise ValueError("max_summary_tokens must be at least 100")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary"""
         return {
             "similarity_threshold": self.similarity_threshold,
@@ -71,7 +67,7 @@ class MemGConfig:
         }
 
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> "MemGConfig":
+    def from_dict(cls, config_dict: dict[str, Any]) -> "MemGConfig":
         """Create configuration from dictionary"""
         return cls(**config_dict)
 
@@ -81,9 +77,7 @@ class MemGConfig:
         return cls(
             similarity_threshold=float(os.getenv("MEMG_SIMILARITY_THRESHOLD", "0.7")),
             score_threshold=float(os.getenv("MEMG_SCORE_THRESHOLD", "0.3")),
-            high_similarity_threshold=float(
-                os.getenv("MEMG_HIGH_SIMILARITY_THRESHOLD", "0.9")
-            ),
+            high_similarity_threshold=float(os.getenv("MEMG_HIGH_SIMILARITY_THRESHOLD", "0.9")),
             max_summary_tokens=int(os.getenv("MEMG_MAX_SUMMARY_TOKENS", "750")),
             enable_ai_type_verification=os.getenv(
                 "MEMG_ENABLE_AI_TYPE_VERIFICATION", "true"

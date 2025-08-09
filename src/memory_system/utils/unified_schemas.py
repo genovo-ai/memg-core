@@ -2,7 +2,7 @@
 Unified JSON schemas for optimized AI processing - 2-call approach
 """
 
-from typing import Any, Dict
+from typing import Any
 
 # Unified Content Analysis Schema - combines type detection, summary, and themes
 UNIFIED_CONTENT_ANALYSIS_SCHEMA = {
@@ -71,6 +71,6 @@ UNIFIED_CONTENT_ANALYSIS_SCHEMA = {
 }
 
 
-def get_unified_schemas() -> Dict[str, Any]:
+def get_unified_schemas() -> dict[str, Any]:
     """Get all unified schemas"""
     return {"unified_content_analysis": UNIFIED_CONTENT_ANALYSIS_SCHEMA}

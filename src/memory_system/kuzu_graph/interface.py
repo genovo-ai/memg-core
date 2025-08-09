@@ -2,10 +2,10 @@
 """Simple Kuzu interface wrapper"""
 
 import os
-from typing import Any, Dict, List
+from typing import Any
 
-import kuzu
 from dotenv import load_dotenv
+import kuzu
 
 
 class KuzuInterface:
@@ -28,7 +28,7 @@ class KuzuInterface:
         self.conn = kuzu.Connection(self.db)
         # Database already has schema, no setup needed
 
-    def add_node(self, table: str, properties: Dict[str, Any]) -> bool:
+    def add_node(self, table: str, properties: dict[str, Any]) -> bool:
         """Add a node to the graph"""
         try:
             # Create table if it doesn't exist with full schema
@@ -93,7 +93,7 @@ class KuzuInterface:
                 """
                 )
 
-            props = ", ".join([f"{k}: ${k}" for k in properties.keys()])
+            props = ", ".join([f"{k}: ${k}" for k in properties])
             query = f"CREATE (:{table} {{{props}}})"
             self.conn.execute(query, parameters=properties)
             return True
@@ -108,7 +108,7 @@ class KuzuInterface:
         rel_type: str,
         from_id: str,
         to_id: str,
-        props: Dict = None,
+        props: dict = None,
     ) -> bool:
         """Add relationship between nodes"""
         try:
@@ -126,17 +126,14 @@ class KuzuInterface:
                     return "DOUBLE"
                 if key in ["is_valid"]:
                     return "BOOLEAN"
-                elif isinstance(value, (int, float)):
+                if isinstance(value, (int, float)):
                     return "DOUBLE"
-                elif isinstance(value, bool):
+                if isinstance(value, bool):
                     return "BOOLEAN"
-                else:
-                    return "STRING"
+                return "STRING"
 
             prop_columns = (
-                ", ".join([f"{k} {get_kuzu_type(k, v)}" for k, v in props.items()])
-                if props
-                else ""
+                ", ".join([f"{k} {get_kuzu_type(k, v)}" for k, v in props.items()]) if props else ""
             )
             extra_cols = f", {prop_columns}" if prop_columns else ""
 
@@ -150,9 +147,7 @@ class KuzuInterface:
             except Exception as schema_error:
                 if "type" in str(schema_error).lower():
                     # Schema mismatch - drop and recreate table
-                    print(
-                        f"🔧 Recreating relationship table {rel_type} due to schema mismatch"
-                    )
+                    print(f"🔧 Recreating relationship table {rel_type} due to schema mismatch")
                     try:
                         self.conn.execute(f"DROP TABLE {rel_type}")
                         self.conn.execute(create_table_sql)
@@ -177,7 +172,7 @@ class KuzuInterface:
             print(f"❌ add_relationship error: {e}")
             return False
 
-    def query(self, cypher: str, params: Dict = None) -> List[Dict[str, Any]]:
+    def query(self, cypher: str, params: dict = None) -> list[dict[str, Any]]:
         """Execute Cypher query and return results"""
         try:
             result = self.conn.execute(cypher, parameters=params or {}).get_as_df()

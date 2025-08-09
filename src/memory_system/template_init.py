@@ -3,7 +3,6 @@ Template system initialization for MEMG
 """
 
 import logging
-from typing import Optional
 
 from .config import get_config
 from .templates.registry import get_template_registry, initialize_template_system
@@ -12,7 +11,7 @@ from .utils.schemas import clear_schema_cache
 logger = logging.getLogger(__name__)
 
 
-def initialize_templates(template_name: Optional[str] = None) -> bool:
+def initialize_templates(template_name: str | None = None) -> bool:
     """
     Initialize the template system for MEMG
 
@@ -104,9 +103,7 @@ def get_current_template_info() -> dict:
             "entity_types_count": len(current_template.entity_types),
             "relationship_types_count": len(current_template.relationship_types),
             "entity_types": [et.name for et in current_template.entity_types],
-            "relationship_types": [
-                rt.name for rt in current_template.relationship_types
-            ],
+            "relationship_types": [rt.name for rt in current_template.relationship_types],
         }
 
     except Exception as e:

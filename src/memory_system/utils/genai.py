@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -23,8 +23,8 @@ class GenAI:
     def __init__(
         self,
         system_instruction: str,
-        api_key: Optional[str] = None,
-        model: Optional[str] = None,
+        api_key: str | None = None,
+        model: str | None = None,
     ):
         """
         Initialize the GenAI client using API key only.
@@ -45,9 +45,7 @@ class GenAI:
         self.system_instruction = system_instruction
         self.model = model
 
-    def generate_json(
-        self, content: str, json_schema: str | Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def generate_json(self, content: str, json_schema: str | dict[str, Any]) -> dict[str, Any]:
         """
         Generate structured content based on the input and schema.
 

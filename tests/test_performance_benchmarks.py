@@ -51,9 +51,7 @@ class TestPerformanceBenchmarks:
         duration = end_time - start_time
 
         # Should create 100 memories in under 0.1 seconds
-        assert (
-            duration < 0.1
-        ), f"Memory creation too slow: {duration:.3f}s for 100 memories"
+        assert duration < 0.1, f"Memory creation too slow: {duration:.3f}s for 100 memories"
 
         # Verify all memories were created correctly
         assert len(memories) == 100
@@ -79,9 +77,7 @@ class TestPerformanceBenchmarks:
         duration = end_time - start_time
 
         # Should create 100 entities in under 0.1 seconds
-        assert (
-            duration < 0.1
-        ), f"Entity creation too slow: {duration:.3f}s for 100 entities"
+        assert duration < 0.1, f"Entity creation too slow: {duration:.3f}s for 100 entities"
 
         # Verify entity types are distributed
         type_counts = {}
@@ -190,14 +186,10 @@ class TestPerformanceBenchmarks:
             for i in range(100)
         ]
 
-        collection_size = sys.getsizeof(memories) + sum(
-            sys.getsizeof(m) for m in memories
-        )
+        collection_size = sys.getsizeof(memories) + sum(sys.getsizeof(m) for m in memories)
 
         # 100 memories should be under 100KB total
-        assert (
-            collection_size < 100 * 1024
-        ), f"Memory collection too large: {collection_size} bytes"
+        assert collection_size < 100 * 1024, f"Memory collection too large: {collection_size} bytes"
 
     def test_concurrent_operations_simulation(self):
         """Test system can handle multiple operations efficiently."""
@@ -258,14 +250,12 @@ class TestPerformanceBenchmarks:
             operation_results.append(results.get())
 
         # Should complete 10 concurrent operations in under 1 second
-        assert (
-            total_duration < 1.0
-        ), f"Concurrent operations too slow: {total_duration:.3f}s"
+        assert total_duration < 1.0, f"Concurrent operations too slow: {total_duration:.3f}s"
 
         # Verify all operations completed
-        assert (
-            len(operation_results) == 10
-        ), f"Not all operations completed: {len(operation_results)}"
+        assert len(operation_results) == 10, (
+            f"Not all operations completed: {len(operation_results)}"
+        )
 
         # Verify each operation was reasonably fast
         for op_type, duration, count in operation_results:
@@ -360,9 +350,7 @@ class TestResourceUsage:
         memory_increase = current_memory - baseline_memory
 
         # Should not use more than 50MB for 1000 objects (very generous limit)
-        assert (
-            memory_increase < 50
-        ), f"Memory usage too high: {memory_increase:.1f}MB increase"
+        assert memory_increase < 50, f"Memory usage too high: {memory_increase:.1f}MB increase"
 
         # Clean up and verify memory is released
         del memories, entities, relationships
@@ -372,9 +360,7 @@ class TestResourceUsage:
         memory_retained = final_memory - baseline_memory
 
         # Should release most memory (allow some overhead)
-        assert (
-            memory_retained < 10
-        ), f"Too much memory retained: {memory_retained:.1f}MB"
+        assert memory_retained < 10, f"Too much memory retained: {memory_retained:.1f}MB"
 
 
 class TestRaspberryPiCompatibility:
@@ -389,13 +375,9 @@ class TestRaspberryPiCompatibility:
         start_time = time.time()
 
         # Remove modules if already imported (for clean test)
-        modules_to_remove = [
-            name for name in sys.modules if name.startswith("memory_system")
-        ]
+        modules_to_remove = [name for name in sys.modules if name.startswith("memory_system")]
         for module_name in modules_to_remove:
-            if (
-                module_name != "memory_system.models.core"
-            ):  # Keep this one as it's needed
+            if module_name != "memory_system.models.core":  # Keep this one as it's needed
                 sys.modules.pop(module_name, None)
 
         # Time the imports
@@ -418,9 +400,7 @@ class TestRaspberryPiCompatibility:
         imported_heavy = [lib for lib in heavy_libs if lib in sys.modules]
 
         # Should not have any heavy dependencies loaded
-        assert (
-            len(imported_heavy) == 0
-        ), f"Heavy dependencies detected: {imported_heavy}"
+        assert len(imported_heavy) == 0, f"Heavy dependencies detected: {imported_heavy}"
 
         # Check for reasonable dependency count
         memg_modules = [name for name in sys.modules if "memory_system" in name]

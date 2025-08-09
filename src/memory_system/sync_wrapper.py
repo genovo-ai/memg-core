@@ -6,7 +6,7 @@ Provides simple sync methods for document and note storage
 
 import asyncio
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .config import MemGConfig, get_config
 from .exceptions import ProcessingError, ValidationError
@@ -24,7 +24,7 @@ class SyncMemorySystem:
     Handles document and note storage with AI-driven type detection
     """
 
-    def __init__(self, config: Optional[MemGConfig] = None):
+    def __init__(self, config: MemGConfig | None = None):
         """Initialize simplified memory system"""
         try:
             # Use provided config or load from environment/defaults
@@ -111,12 +111,12 @@ class SyncMemorySystem:
         self,
         content: str,
         user_id: str,
-        memory_type: Optional[MemoryType] = None,
-        title: Optional[str] = None,
+        memory_type: MemoryType | None = None,
+        title: str | None = None,
         source: str = "user",
-        tags: Optional[List[str]] = None,
-        project_id: Optional[str] = None,
-        project_name: Optional[str] = None,
+        tags: list[str] | None = None,
+        project_id: str | None = None,
+        project_name: str | None = None,
     ) -> ProcessingResponse:
         """
         Add a memory to the system with automatic type detection.
@@ -168,12 +168,8 @@ class SyncMemorySystem:
             from .exceptions import wrap_exception
             from .logging_config import log_error
 
-            wrapped_error = wrap_exception(
-                e, "add_memory", {"content_length": len(content)}
-            )
-            log_error(
-                "sync_wrapper", "add_memory", wrapped_error, content_length=len(content)
-            )
+            wrapped_error = wrap_exception(e, "add_memory", {"content_length": len(content)})
+            log_error("sync_wrapper", "add_memory", wrapped_error, content_length=len(content))
             return ProcessingResponse(
                 success=False,
                 memory_id="",
@@ -189,9 +185,9 @@ class SyncMemorySystem:
         self,
         content: str,
         user_id: str,
-        title: Optional[str] = None,
+        title: str | None = None,
         source: str = "user",
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
     ) -> ProcessingResponse:
         """
         Add a document to the system (will generate summary).
@@ -219,9 +215,9 @@ class SyncMemorySystem:
         self,
         content: str,
         user_id: str,
-        title: Optional[str] = None,
+        title: str | None = None,
         source: str = "user",
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
     ) -> ProcessingResponse:
         """
         Add a note to the system (brief insight, no summary).
@@ -248,10 +244,10 @@ class SyncMemorySystem:
     def search(
         self,
         query: str,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         limit: int = 5,
-        memory_types: Optional[List[MemoryType]] = None,
-    ) -> List[Dict[str, Any]]:
+        memory_types: list[MemoryType] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Search memories using semantic similarity.
 
@@ -281,9 +277,7 @@ class SyncMemorySystem:
             # Filter by memory types if specified
             if memory_types:
                 type_values = [t.value for t in memory_types]
-                results = [
-                    r for r in results if r.memory.memory_type.value in type_values
-                ]
+                results = [r for r in results if r.memory.memory_type.value in type_values]
 
             # Format results for output
             formatted_results = [
@@ -313,9 +307,7 @@ class SyncMemorySystem:
             from .exceptions import wrap_exception
             from .logging_config import log_error
 
-            wrapped_error = wrap_exception(
-                e, "search_memories", {"query": query, "limit": limit}
-            )
+            wrapped_error = wrap_exception(e, "search_memories", {"query": query, "limit": limit})
             log_error(
                 "sync_wrapper",
                 "search_memories",
@@ -325,15 +317,15 @@ class SyncMemorySystem:
             )
             return []
 
-    def search_documents(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+    def search_documents(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
         """Search only documents"""
         return self.search(query, limit, [MemoryType.DOCUMENT])
 
-    def search_notes(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+    def search_notes(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
         """Search only notes"""
         return self.search(query, limit, [MemoryType.NOTE])
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get system statistics"""
         base_stats = {
             "processor_initialized": self.processor is not None,
@@ -388,9 +380,9 @@ class SyncMemorySystem:
     def add_from_message_pair(
         self,
         current_message: str,
-        previous_message: Optional[str] = None,
-        speaker: Optional[str] = None,
-        conversation_id: Optional[str] = None,
+        previous_message: str | None = None,
+        speaker: str | None = None,
+        conversation_id: str | None = None,
         user_id: str = "default_user",
         **kwargs,
     ) -> bool:
@@ -420,11 +412,7 @@ class SyncMemorySystem:
                 content=content,
                 user_id=user_id,
                 source="conversation",
-                tags=(
-                    [f"conversation:{conversation_id}"]
-                    if conversation_id
-                    else ["conversation"]
-                ),
+                tags=([f"conversation:{conversation_id}"] if conversation_id else ["conversation"]),
             )
 
             return result.success
