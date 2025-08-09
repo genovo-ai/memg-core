@@ -10,7 +10,7 @@ from typing import Optional
 from fastmcp import FastMCP
 
 from memory_system.logging_config import log_error
-from memory_system.mcp_server_core import get_memory_system
+from .mcp_server_core import get_memory_system
 from memory_system.models.api import MemoryResultItem, SearchMemoriesResponse
 from memory_system.utils.genai import GenAI
 
