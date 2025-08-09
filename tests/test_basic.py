@@ -42,15 +42,15 @@ def test_basic_config():
         pytest.skip(f"Config not available: {e}")
 
 
-@pytest.mark.asyncio
-async def test_mcp_server_import():
-    """Test MCP server can be imported."""
+def test_mcp_server_import():
+    """Test MCP server can be imported from integration package."""
     try:
-        from memory_system import mcp_server
+        from integration.mcp.mcp_server import app, main  # type: ignore
 
-        assert hasattr(mcp_server, "app") or hasattr(mcp_server, "main")
+        # Basic sanity checks
+        assert app is not None or callable(main)
     except ImportError as e:
-        pytest.skip(f"MCP server import failed: {e}")
+        pytest.skip(f"MCP server import failed (integration path): {e}")
 
 
 def test_requirements_satisfied():

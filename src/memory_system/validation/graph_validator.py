@@ -68,35 +68,37 @@ class GraphValidator:
             Dictionary with coding entity statistics
         """
         try:
-            # Common coding entity types
-            coding_types = {
-                "technology": "MATCH (e:Entity {type: 'TECHNOLOGY'}) RETURN count(e) as count",
-                "error": "MATCH (e:Entity {type: 'ERROR'}) RETURN count(e) as count",
-                "solution": "MATCH (e:Entity {type: 'SOLUTION'}) RETURN count(e) as count",
-                "component": "MATCH (e:Entity {type: 'COMPONENT'}) RETURN count(e) as count",
-                "library": "MATCH (e:Entity {type: 'LIBRARY'}) RETURN count(e) as count",
-                "framework": "MATCH (e:Entity {type: 'FRAMEWORK'}) RETURN count(e) as count",
-            }
+            # Common coding entity types (uppercase string values for storage)
+            coding_type_values: list[str] = [
+                "TECHNOLOGY",
+                "ERROR",
+                "SOLUTION",
+                "COMPONENT",
+                "LIBRARY",
+                "FRAMEWORK",
+            ]
 
-            results = {}
-            for entity_type, base_query in coding_types.items():
-                # Add user filtering if specified
+            results: dict[str, int] = {}
+            for type_value in coding_type_values:
+                # Build parameterized query; prefer WHERE clause for clarity
                 if user_id:
-                    query = base_query.replace(
-                        "Entity {type:",
-                        f"Entity {{type: '{entity_type}', user_id: $user_id",
+                    query = (
+                        "MATCH (e:Entity) "
+                        "WHERE e.type = $type AND e.user_id = $user_id "
+                        "RETURN count(e) as count"
                     )
-                    params = {"user_id": user_id}
+                    params = {"type": type_value, "user_id": user_id}
                 else:
-                    query = base_query
-                    params = {}
+                    query = "MATCH (e:Entity) WHERE e.type = $type RETURN count(e) as count"
+                    params = {"type": type_value}
 
+                key = type_value.lower()
                 try:
                     result = self.kuzu.query(query, params)
-                    results[entity_type] = result[0]["count"] if result else 0
+                    results[key] = result[0]["count"] if result else 0
                 except Exception as e:
-                    logger.warning(f"Failed to query {entity_type} entities: {e}")
-                    results[entity_type] = 0
+                    logger.warning(f"Failed to query {type_value} entities: {e}")
+                    results[key] = 0
 
             total_coding_entities = sum(results.values())
             logger.info(

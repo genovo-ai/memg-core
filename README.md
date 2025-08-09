@@ -28,16 +28,33 @@ docker run -d \
 curl http://localhost:8787/health
 ```
 
-### Option 2: Python Package
+### Option 2: Python Package (Core Library)
 ```bash
 pip install memg-core
 
-# Set up environment
+# Set up environment (for examples/tests)
 cp env.example .env
 # Edit .env and set your GOOGLE_API_KEY
 
-# Start MCP server
-python -m memory_system.mcp_server
+# Use the core library in your app; the MCP server is provided via Docker image
+# Example usage shown below in the Usage section.
+```
+
+### Development setup
+```bash
+# 1) Create virtualenv and install slim runtime deps for library usage
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# 2) For running tests and linters locally, install dev deps
+pip install -r requirements-dev.txt
+
+# 3) Run tests
+export MEMG_TEMPLATE="software_development"
+export QDRANT_STORAGE_PATH="$HOME/.local/share/qdrant"
+export KUZU_DB_PATH="$HOME/.local/share/kuzu/memg.db"
+mkdir -p "$QDRANT_STORAGE_PATH" "$HOME/.local/share/kuzu"
+PYTHONPATH=$(pwd)/src pytest -q
 ```
 
 ## Usage

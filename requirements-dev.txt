@@ -1,0 +1,22 @@
+# Development and test dependencies
+-r ./requirements.txt
+
+# Test utilities
+pytest>=8.4.1
+pytest-cov>=6.2.1
+pytest-asyncio>=0.23.8
+psutil>=5.9.8
+
+# Code quality tools
+pylint>=3.3.7
+black>=25.1.0
+isort>=6.0.1
+ruff>=0.4.0
+mypy>=1.17.0
+bandit>=1.8.6
+pre-commit>=4.2.0
+
+# MCP server (for running integration server locally)
+fastmcp>=2.10.6
+uvicorn>=0.30.6
+starlette>=0.38.2
