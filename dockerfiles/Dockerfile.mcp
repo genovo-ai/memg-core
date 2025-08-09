@@ -9,7 +9,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install the published MEMG core package
+# Install the published MEMG core package
 RUN pip install --no-cache-dir memg-core
+
+# Ensure the integration package code is on PYTHONPATH
+ENV PYTHONPATH=/app
 
 # Copy MCP integration code (paths are relative to build context, not Dockerfile)
 COPY integration/ /app/integration/

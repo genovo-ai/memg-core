@@ -7,8 +7,8 @@ Clean, modular architecture with separated concerns
 import os
 
 from memory_system.logging_config import get_logger
-from memory_system.mcp_server_core import create_mcp_app
-from memory_system.mcp_tools_core import register_core_tools, register_optional_tools
+from .mcp_server_core import create_mcp_app
+from .mcp_tools_core import register_core_tools, register_optional_tools
 
 logger = get_logger("mcp_server")
 

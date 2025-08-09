@@ -167,8 +167,9 @@ temp_tests/
 
 # Local maintenance docs (keep out of repo)
 docs/maintenance/
-integrations/
-integration/*
+# integrations are part of the repo structure for packaging MCP
+# integrations/
+# integration/*
 
 # macOS specific files
 .DS_Store
