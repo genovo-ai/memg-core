@@ -449,7 +449,7 @@ class Message:
 
 @dataclass
 class MessagePair:
-    """Message pair for MEM0-style processing (m_t-1, m_t)"""
+    """Message pair for conversation pair-style processing (m_t-1, m_t)"""
 
     previous_message: Message | None
     current_message: Message

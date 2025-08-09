@@ -1,7 +1,7 @@
 """
 Conversation Context Manager - Handles conversation summaries and message history.
 
-This module manages the conversation context required for MEM0-style memory processing:
+This module manages the conversation context required for conversation pair-style memory processing:
 - Conversation summaries (S) with periodic refresh
 - Recent message windows (last m messages)
 - Message pair creation for memory extraction
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class ConversationContextManager:
     """
-    Manages conversation context for MEM0-style memory processing.
+    Manages conversation context for conversation pair-style memory processing.
 
     Handles:
     - Conversation summary generation and storage

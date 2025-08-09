@@ -70,12 +70,12 @@ class GraphValidator:
         try:
             # Common coding entity types
             coding_types = {
-                "technology": "MATCH (e:Entity {type: 'technology'}) RETURN count(e) as count",
-                "error": "MATCH (e:Entity {type: 'error'}) RETURN count(e) as count",
-                "solution": "MATCH (e:Entity {type: 'solution'}) RETURN count(e) as count",
-                "component": "MATCH (e:Entity {type: 'component'}) RETURN count(e) as count",
-                "library": "MATCH (e:Entity {type: 'library'}) RETURN count(e) as count",
-                "framework": "MATCH (e:Entity {type: 'framework'}) RETURN count(e) as count",
+                "technology": "MATCH (e:Entity {type: 'TECHNOLOGY'}) RETURN count(e) as count",
+                "error": "MATCH (e:Entity {type: 'ERROR'}) RETURN count(e) as count",
+                "solution": "MATCH (e:Entity {type: 'SOLUTION'}) RETURN count(e) as count",
+                "component": "MATCH (e:Entity {type: 'COMPONENT'}) RETURN count(e) as count",
+                "library": "MATCH (e:Entity {type: 'LIBRARY'}) RETURN count(e) as count",
+                "framework": "MATCH (e:Entity {type: 'FRAMEWORK'}) RETURN count(e) as count",
             }
 
             results = {}

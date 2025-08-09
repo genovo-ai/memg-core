@@ -199,10 +199,12 @@ class UnifiedMemoryProcessor:
             return ProcessingResponse(
                 success=True,
                 memory_id=memory.id,
-                final_type=final_type.value,
+                final_type=final_type,
                 ai_verified=True,
                 summary_generated=bool(summary),
-                type_changed=final_type.value != request.memory_type,
+                type_changed=(
+                    request.memory_type is not None and final_type != request.memory_type
+                ),
                 processing_time_ms=processing_time,
                 word_count=len(request.content.split()),
                 entities_extracted=len(entities),

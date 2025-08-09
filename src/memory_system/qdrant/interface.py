@@ -236,12 +236,12 @@ class QdrantInterface:
                 # Auto-create collection with default vector size
                 self.ensure_collection(collection, 768)  # Default to Google AI embedding size
 
-            # Build query filter combining user_id and additional filters
+            # Build query filter combining user_id and additional filters (including ranges)
             query_filter = None
             filter_conditions = []
 
             if user_id or filters:
-                from qdrant_client.models import FieldCondition, Filter, MatchValue
+                from qdrant_client.models import FieldCondition, Filter, MatchValue, Range
 
                 # Add user_id filter
                 if user_id:
@@ -252,18 +252,26 @@ class QdrantInterface:
                 # Add additional filters
                 if filters:
                     for key, value in filters.items():
-                        if value is not None:
-                            # Handle list values (like entity_types) with MatchAny
-                            if isinstance(value, list):
-                                from qdrant_client.models import MatchAny
+                        if value is None:
+                            continue
+                        # Special handling for created_at lower bound (e.g., days_back)
+                        if key == "created_at" and isinstance(value, str):
+                            # Use Range gte for ISO timestamps
+                            filter_conditions.append(
+                                FieldCondition(key="created_at", range=Range(gte=value))
+                            )
+                            continue
+                        # Handle list values (like entity_types) with MatchAny
+                        if isinstance(value, list):
+                            from qdrant_client.models import MatchAny
 
-                                filter_conditions.append(
-                                    FieldCondition(key=key, match=MatchAny(any=value))
-                                )
-                            else:
-                                filter_conditions.append(
-                                    FieldCondition(key=key, match=MatchValue(value=value))
-                                )
+                            filter_conditions.append(
+                                FieldCondition(key=key, match=MatchAny(any=value))
+                            )
+                        else:
+                            filter_conditions.append(
+                                FieldCondition(key=key, match=MatchValue(value=value))
+                            )
 
                 # Create combined filter
                 if filter_conditions:

@@ -149,24 +149,40 @@ def register_core_tools(app: FastMCP) -> None:
                     t.strip().upper() for t in entity_types.split(",") if t.strip()
                 ]
 
-            results = memory._run_async(
-                memory.retriever.graph_search(
-                    query=query,
-                    entity_types=types_list or [],
-                    limit=limit,
-                    user_id=user_id,
+            # Prefer graph search when available, else fall back to semantic search
+            retriever = memory.retriever
+            if hasattr(retriever, "graph_search"):
+                results = memory._run_async(
+                    retriever.graph_search(
+                        query=query,
+                        entity_types=types_list or [],
+                        limit=limit,
+                        user_id=user_id,
+                    )
                 )
-            )
+                search_type = "graph_search"
+                filters_applied = {"entity_types": types_list or []}
+            else:
+                # Fallback: semantic search with entity_types filter if provided
+                filters = {"entity_types": types_list} if types_list else None
+                results = memory._run_async(
+                    retriever.search_memories(
+                        query=query,
+                        user_id=user_id,
+                        filters=filters,
+                        limit=limit,
+                    )
+                )
+                search_type = "semantic_search_fallback"
+                filters_applied = filters or {}
 
-            formatted_results = [
-                MemoryResultItem.from_search_result(r) for r in results
-            ]
+            formatted_results = [MemoryResultItem.from_search_result(r) for r in results]
             response = SearchMemoriesResponse(
                 result=formatted_results,
                 query=query,
                 total_results=len(formatted_results),
-                filters_applied={"entity_types": types_list or []},
-                search_type="graph_search",
+                filters_applied=filters_applied,
+                search_type=search_type,
                 user_id=user_id,
             )
             return response.model_dump()

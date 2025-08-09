@@ -516,13 +516,13 @@ class MemoryProcessor:
             True if successful
         """
         # Store in Qdrant for semantic search
-        qdrant_success = self.qdrant.add_point(
+        success, _ = self.qdrant.add_point(
             vector=memory.vector,
             payload=memory.to_qdrant_payload(),
             point_id=memory.id,
         )
 
-        if not qdrant_success:
+        if not success:
             raise RuntimeError(f"Failed to store memory {memory.id} in Qdrant")
 
         # Store in Kuzu for graph relationships

@@ -128,10 +128,6 @@ class MemoryRetriever:
                     f"Processing result {i + 1}/{len(search_results)}: ID={result.get('id')}, "
                     f"score={result.get('score', 0.0):.3f}"
                 )
-                logger.debug(
-                    f"Result keys: "
-                    f"{list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
-                )
                 if result.get("score", 0.0) < score_threshold:
                     logger.debug(
                         f"Skipping result due to low score: "
@@ -308,7 +304,8 @@ class MemoryRetriever:
             from ..config import get_config
 
             config = get_config()
-            return config.mem0.enable_temporal_reasoning
+            # Use MEMG configuration (remove legacy mem0 reference)
+            return config.memg.enable_temporal_reasoning
         except Exception:
             # Default to filtering invalid memories if config fails
             return True
@@ -599,9 +596,12 @@ class MemoryRetriever:
                     created_at=created_at,
                 )
 
+                confidence = result.get("entity_confidence")
+                if confidence is None:
+                    confidence = result.get("e.confidence", 0.8)
                 search_result = SearchResult(
                     memory=memory,
-                    score=float(result.get("e.confidence", 0.8)),
+                    score=float(confidence),
                     source=source,
                     metadata={},
                 )
