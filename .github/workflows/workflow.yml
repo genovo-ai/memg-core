@@ -168,7 +168,7 @@ jobs:
           echo "Ready for deployment"
           echo ""
           echo "Pull command:"
-          echo "docker pull ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
+          echo "docker pull ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
 
       - name: Deployment Instructions
         run: |
