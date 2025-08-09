@@ -215,6 +215,9 @@ __pycache__/
 *.pyc
 *.pyo
 
+# bandit
+.bandit
+
 # Temporary test environments
 test_venv/
 
