@@ -251,6 +251,7 @@ def register_core_tools(app: FastMCP) -> None:
                 MemoryType,
                 RelationshipStrength,
             )
+
             # Template system for dynamic entity/relationship types
             from memory_system.templates.registry import get_template_registry
             from memory_system.version import __version__ as core_version
@@ -373,7 +374,10 @@ def register_core_tools(app: FastMCP) -> None:
                 "relationship_engine": "kuzu",
             }
 
-            return {"result": "✅ Memory schema retrieved successfully", "schema": schema_info}
+            return {
+                "result": "✅ Memory schema retrieved successfully",
+                "schema": schema_info,
+            }
 
         except Exception as e:
             log_error("mcp_tools_core", "get_memory_schema", e, user_id=user_id)
