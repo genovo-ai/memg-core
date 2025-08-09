@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "memg-core"
 # NOTE: Bump this when publishing a new version; CI uses skip-existing to avoid failures
 version = "1.0.0"
-description = "Core memory system library with dual storage (Qdrant + Kuzu) and AI integration"
+description = "Lightweight memory system for AI agents with vector search and graph storage"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -18,10 +18,13 @@ classifiers = [
  "Intended Audience :: Developers",
  "License :: OSI Approved :: MIT License",
  "Programming Language :: Python :: 3",
- "Programming Language :: Python :: 3.10",
  "Programming Language :: Python :: 3.11",
  "Programming Language :: Python :: 3.12",
+ "Topic :: Scientific/Engineering :: Artificial Intelligence",
+ "Topic :: Software Development :: Libraries :: Python Modules",
+ "Topic :: Database",
 ]
+keywords = ["ai", "memory", "vector-search", "graph-database", "mcp", "agents"]
 dependencies = [
  # Core memory system dependencies (no MCP server)
  "qdrant-client>=1.14.0",
@@ -35,23 +38,79 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Development tools - NOT included in library build
 dev = [
- "pre-commit>=4.2.0",
- "black>=25.1.0",
- "isort>=6.0.1",
+ # Code quality and formatting
+ "ruff>=0.12.0",
  "pylint>=3.3.7",
+ "pre-commit>=4.2.0",
+
+ # Testing
  "pytest>=8.4.1",
  "pytest-asyncio>=0.25.0",
  "pytest-cov>=6.0.0",
- "mypy>=1.17.0",
+
+ # Security and type checking
  "bandit>=1.8.6",
-  "ruff>=0.4.0",
+ "mypy>=1.17.0",
+
+ # Legacy formatters (can be removed if using ruff only)
+ "black>=25.1.0",
+ "isort>=6.0.1",
+]
+
+# Minimal testing dependencies (lighter than full dev)
+test = [
+ "pytest>=8.4.1",
+ "pytest-asyncio>=0.25.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/genovo-ai/memg-core"
 Repository = "https://github.com/genovo-ai/memg-core"
 Issues = "https://github.com/genovo-ai/memg-core/issues"
+
+# PACKAGING CONFIGURATION - Lightweight library build
+[tool.setuptools]
+# Only include the core library, exclude dev tools and configs
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+exclude = [
+    "tests*",
+    "integration*",
+    "*.tests*",
+    "*.tests.*",
+    "tests.*",
+    "test_*"
+]
+
+[tool.setuptools.package-data]
+# Only include essential data files
+"*" = ["*.md", "*.txt", "*.json"]
+
+[tool.setuptools.exclude-package-data]
+# Exclude development and config files from package
+"*" = [
+    "*.pyc",
+    "*.pyo",
+    "*.pyd",
+    "__pycache__",
+    "*.so",
+    "*.egg-info",
+    ".git*",
+    ".pre-commit*",
+    ".pylintrc",
+    "pyrightconfig.json",
+    "*.log",
+    "Dockerfile*",
+    "docker-compose*",
+    "build.sh",
+    "setup-dev.sh",
+    "start_server.sh",
+]
 
 # PYLINT CONFIGURATION - PREVENT GOOGLE-GENAI CONFUSION
 [tool.pylint.main]
