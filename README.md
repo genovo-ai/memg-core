@@ -71,7 +71,7 @@ MEMG_TEMPLATE=software_development
 # Storage
 BASE_MEMORY_PATH=$HOME/.local/share/memory_system
 QDRANT_COLLECTION=memories
-MEMG_VECTOR_DIMENSION=768
+EMBEDDING_DIMENSION_LEN=768
 ```
 
 ## Requirements

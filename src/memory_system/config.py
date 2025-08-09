@@ -83,7 +83,7 @@ class MemGConfig:
                 "MEMG_ENABLE_AI_TYPE_VERIFICATION", "true"
             ).lower()
             == "true",
-            vector_dimension=int(os.getenv("MEMG_VECTOR_DIMENSION", "768")),
+            vector_dimension=int(os.getenv("EMBEDDING_DIMENSION_LEN", "768")),
             batch_processing_size=int(os.getenv("MEMG_BATCH_SIZE", "50")),
             template_name=os.getenv("MEMG_TEMPLATE", "default"),
             qdrant_collection_name=os.getenv("MEMG_QDRANT_COLLECTION", "memories"),

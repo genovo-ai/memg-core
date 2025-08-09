@@ -8,10 +8,10 @@ import logging
 import os
 
 from ..kuzu_graph.interface import KuzuInterface
-from ..templates.registry import get_template_registry
 from ..models import Memory, SearchResult
 from ..models.core import MemoryType
 from ..qdrant.interface import QdrantInterface
+from ..templates.registry import get_template_registry
 from ..utils.embeddings import GenAIEmbedder
 
 logger = logging.getLogger(__name__)
