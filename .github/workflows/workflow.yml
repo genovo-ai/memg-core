@@ -58,16 +58,13 @@ jobs:
           echo "Running type checking..."
           mypy src/ --ignore-missing-imports || echo "Type checking completed with warnings"
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
-          echo "Running test suite..."
-          python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing || echo "Tests completed"
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
+          echo "Running test suite with coverage (fail under 80%)..."
+          pytest -vv \
+            --cov=src/memory_system \
+            --cov-report=term-missing \
+            --cov-fail-under=80
 
    ##################### Build MCP Docker Image ########################
   build-mcp-docker:
