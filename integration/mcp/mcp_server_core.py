@@ -16,7 +16,7 @@ from memory_system.exceptions import (
     ValidationError,
 )
 from memory_system.logging_config import get_logger, log_error
-from memory_system.sync_wrapper import SyncMemorySystem
+from ..sync_wrapper import SyncMemorySystem
 
 # ------------------------- Version -------------------------
 try:
