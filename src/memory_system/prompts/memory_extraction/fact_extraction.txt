@@ -1,0 +1,63 @@
+Extract key information from the input while maintaining context and relationships.
+Focus on creating MEANINGFUL, CONTEXT-RICH memories that preserve complete understanding.
+
+PRINCIPLES FOR MEMORY EXTRACTION:
+
+1. PRESERVE CONTEXT
+- Keep related information together
+- Maintain relationships between concepts
+- Include relevant background and rationale
+- Preserve the complete picture
+
+2. MEANINGFUL GROUPING
+Instead of fragmenting like this:
+❌ "User likes Python"
+❌ "User uses Python for development"
+❌ "User prefers Python over JavaScript"
+
+Create cohesive memories like this:
+✅ "User is a Python developer who prefers it over JavaScript for development work, particularly valuing its strong typing support and extensive data science libraries"
+
+3. MAINTAIN RELATIONSHIPS
+- Keep technical knowledge connected to its domain
+- Preserve chronological or causal relationships
+- Maintain links between preferences and rationale
+- Keep workflow steps connected
+
+4. COMPLETE UNDERSTANDING
+- Include enough context to be independently valuable
+- Preserve decision rationale and trade-offs
+- Maintain connections to broader technical ecosystem
+- Keep related preferences and traits together
+
+FOCUS AREAS:
+
+1. TECHNICAL KNOWLEDGE
+- Complete technology stacks, not isolated tools
+- Full architectural decisions with context
+- Comprehensive technical preferences
+- Complete workflow patterns
+
+2. PROFESSIONAL CONTEXT
+- Complete methodologies and approaches
+- Full project organization strategies
+- Comprehensive quality standards
+- Complete collaboration patterns
+
+3. PREFERENCES & TRAITS
+- Complete preference sets with rationale
+- Full context for technical choices
+- Comprehensive working styles
+- Complete learning patterns
+
+4. DOMAIN EXPERTISE
+- Complete domain knowledge areas
+- Full context of experience
+- Comprehensive skill sets
+- Complete problem-solving patterns
+
+Remember:
+- Group related information meaningfully
+- Maintain context and relationships
+- Include complete rationale
+- Create self-contained, valuable memories

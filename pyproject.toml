@@ -1,0 +1,122 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memg"
+version = "0.4.0"
+description = "Personal memory system using Qdrant + Kuzu + Google Gemini"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+ {name = "MEMG Contributors", email = "memg@example.com"},
+]
+classifiers = [
+ "Development Status :: 4 - Beta",
+ "Intended Audience :: Developers",
+ "License :: OSI Approved :: MIT License",
+ "Programming Language :: Python :: 3",
+ "Programming Language :: Python :: 3.10",
+ "Programming Language :: Python :: 3.11",
+ "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+ # Core runtime dependencies (FastMCP server only)
+ "fastmcp>=2.10.6",
+ "qdrant-client>=1.14.0",
+ "kuzu==0.11.1",
+ "pydantic>=2.11.7,<3.0.0",
+ "pydantic-core>=2.33.0,<3.0.0",
+ "python-dotenv>=1.0.1",
+ "google-genai>=1.0.0", # CORRECT: Modern Google GenAI SDK (NOT google-generativeai!)
+ "uvicorn[standard]>=0.32.1",
+ "typing-extensions>=4.12.0",
+ "httpx>=0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+ "pre-commit>=4.2.0",
+ "black>=25.1.0",
+ "isort>=6.0.1",
+ "pylint>=3.3.7",
+ "pytest>=8.4.1",
+ "pytest-asyncio>=0.25.0",
+ "pytest-cov>=6.0.0",
+ "mypy>=1.17.0",
+ "bandit>=1.8.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/genovo-ai/memg"
+Repository = "https://github.com/genovo-ai/memg"
+Issues = "https://github.com/genovo-ai/memg/issues"
+
+# PYLINT CONFIGURATION - PREVENT GOOGLE-GENAI CONFUSION
+[tool.pylint.main]
+# Add google-genai to recognized imports - PREVENT THE LINTING TRAP!
+extension-pkg-allow-list = ["google.genai", "google"]
+ignored-modules = ["google.generativeai"] # Ignore the deprecated package
+
+[tool.pylint.messages_control]
+# Disable import errors for google-genai (it's a valid modern package!)
+disable = [
+ "import-error", # Don't complain about google-genai imports
+ "no-name-in-module", # Don't complain about google.genai module
+ "too-many-arguments",
+ "too-many-instance-attributes",
+ "too-few-public-methods",
+ "duplicate-code",
+]
+
+[tool.pylint.imports]
+# Allow google-genai imports specifically
+known-third-party = ["google", "google.genai"]
+
+# MYPY CONFIGURATION
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true # Ignore missing stubs for google-genai
+
+# BLACK CONFIGURATION
+[tool.black]
+line-length = 88
+target-version = ['py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+ # directories
+ \.eggs
+ | \.git
+ | \.hg
+ | \.mypy_cache
+ | \.tox
+ | \.venv
+ | build
+ | dist
+)/
+'''
+
+# ISORT CONFIGURATION
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_third_party = ["google", "google.genai", "qdrant_client", "kuzu", "fastmcp"]
+
+# PYTEST CONFIGURATION
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=src --cov-report=term-missing"
+
+# BANDIT SECURITY CONFIGURATION
+[tool.bandit]
+exclude_dirs = ["tests", "test_*"]
+skips = ["B101", "B601"]
