@@ -10,9 +10,10 @@ from typing import Optional
 from fastmcp import FastMCP
 
 from memory_system.logging_config import log_error
-from .mcp_server_core import get_memory_system
 from memory_system.models.api import MemoryResultItem, SearchMemoriesResponse
 from memory_system.utils.genai import GenAI
+
+from .mcp_server_core import get_memory_system
 
 
 def register_core_tools(app: FastMCP) -> None:
@@ -114,7 +115,9 @@ def register_core_tools(app: FastMCP) -> None:
             )
 
             # Format results
-            formatted_results = [MemoryResultItem.from_search_result(result) for result in results]
+            formatted_results = [
+                MemoryResultItem.from_search_result(result) for result in results
+            ]
             response = SearchMemoriesResponse(
                 result=formatted_results,
                 query=query,
@@ -131,7 +134,9 @@ def register_core_tools(app: FastMCP) -> None:
             return {"result": f"❌ Failed to search memories: {str(e)}"}
 
     @app.tool("graph_search")
-    def graph_search(query: str, user_id: str = None, entity_types: str = None, limit: int = 10):
+    def graph_search(
+        query: str, user_id: str = None, entity_types: str = None, limit: int = 10
+    ):
         """Generic graph search over entities mentioned in memories."""
         memory = get_memory_system()
         if not memory:
@@ -140,15 +145,22 @@ def register_core_tools(app: FastMCP) -> None:
         try:
             types_list = None
             if entity_types:
-                types_list = [t.strip().upper() for t in entity_types.split(",") if t.strip()]
+                types_list = [
+                    t.strip().upper() for t in entity_types.split(",") if t.strip()
+                ]
 
             results = memory._run_async(
                 memory.retriever.graph_search(
-                    query=query, entity_types=types_list or [], limit=limit, user_id=user_id
+                    query=query,
+                    entity_types=types_list or [],
+                    limit=limit,
+                    user_id=user_id,
                 )
             )
 
-            formatted_results = [MemoryResultItem.from_search_result(r) for r in results]
+            formatted_results = [
+                MemoryResultItem.from_search_result(r) for r in results
+            ]
             response = SearchMemoriesResponse(
                 result=formatted_results,
                 query=query,
@@ -181,7 +193,9 @@ def register_core_tools(app: FastMCP) -> None:
                     "result": f"✅ GraphRAG validation complete - Health Score: {report['overall_health_score']}/100",
                     "validation_report": report,
                     "summary": {
-                        "entities": report["validation_results"]["entity_storage"]["entity_count"],
+                        "entities": report["validation_results"]["entity_storage"][
+                            "entity_count"
+                        ],
                         "relationships": report["validation_results"]["relationships"][
                             "relationship_count"
                         ],
@@ -253,7 +267,12 @@ def register_core_tools(app: FastMCP) -> None:
                     "categories": {
                         "technology": ["TECHNOLOGY", "DATABASE", "LIBRARY", "TOOL"],
                         "system": ["COMPONENT", "SERVICE", "ARCHITECTURE", "PROTOCOL"],
-                        "problem_solution": ["ERROR", "ISSUE", "SOLUTION", "WORKAROUND"],
+                        "problem_solution": [
+                            "ERROR",
+                            "ISSUE",
+                            "SOLUTION",
+                            "WORKAROUND",
+                        ],
                         "domain": ["CONCEPT", "METHOD", "CONFIGURATION", "FILE_TYPE"],
                     },
                     "total_count": len(EntityType),
@@ -280,8 +299,16 @@ def register_core_tools(app: FastMCP) -> None:
                         "created_at",
                         "confidence",
                     ],
-                    "entity_filters": ["entity_types", "importance_level", "confidence"],
-                    "temporal_filters": ["days_back", "created_after", "created_before"],
+                    "entity_filters": [
+                        "entity_types",
+                        "importance_level",
+                        "confidence",
+                    ],
+                    "temporal_filters": [
+                        "days_back",
+                        "created_after",
+                        "created_before",
+                    ],
                 },
             }
 
@@ -343,7 +370,9 @@ def register_core_tools(app: FastMCP) -> None:
         """Get information about the memory system configuration."""
         memory = get_memory_system()
         if not memory:
-            return {"result": {"components_initialized": False, "status": "Not initialized"}}
+            return {
+                "result": {"components_initialized": False, "status": "Not initialized"}
+            }
 
         try:
             stats = memory.get_stats()
@@ -378,7 +407,9 @@ def register_optional_tools(app: FastMCP) -> None:
 
             try:
                 # Retrieve relevant memories
-                retrieved = memory.search(query=prompt, user_id=user_id, limit=max(1, memory_limit))
+                retrieved = memory.search(
+                    query=prompt, user_id=user_id, limit=max(1, memory_limit)
+                )
 
                 context_chunks = []
                 used_ids = []

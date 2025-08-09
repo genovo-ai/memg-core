@@ -179,9 +179,7 @@ class GraphValidator:
 
             # Count total memories for comparison
             if user_id:
-                total_query = (
-                    "MATCH (m:Memory {user_id: $user_id}) RETURN count(m) as total_memories"
-                )
+                total_query = "MATCH (m:Memory {user_id: $user_id}) RETURN count(m) as total_memories"
                 total_params = {"user_id": user_id}
             else:
                 total_query = "MATCH (m:Memory) RETURN count(m) as total_memories"

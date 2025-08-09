@@ -695,7 +695,9 @@ Extract entities and relationships from this memory content.
 
             # Convert and store entities
             entities = []
-            entity_name_to_id = {}  # Map entity names to UUIDs for relationship creation
+            entity_name_to_id = (
+                {}
+            )  # Map entity names to UUIDs for relationship creation
 
             for entity_data in extraction_result.get("entities", []):
                 try:

@@ -6,7 +6,13 @@ Basic tests for task board entity system and MCP tools
 
 from datetime import datetime, timedelta
 
-from memory_system.models.core import EntityType, Memory, MemoryType, TaskPriority, TaskStatus
+from memory_system.models.core import (
+    EntityType,
+    Memory,
+    MemoryType,
+    TaskPriority,
+    TaskStatus,
+)
 
 
 class TestTaskBoardEntities:
@@ -139,7 +145,14 @@ class TestTaskBoardMCPToolsValidation:
         from memory_system.models.core import TaskStatus
 
         # Valid statuses
-        valid_statuses = ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"]
+        valid_statuses = [
+            "backlog",
+            "todo",
+            "in_progress",
+            "in_review",
+            "done",
+            "cancelled",
+        ]
         for status in valid_statuses:
             assert TaskStatus(status) == status
 

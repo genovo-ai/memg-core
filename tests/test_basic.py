@@ -48,7 +48,7 @@ async def test_mcp_server_import():
     try:
         from memory_system import mcp_server
 
-        assert hasattr(mcp_server, 'app') or hasattr(mcp_server, 'main')
+        assert hasattr(mcp_server, "app") or hasattr(mcp_server, "main")
     except ImportError as e:
         pytest.skip(f"MCP server import failed: {e}")
 
@@ -56,12 +56,12 @@ async def test_mcp_server_import():
 def test_requirements_satisfied():
     """Test that key requirements are installed."""
     # FastAPI is not required; this is a FastMCP-based server
-    required_packages = ['fastmcp', 'qdrant_client', 'kuzu', 'pydantic', 'uvicorn']
+    required_packages = ["fastmcp", "qdrant_client", "kuzu", "pydantic", "uvicorn"]
 
     missing = []
     for package in required_packages:
         try:
-            __import__(package.replace('-', '_'))
+            __import__(package.replace("-", "_"))
         except ImportError:
             missing.append(package)
 

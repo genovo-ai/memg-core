@@ -95,10 +95,8 @@ class StandaloneValidator:
 
         # Validate memories
         for i, memory in enumerate(memories):
-            qdrant_result = (
-                self.pipeline_validator.schema_validator.validate_database_compatibility(
-                    memory, "qdrant"
-                )
+            qdrant_result = self.pipeline_validator.schema_validator.validate_database_compatibility(
+                memory, "qdrant"
             )
             qdrant_result.component = f"Memory {i + 1} (Qdrant)"
             report.add_validation_result(qdrant_result)
@@ -112,10 +110,8 @@ class StandaloneValidator:
         # Validate entities if provided
         if entities:
             for i, entity in enumerate(entities):
-                entity_result = (
-                    self.pipeline_validator.schema_validator.validate_database_compatibility(
-                        entity, "kuzu"
-                    )
+                entity_result = self.pipeline_validator.schema_validator.validate_database_compatibility(
+                    entity, "kuzu"
                 )
                 entity_result.component = f"Entity {i + 1} ({entity.name})"
                 report.add_validation_result(entity_result)

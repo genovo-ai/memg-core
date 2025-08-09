@@ -54,7 +54,10 @@ async def test_graph_search_basic_shape():
         retriever.graph_enabled = True
 
         results = await retriever.graph_search(
-            query="postgres", entity_types=["TECHNOLOGY", "DATABASE"], limit=5, user_id="u"
+            query="postgres",
+            entity_types=["TECHNOLOGY", "DATABASE"],
+            limit=5,
+            user_id="u",
         )
 
         assert len(results) == 2

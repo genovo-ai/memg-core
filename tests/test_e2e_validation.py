@@ -93,7 +93,10 @@ class TestE2EValidation:
     def test_migration_script_exists_and_importable(self):
         """Test migration script can be imported and has required functions."""
         try:
-            from scripts.migrate_entity_types import get_standardized_type, migrate_entities
+            from scripts.migrate_entity_types import (
+                get_standardized_type,
+                migrate_entities,
+            )
 
             # Test function exists and works
             result = get_standardized_type("framework")
@@ -126,9 +129,9 @@ class TestE2EValidation:
 
             # Create retriever instance (with mocked dependencies)
             with (
-                patch('memory_system.processing.memory_retriever.QdrantInterface'),
-                patch('memory_system.processing.memory_retriever.GenAIEmbedder'),
-                patch('memory_system.processing.memory_retriever.KuzuInterface'),
+                patch("memory_system.processing.memory_retriever.QdrantInterface"),
+                patch("memory_system.processing.memory_retriever.GenAIEmbedder"),
+                patch("memory_system.processing.memory_retriever.KuzuInterface"),
             ):
 
                 retriever = MemoryRetriever()
@@ -299,7 +302,9 @@ class TestPerformanceReadiness:
 
         for i in range(100):
             memory = Memory(
-                user_id="perf_test", content=f"Test content {i}", memory_type=MemoryType.NOTE
+                user_id="perf_test",
+                content=f"Test content {i}",
+                memory_type=MemoryType.NOTE,
             )
             # Test serialization is fast
             qdrant_payload = memory.to_qdrant_payload()
@@ -309,7 +314,9 @@ class TestPerformanceReadiness:
         duration = end - start
 
         # Should be able to create and serialize 100 memories in under 1 second
-        assert duration < 1.0, f"Memory operations too slow: {duration}s for 100 operations"
+        assert (
+            duration < 1.0
+        ), f"Memory operations too slow: {duration}s for 100 operations"
 
     def test_entity_model_efficiency(self):
         """Test Entity model is efficient."""
@@ -332,7 +339,9 @@ class TestPerformanceReadiness:
         duration = end - start
 
         # Should be fast
-        assert duration < 1.0, f"Entity operations too slow: {duration}s for 100 operations"
+        assert (
+            duration < 1.0
+        ), f"Entity operations too slow: {duration}s for 100 operations"
 
 
 if __name__ == "__main__":

@@ -10,7 +10,11 @@ from typing import Optional
 from fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
-from memory_system.exceptions import ConfigurationError, ProcessingError, ValidationError
+from memory_system.exceptions import (
+    ConfigurationError,
+    ProcessingError,
+    ValidationError,
+)
 from memory_system.logging_config import get_logger, log_error
 from memory_system.sync_wrapper import SyncMemorySystem
 
@@ -63,7 +67,9 @@ def setup_health_endpoints(app: FastMCP) -> None:
     @app.custom_route("/", methods=["GET"])
     async def root(_req):
         """Root endpoint for basic health check"""
-        return JSONResponse({"status": "healthy", "service": f"MEMG MCP v{__version__}"})
+        return JSONResponse(
+            {"status": "healthy", "service": f"MEMG MCP v{__version__}"}
+        )
 
     @app.custom_route("/health", methods=["GET"])
     async def health(_req):
