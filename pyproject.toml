@@ -65,10 +65,16 @@ disable = [
  "import-error", # Don't complain about google-genai imports
  "no-name-in-module", # Don't complain about google.genai module
  "too-many-arguments",
- "too-many-instance-attributes",
+ "too-many-instance-attributes", 
  "too-few-public-methods",
  "duplicate-code",
+ "too-many-locals", # Temporarily disable while we refactor
+ "too-many-branches", # Temporarily disable while we refactor
+ "too-many-statements", # Temporarily disable while we refactor
 ]
+
+# Set minimum score for CI
+fail-under = 8.5
 
 [tool.pylint.imports]
 # Allow google-genai imports specifically

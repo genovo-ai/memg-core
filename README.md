@@ -119,6 +119,48 @@ MEMG is configured via environment variables. See `example.env` for all availabl
 -   `KUZU_DB_PATH`: Filesystem path for the Kuzu database.
 -   `QDRANT_STORAGE_PATH`: Filesystem path for the Qdrant database.
 
+## Development
+
+### 🚨 **IMPORTANT: Linting is Now Enforced**
+
+As of the latest updates, **linting is strictly enforced in CI/CD**. The build will fail if code doesn't meet quality standards.
+
+### Quick Setup
+
+```bash
+# 1. Clone and setup development environment
+git clone <repo-url>
+cd memg
+./setup-dev.sh  # Installs deps and pre-commit hooks
+
+# 2. Configure environment
+cp env.example .env
+# Edit .env with your API keys
+
+# 3. Start development
+./start_server.sh  # Start MCP server
+pytest            # Run tests
+```
+
+### Pre-commit Hooks
+
+Pre-commit hooks are **mandatory** and will automatically:
+- Format code with `black` and `ruff`
+- Check imports with `isort`  
+- Run `pylint` with minimum score of 8.5/10
+- Run `mypy` type checking
+- Security scan with `bandit`
+
+**The CI will fail if your code doesn't pass these checks.**
+
+### Code Quality Standards
+
+- **Pylint Score**: Minimum 8.5/10 (currently enforced)
+- **Type Hints**: Required for all functions
+- **Documentation**: Docstrings for public APIs
+- **Security**: No high-severity bandit issues
+- **Formatting**: Black + isort + ruff
+
 ## Mission & Philosophy
 
 -   **Simplicity & Power**: Deliver powerful AI memory capabilities without the crushing complexity.

@@ -42,10 +42,16 @@ jobs:
       - name: Code quality with ruff
         run: |
           echo "Running code quality checks with ruff..."
-          # Save a JSON report but never fail the pipeline on lint issues
-          ruff check src/ --output-format=json > ruff-report.json || true
-          # Human-readable output without failing CI
-          ruff check src/ --exit-zero
+          ruff check src/ --output-format=json > ruff-report.json || echo "Ruff found issues"
+          echo "Running ruff format check..."
+          ruff format --check src/
+          echo "Running ruff linting (will fail CI on issues)..."
+          ruff check src/
+
+      - name: Pylint code quality check
+        run: |
+          echo "Running pylint quality check..."
+          pylint src/ --fail-under=8.5 --score=yes
 
       - name: Type checking with mypy
         run: |

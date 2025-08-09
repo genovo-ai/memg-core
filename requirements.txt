@@ -12,6 +12,15 @@ pytest-cov>=6.2.1
 psutil>=5.9.8
 pytest-asyncio>=0.23.8
 
+# Code quality tools (required for CI)
+pylint>=3.3.7
+black>=25.1.0
+isort>=6.0.1
+ruff>=0.4.0
+mypy>=1.17.0
+bandit>=1.8.6
+pre-commit>=4.2.0
+
 # Pydantic (latest stable)
 pydantic==2.11.7
 
