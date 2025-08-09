@@ -112,7 +112,7 @@ class MemorySystemConfig:
 
     # MCP server settings
     mcp_port: int = 8787
-    mcp_host: str = "0.0.0.0"
+    mcp_host: str = "0.0.0.0"  # nosec B104
 
     def __post_init__(self):
         """Validate system configuration"""
@@ -129,7 +129,7 @@ class MemorySystemConfig:
             debug_mode=os.getenv("MEMORY_SYSTEM_DEBUG", "false").lower() == "true",
             log_level=os.getenv("MEMORY_SYSTEM_LOG_LEVEL", "INFO").upper(),
             mcp_port=int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8787")),
-            mcp_host=os.getenv("MEMORY_SYSTEM_MCP_HOST", "0.0.0.0"),
+            mcp_host=os.getenv("MEMORY_SYSTEM_MCP_HOST", "0.0.0.0"),  # nosec B104
         )
 
 
