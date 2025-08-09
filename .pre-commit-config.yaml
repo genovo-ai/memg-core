@@ -13,13 +13,26 @@ repos:
       - id: check-merge-conflict
       - id: debug-statements
 
-  # Python code formatting with ruff (essential for CI)
+  # Python code formatting and linting with ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.8
     hooks:
-      # Run the formatter only (most important for CI consistency)
+      # Run the linter first
+      - id: ruff
+        files: ^src/.*\.py$
+        args: [--fix, --exit-non-zero-on-fix]
+      # Then run the formatter
       - id: ruff-format
         files: ^src/.*\.py$
+
+  # Type checking with mypy (disabled for now due to extensive structural issues)
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.17.0
+  #   hooks:
+  #     - id: mypy
+  #       files: ^src/.*\.py$
+  #       additional_dependencies: [types-requests, types-PyYAML, pydantic]
+  #       args: [--ignore-missing-imports, --no-strict-optional]
 
   # Shell script linting - temporarily disabled due to SSL certificate issues
   # - repo: https://github.com/shellcheck-py/shellcheck-py
