@@ -94,27 +94,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKER_HUB_TOKEN_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN_PASSWORD }}
-
-      - name: Extract metadata for MCP server (GHCR + Docker Hub)
+      - name: Extract metadata for MCP server (GHCR only)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository }}-mcp
-            docker.io/${{ secrets.DOCKER_HUB_TOKEN_USERNAME }}/memg-core-mcp
+          images: ghcr.io/${{ github.repository }}-mcp
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push MCP Docker image (to GHCR + Docker Hub)
+      - name: Build and push MCP Docker image (to GHCR)
         id: build
         uses: docker/build-push-action@v5
         with:
@@ -185,13 +176,13 @@ jobs:
           echo ""
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
             echo "📦 Core Library: pip install memg-core"
-            echo "🐳 MCP Server: docker pull ghcr.io/genovo-ai/memg-core-mcp:latest"
+            echo "🐳 MCP Server: docker pull ghcr.io/${{ github.repository }}-mcp:latest"
           fi
           echo ""
           echo "🚀 Deploy MCP Server:"
-          echo "1. docker pull ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
+          echo "1. docker pull ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
           echo "2. cp env.example .env && edit GOOGLE_API_KEY"
-          echo "3. docker run --env-file .env -p 8787:8787 ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
+          echo "3. docker run --env-file .env -p 8787:8787 ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
           echo ""
           echo "📚 Use Core Library:"
           echo "1. pip install memg-core"
