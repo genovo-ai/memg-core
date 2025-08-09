@@ -259,7 +259,12 @@ class QdrantInterface:
             filter_conditions = []
 
             if user_id or filters:
-                from qdrant_client.models import FieldCondition, Filter, MatchValue, Range
+                from qdrant_client.models import (
+                    FieldCondition,
+                    Filter,
+                    MatchValue,
+                    Range,
+                )
 
                 # Add user_id filter
                 if user_id:
