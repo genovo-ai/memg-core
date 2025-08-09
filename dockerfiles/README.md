@@ -2,7 +2,22 @@
 
 🚀 **Simple Docker deployment for MEMG Core memory system**
 
-## Quick Start
+## Quick Start (Public Image)
+
+**Fastest way to get started:**
+```bash
+# Run MEMG MCP Server directly
+docker run -d \
+  -p 8787:8787 \
+  -e GOOGLE_API_KEY="your-api-key" \
+  -e MEMG_ENABLE_GRAPH=true \
+  ghcr.io/genovo-ai/memg-core-mcp:latest
+
+# Test it's working
+curl http://localhost:8787/health
+```
+
+## Alternative: Docker Compose
 
 1. **Setup environment:**
    ```bash
@@ -16,12 +31,7 @@
    docker-compose up -d
    ```
 
-3. **Test the server:**
-   ```bash
-   curl http://localhost:8787/health
-   ```
-
-4. **Stop when done:**
+3. **Stop when done:**
    ```bash
    docker-compose down
    ```

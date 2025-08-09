@@ -12,6 +12,20 @@
 
 ## Quick Start
 
+### Option 1: Docker (Recommended)
+```bash
+# Run MEMG MCP Server (359MB)
+docker run -d \
+  -p 8787:8787 \
+  -e GOOGLE_API_KEY="your-api-key" \
+  -e MEMG_ENABLE_GRAPH=true \
+  ghcr.io/genovo-ai/memg-core-mcp:latest
+
+# Test it's working
+curl http://localhost:8787/health
+```
+
+### Option 2: Python Package
 ```bash
 pip install memg-core
 
