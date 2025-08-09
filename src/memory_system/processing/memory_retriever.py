@@ -556,3 +556,64 @@ class MemoryRetriever:
                 continue
 
         return search_results
+
+    async def graph_search(
+        self,
+        query: str,
+        entity_types: list[str] | None = None,
+        limit: int = 10,
+        user_id: str | None = None,
+    ) -> list[SearchResult]:
+        """
+        Generic graph search over entities mentioned in memories.
+
+        Args:
+            query: Search query text to match against entity names
+            entity_types: Optional list of entity types to filter by
+            limit: Maximum number of results to return
+            user_id: Optional user ID for filtering
+
+        Returns:
+            List of SearchResult objects from graph search
+        """
+        if not self.graph_enabled:
+            logger.warning("Graph search requested but not enabled")
+            return []
+
+        try:
+            # Build Cypher query with optional filters
+            cypher_query = """
+            MATCH (m:Memory)-[:MENTIONS]->(e:Entity)
+            WHERE toLower(e.name) CONTAINS toLower($query)
+            """
+            params = {"query": query, "limit": limit}
+
+            # Add entity type filter if provided
+            if entity_types:
+                type_conditions = [
+                    f"e.type = '{entity_type.upper()}'" for entity_type in entity_types
+                ]
+                cypher_query += f" AND ({' OR '.join(type_conditions)})"
+
+            # Add user filter if provided
+            if user_id:
+                cypher_query += " AND m.user_id = $user_id"
+                params["user_id"] = user_id
+
+            cypher_query += """
+            RETURN DISTINCT m.id, m.user_id, m.content, m.title, m.memory_type,
+                   m.created_at, m.summary, m.source, m.tags, m.confidence, e.confidence as entity_confidence
+            ORDER BY e.confidence DESC, m.created_at DESC
+            LIMIT $limit
+            """
+
+            logger.info(
+                f"Executing graph search for query: '{query}' with entity_types: {entity_types}"
+            )
+            results = self.kuzu.query(cypher_query, params)
+
+            return await self._convert_kuzu_to_search_results(results, source="graph_search")
+
+        except Exception as e:
+            logger.error(f"Graph search failed for query '{query}': {e}")
+            return []
