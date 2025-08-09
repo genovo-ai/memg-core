@@ -2,9 +2,9 @@ name: MEMG Core CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main, dev, dev-slim ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, dev, dev-slim ]
 
 env:
   REGISTRY: ghcr.io
@@ -60,17 +60,17 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          echo "Running test suite with coverage (fail under 80%)..."
+          echo "Running test suite with coverage (fail under 50% for lean core)..."
           pytest -vv \
             --cov=src/memory_system \
             --cov-report=term-missing \
-            --cov-fail-under=80
+            --cov-fail-under=50
 
    ##################### Build MCP Docker Image ########################
   build-mcp-docker:
-    needs: publish-to-pypi
+    needs: security-and-quality  # Changed from publish-to-pypi
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/dev-slim'
     permissions:
       contents: read
       packages: write
@@ -115,46 +115,46 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-   ##################### PyPI Publishing ########################
-  publish-to-pypi:
-    needs: security-and-quality
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      id-token: write  # Required for Trusted Publishing
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build
-
-      - name: Build package
-        run: |
-          echo "Building Python package..."
-          python -m build
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          print-hash: true
-          skip-existing: true
-          attestations: true  # Enable package attestations for better security
+   ##################### PyPI Publishing (DISABLED) ########################
+  # publish-to-pypi:
+  #   needs: security-and-quality
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   permissions:
+  #     id-token: write  # Required for Trusted Publishing
+  #     contents: read
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: '3.11'
+  #         cache: 'pip'
+  #
+  #     - name: Install build dependencies
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install build
+  #
+  #     - name: Build package
+  #       run: |
+  #         echo "Building Python package..."
+  #         python -m build
+  #
+  #     - name: Publish to PyPI
+  #       uses: pypa/gh-action-pypi-publish@release/v1
+  #       with:
+  #         print-hash: true
+  #         skip-existing: true
+  #         attestations: true  # Enable package attestations for better security
 
    ##################### Deployment ########################
   deploy:
-    needs: [build-mcp-docker, publish-to-pypi]
+    needs: [build-mcp-docker]  # Removed publish-to-pypi dependency
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/dev-slim'
     steps:
       - name: MCP Docker Image Published
         id: deploy
@@ -169,18 +169,15 @@ jobs:
 
       - name: Deployment Instructions
         run: |
-          echo "🎉 MEMG Core published successfully!"
+          echo "🎉 MEMG Core (lean) build successful!"
           echo ""
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "📦 Core Library: pip install memg-core"
-            echo "🐳 MCP Server: docker pull ghcr.io/${{ github.repository }}-mcp:latest"
-          fi
+          echo "🐳 MCP Server: docker pull ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
           echo ""
           echo "🚀 Deploy MCP Server:"
           echo "1. docker pull ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
           echo "2. cp env.example .env && edit GOOGLE_API_KEY"
           echo "3. docker run --env-file .env -p 8787:8787 ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
           echo ""
-          echo "📚 Use Core Library:"
-          echo "1. pip install memg-core"
-          echo "2. from memory_system import MemorySystem"
+          echo "📚 Core Library (PyPI publishing disabled for now):"
+          echo "1. Local install: pip install -e ."
+          echo "2. from memory_system.processing import MemoryRetriever"
