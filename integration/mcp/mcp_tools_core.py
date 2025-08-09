@@ -192,56 +192,25 @@ def register_core_tools(app: FastMCP) -> None:
             return {"result": f"❌ Graph search error: {str(e)}"}
 
     @app.tool("validate_graph")
-    def validate_graph(user_id: str = None, validation_type: str = "comprehensive"):
-        """Validate GraphRAG Stage 1 implementation - entity extraction and graph storage."""
+    def validate_graph(user_id: str = None, validation_type: str = "basic"):
+        """Lightweight graph validation using Kuzu primitives (lean core)."""
         memory = get_memory_system()
         if not memory:
             return {"result": "❌ Memory system not initialized"}
 
         try:
-            from memory_system.validation.graph_validator import GraphValidator
-
-            validator = GraphValidator(memory.processor.kuzu)
-
-            if validation_type == "comprehensive":
-                report = validator.run_comprehensive_validation(user_id)
-                return {
-                    "result": f"✅ GraphRAG validation complete - Health Score: {report['overall_health_score']}/100",
-                    "validation_report": report,
-                    "summary": {
-                        "entities": report["validation_results"]["entity_storage"][
-                            "entity_count"
-                        ],
-                        "relationships": report["validation_results"]["relationships"][
-                            "relationship_count"
-                        ],
-                        "memory_connections": f"{report['validation_results']['memory_connections'].get('connection_rate_percent', 0)}%",
-                    },
-                }
-            elif validation_type == "entities":
-                entities_report = validator.validate_entity_storage(user_id)
-                coding_report = validator.validate_coding_entities(user_id)
-                return {
-                    "result": f"✅ Entity validation complete - {entities_report['entity_count']} total entities",
-                    "entities": entities_report,
-                    "coding_entities": coding_report,
-                }
-            elif validation_type == "relationships":
-                rel_report = validator.validate_relationships(user_id)
-                return {
-                    "result": f"✅ Relationship validation complete - {rel_report['relationship_count']} relationships",
-                    "relationships": rel_report,
-                }
-            elif validation_type == "connections":
-                conn_report = validator.validate_memory_entity_connections(user_id)
-                return {
-                    "result": f"✅ Connection validation complete - {conn_report.get('connection_rate_percent', 0)}% memories have entities",
-                    "connections": conn_report,
-                }
-            else:
-                return {
-                    "result": f"❌ Invalid validation_type: {validation_type}. Use 'comprehensive', 'entities', 'relationships', or 'connections'"
-                }
+            kuzu = memory.kuzu_interface
+            entity_count = kuzu.query("MATCH (e:Entity) RETURN COUNT(e) as c")
+            memory_count = kuzu.query("MATCH (m:Memory) RETURN COUNT(m) as c")
+            rel_count = kuzu.query("MATCH ()-[r]-() RETURN COUNT(r) as c")
+            return {
+                "result": "✅ Graph validation (basic) complete",
+                "summary": {
+                    "entities": (entity_count[0]["c"] if entity_count else 0),
+                    "memories": (memory_count[0]["c"] if memory_count else 0),
+                    "relationships": (rel_count[0]["c"] if rel_count else 0),
+                },
+            }
 
         except Exception as e:
             log_error(
@@ -254,146 +223,37 @@ def register_core_tools(app: FastMCP) -> None:
             return {"result": f"❌ Graph validation error: {str(e)}"}
 
     @app.tool("get_memory_schema")
-    def get_memory_schema(user_id: str = None, include_stats: bool = True):
-        """Return schema derived dynamically from active template and enums (no hardcoding)."""
+    def get_memory_schema(user_id: str = None, include_stats: bool = True, yaml_path: str = None):
+        """Return core enums plus optional YAML-defined catalogs if available (lean core)."""
         memory = get_memory_system()
         if not memory:
             return {"result": "❌ Memory system not initialized"}
 
         try:
-            # Core enums that remain stable
-            from memory_system.models.core import (
-                ImportanceLevel,
-                MemoryType,
-                RelationshipStrength,
-            )
+            from memory_system.models.core import MemoryType
+            from memory_system.utils.yaml_schema import load_yaml_schema
 
-            # Template system for dynamic entity/relationship types
-            from memory_system.templates.registry import get_template_registry
-            from memory_system.version import __version__ as core_version
-
-            registry = get_template_registry()
-            template = registry.get_current_template()
-
-            # Fallbacks if template is missing for any reason
-            entity_types_available: list[str] = []
-            entity_categories: dict[str, list[str]] = {}
-            relationship_types_available: list[str] = []
-            relationship_descriptions: dict[str, str] = {}
-            relationship_directionality: dict[str, str] = {}
-            template_name = None
-            template_version = None
-
-            if template is not None:
-                # Entity types and categories from template
-                entity_types_available = template.get_entity_type_names()
-                for et in template.entity_types:
-                    cat_key = (et.category or "GENERAL").lower()
-                    entity_categories.setdefault(cat_key, []).append(et.name)
-
-                # Relationship types from template
-                relationship_types_available = template.get_relationship_type_names()
-                for rt in template.relationship_types:
-                    relationship_descriptions[rt.name] = rt.description
-                    relationship_directionality[rt.name] = rt.directionality
-
-                template_name = template.name
-                template_version = template.version
-
-            schema_info: dict = {
-                "memory_types": {
-                    "available_types": [t.value for t in MemoryType],
-                    # Keep concise, non-domain-specific descriptions
-                    "descriptions": {
-                        "document": "Long-form content with optional AI summary",
-                        "note": "Short-form content, quick facts or observations",
-                        "conversation": "Dialog turns or chat transcripts",
-                        "task": "Actionable work items with optional status",
-                    },
-                },
-                "entity_types": {
-                    "available_types": entity_types_available,
-                    "categories": entity_categories,
-                    "total_count": len(entity_types_available),
-                },
-                "relationship_types": {
-                    "available_types": relationship_types_available,
-                    "descriptions": relationship_descriptions,
-                    "directionality": relationship_directionality,
-                },
-                "relationship_strengths": [s.value for s in RelationshipStrength],
-                "importance_levels": [i.value for i in ImportanceLevel],
-                "filterable_fields": {
-                    # Keep filter set generic and template-agnostic
-                    "memory_filters": [
-                        "memory_type",
-                        "project_id",
-                        "source",
-                        "tags",
-                        "created_at",
-                        "confidence",
-                    ],
-                    "entity_filters": [
-                        "entity_types",
-                        "importance_level",
-                        "confidence",
-                    ],
-                    "temporal_filters": [
-                        "days_back",
-                        "created_after",
-                        "created_before",
-                    ],
+            response = {
+                "result": "✅ Schema generated",
+                "core": {
+                    "enums": {
+                        "MemoryType": [t.value for t in MemoryType],
+                    }
                 },
             }
 
-            # Optional usage statistics from graph store
+            schema = load_yaml_schema(yaml_path)
+            if schema:
+                response["yaml"] = schema.model_dump()
+
             if include_stats:
                 try:
-                    kuzu = memory.processor.kuzu
-                    if user_id:
-                        entity_stats = kuzu.query(
-                            "MATCH (e:Entity) WHERE e.user_id = $user_id RETURN e.type as entity_type, COUNT(*) as count ORDER BY count DESC",
-                            {"user_id": user_id},
-                        )
-                        memory_stats = kuzu.query(
-                            "MATCH (m:Memory) WHERE m.user_id = $user_id RETURN m.memory_type as memory_type, COUNT(*) as count ORDER BY count DESC",
-                            {"user_id": user_id},
-                        )
-                    else:
-                        entity_stats = kuzu.query(
-                            "MATCH (e:Entity) RETURN e.type as entity_type, COUNT(*) as count ORDER BY count DESC",
-                            {},
-                        )
-                        memory_stats = kuzu.query(
-                            "MATCH (m:Memory) RETURN m.memory_type as memory_type, COUNT(*) as count ORDER BY count DESC",
-                            {},
-                        )
+                    stats = memory._run_async(memory.retriever.get_stats())
+                    response["stats"] = stats
+                except Exception:
+                    pass
 
-                    schema_info["usage_statistics"] = {
-                        "entity_type_distribution": entity_stats,
-                        "memory_type_distribution": memory_stats,
-                        "user_scoped": user_id is not None,
-                    }
-                except Exception as stats_error:
-                    schema_info["usage_statistics"] = {
-                        "error": f"Could not retrieve stats: {str(stats_error)}"
-                    }
-
-            # Metadata
-            schema_info["schema_metadata"] = {
-                "version": core_version,
-                "template": template_name,
-                "template_version": template_version,
-                "supports_user_isolation": True,
-                "supports_project_scoping": True,
-                "primary_search_engine": "qdrant",
-                "relationship_engine": "kuzu",
-            }
-
-            return {
-                "result": "✅ Memory schema retrieved successfully",
-                "schema": schema_info,
-            }
+            return response
 
         except Exception as e:
             log_error("mcp_tools_core", "get_memory_schema", e, user_id=user_id)
