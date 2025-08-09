@@ -1,42 +1,32 @@
 #!/bin/bash
 
-# 🏗️ MEMG Core Build Script
-# Builds both the core package and MCP server
+# 🏗️ MEMG Core Build Script (package only)
+# - Builds the memg-core wheel/sdist into ./dist
+# - Verifies the package can be installed
+# - MCP runtime is handled separately by start_server.sh + dockerfiles/docker-compose.yml
 
-set -e
+set -euo pipefail
 
-echo "🏗️ Building MEMG Core..."
+echo "🏗️ Building memg-core package..."
 
-# Configuration
-CORE_PACKAGE="memg-core"
-MCP_IMAGE="memg-mcp-server"
-REGISTRY="ghcr.io/genovo-ai"
+# Clean previous build artifacts
+rm -rf dist build ./*.egg-info || true
 
-# Build core package
-echo "📦 Building core package..."
+# Ensure build tool is available
+python -m pip install --upgrade pip build >/dev/null
+
+# Build wheel and sdist
 python -m build
 
-echo "✅ Core package built successfully!"
-echo "📋 Built files:"
+echo "✅ Build complete. Artifacts:"
 ls -la dist/
 
-# Test installation
-echo "🧪 Testing core package installation..."
-pip install --force-reinstall dist/*.whl
-echo "✅ Core package installs successfully!"
+# Smoke test install
+echo "🧪 Verifying installation of built wheel..."
+pip install --force-reinstall dist/*.whl >/dev/null
 
-# Build MCP Docker image (for local testing)
-echo "🐳 Building MCP Docker image for local testing..."
-docker build -f dockerfiles/Dockerfile.mcp -t ${MCP_IMAGE}:local .
-
+echo "✅ memg-core installs successfully from the built wheel."
 echo ""
-echo "🎉 Build complete!"
-echo ""
-echo "📦 Core package: dist/memg_core-*.whl"
-echo "🐳 MCP image: ${MCP_IMAGE}:local"
-echo ""
-echo "🚀 Test MCP server locally:"
-echo "docker run -p 8787:8787 -e GOOGLE_API_KEY=your_key ${MCP_IMAGE}:local"
-echo ""
-echo "📚 Install core library:"
-echo "pip install dist/memg_core-*.whl"
+echo "Next steps:"
+echo "- To run MCP server, use: ./start_server.sh (uses dockerfiles/docker-compose.yml)"
+echo "- To publish (CI will handle), ensure PYPI_API_TOKEN is set in secrets."
