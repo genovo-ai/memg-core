@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memg-core"
+# NOTE: Bump this when publishing a new version; CI uses skip-existing to avoid failures
 version = "1.0.0"
 description = "Core memory system library with dual storage (Qdrant + Kuzu) and AI integration"
 readme = "README.md"
