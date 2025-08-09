@@ -10,7 +10,15 @@ echo "🚀 Starting MEMG Core MCP Server via Docker Compose..."
 # Usage: ./start_server.sh [--local]
 #   --local  Use local Dockerfile/compose to build from current source (no PyPI)
 
-# Configuration with defaults
+# Load .env first (so docker compose variable substitution uses it)
+if [[ -f ".env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+fi
+
+# Configuration with defaults (do not override .env)
 export MEMORY_SYSTEM_MCP_PORT=${MEMORY_SYSTEM_MCP_PORT:-8787}
 export BASE_MEMORY_PATH=${BASE_MEMORY_PATH:-"$HOME/.local/share/memory_system"}
 export MEMG_TEMPLATE=${MEMG_TEMPLATE:-"software_development"}
