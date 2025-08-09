@@ -124,7 +124,7 @@ class KuzuInterface:
                 """Map Python types to Kuzu types"""
                 if key in ["confidence"]:
                     return "DOUBLE"
-                elif key in ["is_valid"]:
+                if key in ["is_valid"]:
                     return "BOOLEAN"
                 elif isinstance(value, (int, float)):
                     return "DOUBLE"
@@ -134,12 +134,17 @@ class KuzuInterface:
                     return "STRING"
 
             prop_columns = (
-                ", ".join([f"{k} {get_kuzu_type(k, v)}" for k, v in props.items()]) if props else ""
+                ", ".join([f"{k} {get_kuzu_type(k, v)}" for k, v in props.items()])
+                if props
+                else ""
             )
             extra_cols = f", {prop_columns}" if prop_columns else ""
 
             # Try to create table, if it fails due to schema mismatch, recreate it
-            create_table_sql = f"CREATE REL TABLE IF NOT EXISTS {rel_type}(FROM {from_table} TO {to_table}{extra_cols})"
+            create_table_sql = (
+                f"CREATE REL TABLE IF NOT EXISTS {rel_type}"
+                f"(FROM {from_table} TO {to_table}{extra_cols})"
+            )
             try:
                 self.conn.execute(create_table_sql)
             except Exception as schema_error:
@@ -158,7 +163,11 @@ class KuzuInterface:
             # Add the relationship
             prop_str = ", ".join([f"{k}: ${k}" for k in props.keys()]) if props else ""
             rel_props = f" {{{prop_str}}}" if prop_str else ""
-            query = f"MATCH (a:{from_table} {{id: $from_id}}), (b:{to_table} {{id: $to_id}}) CREATE (a)-[:{rel_type}{rel_props}]->(b)"
+            query = (
+                f"MATCH (a:{from_table} {{id: $from_id}}), "
+                f"(b:{to_table} {{id: $to_id}}) "
+                f"CREATE (a)-[:{rel_type}{rel_props}]->(b)"
+            )
             params = {"from_id": from_id, "to_id": to_id, **props}
             self.conn.execute(query, parameters=params)
             return True

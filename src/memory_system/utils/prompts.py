@@ -2,7 +2,6 @@
 Prompt loading utilities for the memory system.
 """
 
-import os
 from pathlib import Path
 from typing import Dict, Optional
 

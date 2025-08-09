@@ -122,7 +122,8 @@ class PipelineValidator:
         self._validate_cross_component_consistency(report, memory_extraction_model, memory_objects)
 
         logger.info(
-            f"Pipeline validation complete: {report.error_count} errors, {report.warning_count} warnings"
+            f"Pipeline validation complete: {report.error_count} errors, "
+            f"{report.warning_count} warnings"
         )
         return report
 
@@ -340,7 +341,7 @@ class PipelineValidator:
     def print_validation_report(self, report: PipelineValidationReport):
         """Print a formatted validation report."""
         print(f"\n{'='*60}")
-        print(f"🔍 PIPELINE VALIDATION REPORT")
+        print("🔍 PIPELINE VALIDATION REPORT")
         print(f"{'='*60}")
         print(f"Overall Status: {'✅ PASS' if report.pipeline_valid else '❌ FAIL'}")
         print(f"Total Issues: {report.total_issues}")

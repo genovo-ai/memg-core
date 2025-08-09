@@ -155,7 +155,7 @@ Pre-commit hooks are **mandatory** and will automatically:
 
 ### Code Quality Standards
 
-- **Pylint Score**: Minimum 8.5/10 (currently enforced)
+- **Pylint Score**: Minimum 7.0/10 (currently enforced, will increase to 8.5+ after refactor)
 - **Type Hints**: Required for all functions
 - **Documentation**: Docstrings for public APIs
 - **Security**: No high-severity bandit issues

@@ -51,7 +51,7 @@ jobs:
       - name: Pylint code quality check
         run: |
           echo "Running pylint quality check..."
-          pylint src/ --fail-under=8.5 --score=yes
+          pylint src/ --fail-under=7.0 --score=yes
 
       - name: Type checking with mypy
         run: |

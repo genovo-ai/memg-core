@@ -7,7 +7,6 @@ This module manages the conversation context required for MEM0-style memory proc
 - Message pair creation for memory extraction
 """
 
-import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional

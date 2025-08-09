@@ -5,8 +5,6 @@ Template registry system for MEMG - Dynamic template loading and management
 import importlib
 import json
 import logging
-import os
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .base import MemoryTemplate, TemplateValidationError
@@ -114,7 +112,7 @@ class TemplateRegistry:
             template = getattr(module, template_name)
 
             if not isinstance(template, MemoryTemplate):
-                raise TemplateValidationError(f"Template object must be MemoryTemplate instance")
+                raise TemplateValidationError("Template object must be MemoryTemplate instance")
 
             self.register_template(template)
 

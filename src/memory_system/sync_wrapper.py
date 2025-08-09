@@ -184,6 +184,7 @@ class SyncMemorySystem:
     def add_document(
         self,
         content: str,
+        user_id: str,
         title: Optional[str] = None,
         source: str = "user",
         tags: Optional[List[str]] = None,
@@ -193,6 +194,7 @@ class SyncMemorySystem:
 
         Args:
             content: Document content to store
+            user_id: User identifier for memory isolation
             title: Optional title
             source: Source of the document
             tags: Optional tags list
@@ -202,6 +204,7 @@ class SyncMemorySystem:
         """
         return self.add(
             content=content,
+            user_id=user_id,
             memory_type=MemoryType.DOCUMENT,
             title=title,
             source=source,
@@ -211,6 +214,7 @@ class SyncMemorySystem:
     def add_note(
         self,
         content: str,
+        user_id: str,
         title: Optional[str] = None,
         source: str = "user",
         tags: Optional[List[str]] = None,
@@ -220,6 +224,7 @@ class SyncMemorySystem:
 
         Args:
             content: Note content to store
+            user_id: User identifier for memory isolation
             title: Optional title
             source: Source of the note
             tags: Optional tags list
@@ -229,6 +234,7 @@ class SyncMemorySystem:
         """
         return self.add(
             content=content,
+            user_id=user_id,
             memory_type=MemoryType.NOTE,
             title=title,
             source=source,
@@ -377,6 +383,7 @@ class SyncMemorySystem:
         previous_message: Optional[str] = None,
         speaker: Optional[str] = None,
         conversation_id: Optional[str] = None,
+        user_id: str = "default_user",
         **kwargs,
     ) -> bool:
         """
@@ -403,6 +410,7 @@ class SyncMemorySystem:
             # Add as note with conversation context
             result = self.add_note(
                 content=content,
+                user_id=user_id,
                 source="conversation",
                 tags=([f"conversation:{conversation_id}"] if conversation_id else ["conversation"]),
             )

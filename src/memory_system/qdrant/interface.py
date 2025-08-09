@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
-from ..exceptions import DatabaseError, NetworkError, StorageError, wrap_exception
-from ..logging_config import get_logger, log_error, log_operation
+from ..exceptions import DatabaseError, NetworkError, StorageError
+from ..logging_config import get_logger, log_error
 
 
 class QdrantInterface:

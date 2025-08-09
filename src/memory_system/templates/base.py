@@ -51,7 +51,8 @@ class RelationshipTypeDefinition:
             raise TemplateValidationError(f"Relationship type name must be uppercase: {self.name}")
         if not re.match(r"^[A-Z][A-Z_]*$", self.name):
             raise TemplateValidationError(
-                f"Relationship type name must contain only uppercase letters and underscores: {self.name}"
+                f"Relationship type name must contain only uppercase letters and \
+        underscores: {self.name}"
             )
         if not self.description:
             raise TemplateValidationError(f"Relationship type description is required: {self.name}")
@@ -139,12 +140,12 @@ class MemoryTemplate(BaseModel):
         """Comprehensive template validation"""
         try:
             # Validate all entity types
-            for entity_type in self.entity_types:
+            for _ in self.entity_types:
                 # EntityTypeDefinition.__post_init__ will validate
                 pass
 
             # Validate all relationship types
-            for relationship_type in self.relationship_types:
+            for _ in self.relationship_types:
                 # RelationshipTypeDefinition.__post_init__ will validate
                 pass
 

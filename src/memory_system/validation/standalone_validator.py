@@ -10,12 +10,11 @@ Usage:
     report = validator.validate_memory_flow(...)
 """
 
-import asyncio
 import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from ..models import CreateMemoryRequest, Entity, Memory, Relationship
+from ..models import Entity, Memory, Relationship
 from .pipeline_validator import PipelineValidationReport, PipelineValidator
 
 logger = logging.getLogger(__name__)
@@ -268,7 +267,6 @@ def run_validation_demo():
     print(f"   Valid: {result.is_valid}, Issues: {len(result.issues)}")
 
     # Example Memory validation
-    from ..models import Memory
 
     print("\n2. Validating sample Memory object...")
     # Cannot create memory with mock vectors - real embeddings required

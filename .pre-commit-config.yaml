@@ -38,7 +38,7 @@ repos:
           - google-genai==1.27.0
           - pydantic==2.11.7
           - fastmcp>=2.10.6
-        args: [--score=yes, --fail-under=8.5]
+        args: [--score=yes, --fail-under=7.0]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.17.0

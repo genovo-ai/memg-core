@@ -1,0 +1,31 @@
+{
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "integration",
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/node_modules"
+  ],
+  "ignore": [
+    "integration/**",
+    "**/mcp_server.py"
+  ],
+  "pythonVersion": "3.11",
+  "pythonPlatform": "All",
+  "executionEnvironments": [
+    {
+      "root": "src",
+      "pythonVersion": "3.11",
+      "extraPaths": ["src"]
+    }
+  ],
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": false,
+  "reportImportCycles": false,
+  "reportUnusedImport": "warning",
+  "reportUnusedClass": "warning",
+  "reportUnusedFunction": "warning",
+  "reportUnusedVariable": "warning"
+}

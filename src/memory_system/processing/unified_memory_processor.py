@@ -6,13 +6,13 @@ Reduces AI calls from 4 to 2:
 2. Focused Entity & Relationship Extraction (using analysis results)
 """
 
-import logging
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..exceptions import NetworkError, ProcessingError, ValidationError, wrap_exception
+from ..exceptions import ProcessingError, ValidationError
 from ..kuzu_graph.interface import KuzuInterface
-from ..logging_config import get_logger, log_error, log_operation, log_performance
+from ..logging_config import get_logger, log_error
 from ..models import CreateMemoryRequest, Memory, MemoryType, ProcessingResponse
 from ..models.template_models import TemplateAwareEntity as Entity
 from ..models.template_models import (
@@ -87,7 +87,10 @@ class UnifiedMemoryProcessor:
                 final_type = MemoryType.TASK
                 # Generate task-specific summary if AI didn't provide one
                 if not content_analysis["summary"] and ai_suggested_type != MemoryType.TASK:
-                    summary = f"Task: {request.content[:100]}{'...' if len(request.content) > 100 else ''}"
+                    summary = (
+                        f"Task: {request.content[:100]}"
+                        f"{'...' if len(request.content) > 100 else ''}"
+                    )
                 else:
                     summary = content_analysis["summary"] if content_analysis["summary"] else None
             else:
@@ -116,7 +119,6 @@ class UnifiedMemoryProcessor:
 
             # CALL 2: Focused Entity & Relationship Extraction
             entities, relationships = [], []
-            import os
 
             entity_extraction_enabled = (
                 os.getenv("MEMG_ENABLE_ENTITY_EXTRACTION", "true").lower() == "true"
@@ -178,7 +180,8 @@ class UnifiedMemoryProcessor:
                             )
                             if success:
                                 logger.info(
-                                    f"Updated Qdrant payload with entity types: {unique_entity_types}"
+                                    f"Updated Qdrant payload with entity types: "
+                                    f"{unique_entity_types}"
                                 )
                             else:
                                 logger.warning("Failed to update Qdrant payload with entity types")
@@ -238,7 +241,6 @@ class UnifiedMemoryProcessor:
         """
         try:
             # Load unified analysis prompt
-            import os
 
             prompt_path = os.path.join(
                 os.path.dirname(__file__),
@@ -247,7 +249,7 @@ class UnifiedMemoryProcessor:
                 "unified_analysis",
                 "content_analysis.md",
             )
-            with open(prompt_path, "r") as f:
+            with open(prompt_path, "r", encoding="utf-8") as f:
                 system_prompt = f.read()
 
             genai_client = GenAI(system_instruction=system_prompt)
@@ -311,7 +313,8 @@ Provide complete analysis following the schema.
             critical_issues = content_analysis.get("critical_issues", [])
 
             focused_prompt = f"""
-You are an expert entity extraction specialist. Extract entities and relationships from the given content.
+You are an expert entity extraction specialist. Extract entities and \
+        relationships from the given content.
 
 CONTENT ANALYSIS CONTEXT:
 - Domain: {content_analysis.get("domain", "general")}
@@ -365,7 +368,8 @@ Extract entities and relationships with focus on the above context.
                     entity_type_str = entity_data["type"]
                     if not validate_entity_type(entity_type_str):
                         logger.warning(
-                            f"Skipping entity with invalid type '{entity_type_str}': {entity_data.get('name')}"
+                            f"Skipping entity with invalid type '{entity_type_str}': "
+                            f"{entity_data.get('name')}"
                         )
                         continue
 
@@ -406,7 +410,8 @@ Extract entities and relationships with focus on the above context.
                     rel_type_str = rel_data["type"]
                     if not validate_relationship_type(rel_type_str):
                         logger.warning(
-                            f"Skipping relationship with invalid type '{rel_type_str}': {source_name} -> {target_name}"
+                            f"Skipping relationship with invalid type '{rel_type_str}': "
+                            f"{source_name} -> {target_name}"
                         )
                         continue
 
@@ -461,7 +466,7 @@ Extract entities and relationships with focus on the above context.
                 "is_valid": memory.is_valid,
                 "confidence": memory.confidence,
             }
-            success, point_id = self.qdrant.add_point(
+            success, _ = self.qdrant.add_point(
                 vector=embedding, payload=memory_payload, point_id=memory.id
             )
             logger.debug(f"Stored memory in Qdrant: {memory.id}")

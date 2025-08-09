@@ -43,7 +43,8 @@ def initialize_templates(template_name: Optional[str] = None) -> bool:
         clear_schema_cache()
 
         logger.info(
-            f"Template system initialized successfully with template: {current_template.name} v{current_template.version}"
+            f"Template system initialized successfully with template: "
+            f"{current_template.name} v{current_template.version}"
         )
         return True
 
@@ -76,7 +77,8 @@ def switch_template(template_name: str) -> bool:
 
         current_template = registry.get_current_template()
         logger.info(
-            f"Successfully switched to template: {current_template.name} v{current_template.version}"
+            f"Successfully switched to template: "
+            f"{current_template.name} v{current_template.version}"
         )
         return True
 

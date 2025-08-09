@@ -47,8 +47,6 @@ class ConfigurationError(MemorySystemError):
     - Configuration validation failures
     """
 
-    pass
-
 
 class DatabaseError(MemorySystemError):
     """
@@ -60,8 +58,6 @@ class DatabaseError(MemorySystemError):
     - Storage path issues
     - Collection creation failures
     """
-
-    pass
 
 
 class ProcessingError(MemorySystemError):
@@ -75,8 +71,6 @@ class ProcessingError(MemorySystemError):
     - Validation errors
     """
 
-    pass
-
 
 class NetworkError(MemorySystemError):
     """
@@ -89,8 +83,6 @@ class NetworkError(MemorySystemError):
     - Timeout errors
     """
 
-    pass
-
 
 class ValidationError(MemorySystemError):
     """
@@ -102,8 +94,6 @@ class ValidationError(MemorySystemError):
     - Input format errors
     - Type checking failures
     """
-
-    pass
 
 
 class StorageError(DatabaseError):
@@ -119,8 +109,6 @@ class StorageError(DatabaseError):
     - Path access errors
     """
 
-    pass
-
 
 class EmbeddingError(NetworkError):
     """
@@ -135,8 +123,6 @@ class EmbeddingError(NetworkError):
     - Rate limiting
     """
 
-    pass
-
 
 class MCPError(MemorySystemError):
     """
@@ -148,8 +134,6 @@ class MCPError(MemorySystemError):
     - Protocol communication issues
     - Session management errors
     """
-
-    pass
 
 
 # Utility functions for error handling

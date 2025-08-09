@@ -3,9 +3,9 @@ Dynamic JSON schema generation from templates for MEMG
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-from ..templates.base import EntityTypeDefinition, MemoryTemplate, RelationshipTypeDefinition
+from ..templates.base import MemoryTemplate
 
 logger = logging.getLogger(__name__)
 

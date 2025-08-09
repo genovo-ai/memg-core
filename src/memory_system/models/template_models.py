@@ -4,13 +4,13 @@ Template-aware models for MEMG - Dynamic entity and relationship types
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, validator
 
 from ..templates.registry import get_template_registry
-from .core import MemoryType  # Keep existing MemoryType for now
+from .core import MemoryType
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,8 @@ class TemplateAwareEntity(BaseModel):
             valid_types = current_template.get_entity_type_names()
             if v not in valid_types:
                 raise ValueError(
-                    f"Invalid entity type '{v}' for template '{current_template.name}'. Valid types: {valid_types}"
+                    f"Invalid entity type '{v}' for template '{current_template.name}'. "
+                    f"Valid types: {valid_types}"
                 )
 
             return v
@@ -128,7 +129,8 @@ class TemplateAwareRelationship(BaseModel):
             valid_types = current_template.get_relationship_type_names()
             if v not in valid_types:
                 raise ValueError(
-                    f"Invalid relationship type '{v}' for template '{current_template.name}'. Valid types: {valid_types}"
+                    f"Invalid relationship type '{v}' for template '{current_template.name}'. "
+                    f"Valid types: {valid_types}"
                 )
 
             return v

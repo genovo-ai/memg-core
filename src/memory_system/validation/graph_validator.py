@@ -191,7 +191,8 @@ class GraphValidator:
             )
 
             logger.info(
-                f"Memory-entity connections: {memories_with_entities}/{total_memories} memories have entities ({connection_rate:.1f}%)"
+                f"Memory-entity connections: {memories_with_entities}/{total_memories} "
+                f"memories have entities ({connection_rate:.1f}%)"
             )
 
             return {

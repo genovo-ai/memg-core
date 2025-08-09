@@ -114,7 +114,8 @@ class MemoryRetriever:
             logger.info(f"Search results type: {type(search_results)}")
             if search_results:
                 logger.info(
-                    f"First result type: {type(search_results[0])}, keys: {list(search_results[0].keys()) if isinstance(search_results[0], dict) else 'Not a dict'}"
+                    f"First result type: {type(search_results[0])}, "
+                    f"keys: {list(search_results[0].keys()) if isinstance(search_results[0], dict) else 'Not a dict'}"
                 )
             else:
                 logger.info("Search results is empty or None")
@@ -124,14 +125,17 @@ class MemoryRetriever:
             logger.info(f"Starting to process {len(search_results)} results from Qdrant")
             for i, result in enumerate(search_results):
                 logger.debug(
-                    f"Processing result {i+1}/{len(search_results)}: ID={result.get('id')}, score={result.get('score', 0.0):.3f}"
+                    f"Processing result {i+1}/{len(search_results)}: ID={result.get('id')}, "
+                    f"score={result.get('score', 0.0):.3f}"
                 )
                 logger.debug(
-                    f"Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+                    f"Result keys: "
+                    f"{list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
                 )
                 if result.get("score", 0.0) < score_threshold:
                     logger.debug(
-                        f"Skipping result due to low score: {result.get('score', 0.0):.3f} < {score_threshold}"
+                        f"Skipping result due to low score: "
+                        f"{result.get('score', 0.0):.3f} < {score_threshold}"
                     )
                     continue
 
@@ -156,7 +160,8 @@ class MemoryRetriever:
                         memory_type = MemoryType.NOTE  # Default fallback
 
                     logger.debug(
-                        f"Constructing Memory object with ID: {result.get('id')}, payload keys: {list(payload.keys())}"
+                        f"Constructing Memory object with ID: {result.get('id')}, "
+                        f"payload keys: {list(payload.keys())}"
                     )
 
                     memory = Memory(
@@ -201,7 +206,8 @@ class MemoryRetriever:
 
                 results.append(search_result)
                 logger.debug(
-                    f"Found memory: {memory.title or memory.content[:50]}... (score: {search_result.score:.3f})"
+                    f"Found memory: {memory.title or memory.content[:50]}... "
+                    f"(score: {search_result.score:.3f})"
                 )
 
             # Sort by score (highest first) and add relevance metadata
@@ -237,12 +243,15 @@ class MemoryRetriever:
         )
         return None
 
-    async def get_memories_by_category(self, category: str, limit: int = 20) -> List[Memory]:
+    async def get_memories_by_category(
+        self, category: str, user_id: str, limit: int = 20
+    ) -> List[Memory]:
         """
         Get all memories in a specific category.
 
         Args:
             category: Category to filter by
+            user_id: User ID for memory isolation
             limit: Maximum number of memories to return
 
         Returns:
@@ -255,6 +264,7 @@ class MemoryRetriever:
         # Do a general search with a neutral query
         search_results = await self.search_memories(
             query=f"category {category}",
+            user_id=user_id,
             limit=limit,
             score_threshold=0.0,  # Lower threshold for category search
         )
@@ -403,7 +413,8 @@ class MemoryRetriever:
                 params["user_id"] = user_id
 
             error_query += """
-            RETURN DISTINCT m.id, m.user_id, m.content, m.title, m.memory_type, m.created_at, e.confidence
+            RETURN DISTINCT m.id,
+        m.user_id, m.content, m.title, m.memory_type, m.created_at, e.confidence
             ORDER BY e.confidence DESC, m.created_at DESC
             LIMIT $limit
             """

@@ -1,0 +1,57 @@
+[MAIN]
+# Only analyze the src directory, ignore integration
+ignore=integration
+ignore-patterns=.*mcp_server.*
+
+[MESSAGES CONTROL]
+# Disable all the warnings that are not critical for code quality
+disable=
+    import-error,
+    too-many-arguments,
+    too-many-instance-attributes,
+    too-few-public-methods,
+    duplicate-code,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    too-many-positional-arguments,
+    import-outside-toplevel,
+    broad-exception-caught,
+    logging-fstring-interpolation,
+    raise-missing-from,
+    no-self-argument,
+    missing-function-docstring,
+    missing-module-docstring,
+    no-else-return,
+    no-member,
+    unused-argument,
+    fixme,
+    protected-access,
+    unused-import,
+    reimported,
+    global-statement,
+    global-variable-not-assigned,
+    unnecessary-pass,
+    too-many-return-statements,
+    too-many-nested-blocks,
+    consider-using-set-comprehension,
+    unrecognized-option,
+    bad-indentation
+
+[IMPORTS]
+# Known third-party packages
+known-third-party=google,google.genai,kuzu,qdrant_client,pydantic,dotenv,httpx,typing_extensions,fastmcp,uvicorn,starlette
+
+[DESIGN]
+# Reasonable limits for production code
+max-args=15
+max-attributes=20
+max-locals=25
+max-branches=20
+max-statements=80
+max-returns=10
+max-nested-blocks=8
+
+[FORMAT]
+# Allow reasonable line lengths
+max-line-length=100

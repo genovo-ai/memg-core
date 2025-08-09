@@ -8,13 +8,13 @@ This module handles the end-to-end processing for documents and notes:
 4. Simple, fast processing focused on documents and notes
 """
 
-import logging
+import os
 from typing import List, Optional, Tuple
 
-from ..exceptions import NetworkError, ProcessingError, ValidationError, wrap_exception
+from ..exceptions import NetworkError, ProcessingError, ValidationError
 from ..kuzu_graph.interface import KuzuInterface
-from ..logging_config import get_logger, log_error, log_operation, log_performance
-from ..models import CreateMemoryRequest, Memory, MemoryType, ProcessingResponse, Relationship
+from ..logging_config import get_logger, log_error
+from ..models import CreateMemoryRequest, Memory, MemoryType, ProcessingResponse
 from ..models.template_models import TemplateAwareEntity as Entity
 from ..models.template_models import (
     TemplateAwareRelationship,
@@ -112,7 +112,6 @@ class MemoryProcessor:
 
             # Step 4.5: Extract entities and relationships (NEW)
             entities, relationships = [], []
-            import os
 
             entity_extraction_enabled = (
                 os.getenv("MEMG_ENABLE_ENTITY_EXTRACTION", "true").lower() == "true"
@@ -380,7 +379,8 @@ class MemoryProcessor:
         try:
             genai_client = GenAI(system_instruction=system_prompt)
             response = genai_client.generate_text(
-                content=f"Classify this content (word count: {word_count}):\n\n{content[:1000]}"  # Limit for latency
+                content=f"Classify this content (word count: {word_count}):\n\n"
+                f"{content[:1000]}"  # Limit for latency
             )
 
             response_lower = response.strip().lower()
@@ -606,7 +606,8 @@ class MemoryProcessor:
 
         if invalidated_count > 0:
             logger.info(
-                f"Invalidated {invalidated_count} conflicting memories due to new memory: {new_memory.content[:50]}..."
+                f"Invalidated {invalidated_count} conflicting memories "
+                f"due to new memory: {new_memory.content[:50]}..."
             )
 
         return invalidated_count
@@ -621,7 +622,7 @@ class MemoryProcessor:
         from ..config import get_config
 
         config = get_config()
-        return config.mem0.enable_temporal_reasoning
+        return config.memg.enable_temporal_reasoning
 
     async def _extract_entities_and_relationships(self, memory: Memory) -> tuple[List, List]:
         """
@@ -672,7 +673,8 @@ Extract entities and relationships from this memory content.
                     entity_type_str = entity_data["type"]
                     if not validate_entity_type(entity_type_str):
                         logger.warning(
-                            f"Skipping entity with invalid type '{entity_type_str}': {entity_data.get('name')}"
+                            f"Skipping entity with invalid type '{entity_type_str}': "
+                            f"{entity_data.get('name')}"
                         )
                         continue
 
@@ -714,7 +716,8 @@ Extract entities and relationships from this memory content.
                     rel_type_str = rel_data["type"]
                     if not validate_relationship_type(rel_type_str):
                         logger.warning(
-                            f"Skipping relationship with invalid type '{rel_type_str}': {source_name} -> {target_name}"
+                            f"Skipping relationship with invalid type '{rel_type_str}': "
+                            f"{source_name} -> {target_name}"
                         )
                         continue
 
@@ -741,7 +744,8 @@ Extract entities and relationships from this memory content.
                     if success:
                         relationships.append(relationship)
                         logger.debug(
-                            f"Stored relationship: {source_name} -> {target_name} (UUIDs: {source_id[:8]}...-> {target_id[:8]}...)"
+                            f"Stored relationship: {source_name} -> {target_name} "
+                            f"(UUIDs: {source_id[:8]}...-> {target_id[:8]}...)"
                         )
                 else:
                     logger.warning(

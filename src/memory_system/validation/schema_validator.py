@@ -447,7 +447,7 @@ class SchemaValidator:
                 # Handle generic types like List[str], Optional[str], etc.
                 return True  # Simplified for now
             return isinstance(value, expected_annotation)
-        except:
+        except Exception:
             return True  # If we can't validate, assume it's ok
 
     def _is_kuzu_compatible_type(self, value) -> bool:

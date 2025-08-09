@@ -95,7 +95,8 @@ DEFAULT_ENTITY_TYPES = [
     ),
     EntityTypeDefinition(
         name="CONFLICT",
-        description="Version conflicts, dependency conflicts, merge conflicts, and compatibility issues",
+        description="Version conflicts, dependency conflicts, merge conflicts, and \
+        compatibility issues",
         category="CRITICAL",
         extraction_hints=[
             "conflict",

@@ -27,6 +27,7 @@ class MemGConfig:
     # Processing settings
     max_summary_tokens: int = 750  # Max tokens for document summarization (latency control)
     enable_ai_type_verification: bool = True  # AI-based type detection
+    enable_temporal_reasoning: bool = False  # Enable temporal reasoning for memory updates
 
     # Performance settings
     vector_dimension: int = 768  # Embedding dimension
@@ -41,11 +42,11 @@ class MemGConfig:
 
     def __post_init__(self):
         """Validate configuration parameters"""
-        if not (0.0 <= self.similarity_threshold <= 1.0):
+        if not 0.0 <= self.similarity_threshold <= 1.0:
             raise ValueError("similarity_threshold must be between 0.0 and 1.0")
-        if not (0.0 <= self.score_threshold <= 1.0):
+        if not 0.0 <= self.score_threshold <= 1.0:
             raise ValueError("score_threshold must be between 0.0 and 1.0")
-        if not (0.0 <= self.high_similarity_threshold <= 1.0):
+        if not 0.0 <= self.high_similarity_threshold <= 1.0:
             raise ValueError("high_similarity_threshold must be between 0.0 and 1.0")
         if self.max_summary_tokens < 100:
             raise ValueError("max_summary_tokens must be at least 100")
