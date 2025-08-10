@@ -2,7 +2,7 @@
 """YAML schema loader for entity/relationship catalogs and retrieval knobs.
 
 Feature-flagged via MEMG_ENABLE_YAML_SCHEMA and MEMG_YAML_SCHEMA path.
-Falls back gracefully when not configured.
+Optional: code compiles without YAML; when present, we use shipped core registries by default.
 """
 
 from __future__ import annotations
@@ -55,9 +55,9 @@ def _resolve_yaml_path(explicit_path: str | None) -> str | None:
     env_path = os.getenv("MEMG_YAML_SCHEMA")
     if env_path and Path(env_path).exists():
         return env_path
-    # Optional repo default
-    repo_default = Path.cwd() / "integration" / "config" / "schema.example.yaml"
-    return str(repo_default) if repo_default.exists() else None
+    # Default to core minimal registry if present
+    core_default = Path.cwd() / "integration" / "config" / "core.minimal.yaml"
+    return str(core_default) if core_default.exists() else None
 
 
 @lru_cache(maxsize=4)

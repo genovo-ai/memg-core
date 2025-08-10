@@ -24,6 +24,7 @@ except ImportError:
     app = None
 
 from memory_system.models.core import EntityType, MemoryType
+from memory_system.utils.system_info import get_system_info
 
 
 class TestE2EValidation:
@@ -279,6 +280,16 @@ class TestSystemReadiness:
         env_example = project_root / "env.example"
 
         assert env_example.exists(), "env.example missing"
+
+    def test_get_system_info_minimum_fields(self, monkeypatch):
+        """System info exposes registry path, qdrant stats, graph flag, neighbor cap."""
+        monkeypatch.setenv("KUZU_DB_PATH", "/tmp/memg_core_test_kuzu.db")
+        monkeypatch.setenv("QDRANT_STORAGE_PATH", "/tmp/memg_core_test_qdrant")
+        info = get_system_info()
+        assert "registry" in info and isinstance(info["registry"], dict)
+        assert "qdrant" in info and isinstance(info["qdrant"], dict)
+        assert "graph_enabled" in info
+        assert "neighbor_cap_default" in info
 
 
 class TestSystemReadiness:

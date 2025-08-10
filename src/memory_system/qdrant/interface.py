@@ -281,13 +281,17 @@ class QdrantInterface:
                     for key, value in filters.items():
                         if value is None:
                             continue
-                        # Special handling for created_at lower bound (e.g., days_back)
-                        if key == "created_at" and isinstance(value, str):
-                            # Use Range gte for ISO timestamps
-                            filter_conditions.append(
-                                FieldCondition(key="created_at", range=Range(gte=value))
-                            )
-                            continue
+                        # General range support: dict with gt/gte/lt/lte
+                        if isinstance(value, dict):
+                            range_kwargs = {}
+                            for bound_key in ("gt", "gte", "lt", "lte"):
+                                if bound_key in value and value[bound_key] is not None:
+                                    range_kwargs[bound_key] = value[bound_key]
+                            if range_kwargs:
+                                filter_conditions.append(
+                                    FieldCondition(key=key, range=Range(**range_kwargs))
+                                )
+                                continue
                         # Handle list values (like entity_types) with MatchAny
                         if isinstance(value, list):
                             from qdrant_client.models import MatchAny
@@ -355,6 +359,85 @@ class QdrantInterface:
                 operation="search_points",
                 original_error=e,
             )
+
+    def get_point(self, point_id: str, collection: str | None = None) -> dict[str, Any] | None:
+        """Retrieve a single point by ID with payload only."""
+        try:
+            collection = collection or self.collection_name
+            if not self.collection_exists(collection):
+                return None
+            results = self.client.retrieve(
+                collection_name=collection,
+                ids=[point_id],
+                with_payload=True,
+                with_vectors=False,
+            )
+            if not results:
+                return None
+            r = results[0]
+            return {"id": r.id, "payload": r.payload}
+        except Exception as e:
+            log_error(
+                "qdrant_interface",
+                "get_point",
+                e,
+                collection=collection,
+                point_id=point_id,
+            )
+            return None
+
+    def filter_points(
+        self,
+        filters: dict[str, Any] | None = None,
+        limit: int = 50,
+        collection: str | None = None,
+        user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return points by payload filters only (no vector similarity)."""
+        try:
+            from qdrant_client.models import FieldCondition, Filter, MatchValue, Range
+
+            collection = collection or self.collection_name
+            if not self.collection_exists(collection):
+                return []
+
+            conditions = []
+            if user_id:
+                conditions.append(FieldCondition(key="user_id", match=MatchValue(value=user_id)))
+
+            if filters:
+                for key, value in filters.items():
+                    if value is None:
+                        continue
+                    if isinstance(value, dict):
+                        range_kwargs = {}
+                        for bound_key in ("gt", "gte", "lt", "lte"):
+                            if bound_key in value and value[bound_key] is not None:
+                                range_kwargs[bound_key] = value[bound_key]
+                        if range_kwargs:
+                            conditions.append(FieldCondition(key=key, range=Range(**range_kwargs)))
+                            continue
+                    if isinstance(value, list):
+                        from qdrant_client.models import MatchAny
+
+                        conditions.append(FieldCondition(key=key, match=MatchAny(any=value)))
+                    else:
+                        conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
+
+            query_filter = Filter(must=conditions) if conditions else None
+
+            scroll = self.client.scroll(
+                collection_name=collection,
+                with_payload=True,
+                with_vectors=False,
+                limit=limit,
+                scroll_filter=query_filter,
+            )
+            points, _next_page = scroll
+            return [{"id": p.id, "payload": p.payload} for p in points]
+        except Exception as e:
+            log_error("qdrant_interface", "filter_points", e, collection=collection)
+            return []
 
     def get_stats(self, collection: str = None) -> dict[str, Any]:
         """Get collection statistics"""
