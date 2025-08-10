@@ -151,6 +151,7 @@ class TestE2EValidation:
         try:
             try:
                 from integration.mcp.mcp_server import app
+
                 # Check that the app exists and is configured
                 assert app is not None
             except ImportError:
@@ -168,7 +169,9 @@ class TestE2EValidation:
 
             # Try to confirm expected tool names are registered on the app
             try:
-                registered = set(getattr(app, "_tools", {}).keys()) if hasattr(app, "_tools") else set()
+                registered = (
+                    set(getattr(app, "_tools", {}).keys()) if hasattr(app, "_tools") else set()
+                )
                 missing = expected_tools - registered
                 if missing:
                     pytest.skip(f"Some tools not present in this environment: {missing}")

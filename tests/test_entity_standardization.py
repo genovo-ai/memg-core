@@ -22,6 +22,7 @@ from memory_system.models.core import (
     MemoryType,
     Relationship,
 )
+
 # MemoryProcessor moved to _stash - test core functionality only
 from memory_system.processing.memory_retriever import MemoryRetriever
 
