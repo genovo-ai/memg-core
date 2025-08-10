@@ -8,18 +8,35 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 import os
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from memg_core.core_services.embeddings import GenAIEmbedder
 from memg_core.database_services import KuzuInterface, QdrantInterface
 from memg_core.models.core import Memory, MemoryType, SearchResult
 
 
+def _resolve_relation_names() -> list[str]:
+    """Resolve allowed relation type names from YAML registry if available; default to MENTIONS."""
+    if os.getenv("MEMG_ENABLE_YAML_SCHEMA", "false").lower() == "true":
+        schema_path = os.getenv("MEMG_YAML_SCHEMA")
+        if schema_path and Path(schema_path).exists():
+            with open(schema_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            rels = data.get("relations", [])
+            names = [str(r.get("name")).upper() for r in rels if r.get("name")]
+            return names or ["MENTIONS"]
+    return ["MENTIONS"]
+
+
 def _build_graph_query(
     base_query: str, user_id: str | None, limit: int, entity_types: list[str] | None = None
 ) -> tuple[str, dict[str, Any]]:
-    cypher = """
-    MATCH (m:Memory)-[:MENTIONS]->(e:Entity)
+    rel_alternatives = "|".join(_resolve_relation_names())
+    cypher = f"""
+    MATCH (m:Memory)-[r:{rel_alternatives}]->(e:Entity)
     WHERE toLower(e.name) CONTAINS toLower($q)
     """
     params: dict[str, Any] = {"q": base_query, "limit": limit}

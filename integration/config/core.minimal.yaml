@@ -1,0 +1,114 @@
+# Minimal core registry (v1) for memg-core
+
+version: v1
+
+id_policy:
+  kind: uuid
+  field: id
+
+defaults:
+  vector:
+    metric: cosine
+    normalize: true
+    dim: 768
+  timestamps:
+    auto_create: true
+    auto_update: true
+
+entities:
+  - name: note
+    description: "Short free-form note"
+    anchor: content
+    fields:
+      id:          { type: string, required: true, system: true }
+      content:     { type: string, required: true, max_length: 8000 }
+      title:       { type: string }
+      tags:        { type: tags }
+      created_at:  { type: datetime, required: true, system: true }
+      updated_at:  { type: datetime, system: true }
+      embedding:   { type: vector, dim: 768, derived_from: content, system: true }
+
+  - name: document
+    description: "Document with optional summary used as embedding anchor"
+    anchor: summary
+    fields:
+      id:          { type: string, required: true, system: true }
+      title:       { type: string }
+      summary:     { type: string, max_length: 4000 }
+      content:     { type: string, required: true }
+      tags:        { type: tags }
+      created_at:  { type: datetime, required: true, system: true }
+      updated_at:  { type: datetime, system: true }
+      embedding:   { type: vector, dim: 768, derived_from: summary, system: true }
+
+  - name: task
+    description: "Actionable item"
+    anchor: content
+    fields:
+      id:          { type: string, required: true, system: true }
+      title:       { type: string }
+      content:     { type: string, required: true }
+      due_date:    { type: datetime }
+      tags:        { type: tags }
+      created_at:  { type: datetime, required: true, system: true }
+      updated_at:  { type: datetime, system: true }
+      embedding:   { type: vector, dim: 768, derived_from: content, system: true }
+
+relations:
+  - name: has_note
+    description: "Attach notes to any entity"
+    directed: true
+    predicates: [HAS_NOTE]
+    source: "*"
+    target: note
+
+  - name: has_document
+    description: "Attach documents to any entity"
+    directed: true
+    predicates: [HAS_DOCUMENT]
+    source: "*"
+    target: document
+
+  - name: association
+    description: "Generic association between entities"
+    directed: true
+    predicates: [RELATED]
+    source: "*"
+    target: "*"
+
+# Core minimal registry (generic, not over-specific)
+
+entity_types:
+  - name: note
+    description: Short free-form note
+  - name: document
+    description: Document with summary used as anchor when available
+  - name: task
+    description: Actionable item
+
+relationship_types:
+  - name: has_note
+    description: Attach notes to any entity
+    directionality: directed
+    from_types: ["*"]
+    to_types: [note]
+  - name: has_document
+    description: Attach document to any entity
+    directionality: directed
+    from_types: ["*"]
+    to_types: [document]
+  - name: association
+    description: Generic association between entities
+    directionality: undirected
+    from_types: ["*"]
+    to_types: ["*"]
+
+retrieval:
+  graph_first: true
+  neighbor_notes_limit: 5
+  neighbor_docs_limit: 3
+
+indexing:
+  note_index_text: content
+  document_index_text: summary_or_content
+  task_index_text: content_plus_title

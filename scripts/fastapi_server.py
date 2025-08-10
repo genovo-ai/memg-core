@@ -25,6 +25,8 @@ from memg_core.application.memory import (
     search_memories as core_search_memories,
     graph_search as core_graph_search,
     get_memory_by_id as core_get_by_id,
+    update_memory as core_update_memory,
+    delete_memory as core_delete_memory,
 )
 from memg_core.core_services.embeddings import GenAIEmbedder
 from memg_core.database_services import KuzuInterface, QdrantInterface
@@ -185,6 +187,54 @@ def seed_basic(user_id: str = "demo_user") -> dict[str, Any]:
     added.append(core_add_memory(task, qdrant=qdrant, kuzu=kuzu, embedder=embedder))
 
     return {"ok": True, "ids": added}
+
+
+@app.put("/memories/{memory_id}")
+def update_memory_endpoint(memory_id: str, req: AddMemoryRequest) -> dict[str, Any]:
+    try:
+        try:
+            mtype = MemoryType(req.memory_type)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid memory_type")
+
+        due_dt = None
+        if req.due_date:
+            try:
+                due_dt = datetime.fromisoformat(req.due_date)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid due_date format")
+
+        mem = Memory(
+            id=memory_id,  # Use provided ID
+            user_id=req.user_id,
+            content=req.content,
+            memory_type=mtype,
+            title=req.title,
+            summary=req.summary,
+            tags=req.tags,
+            due_date=due_dt,
+        )
+
+        embedder = _select_embedder()
+        success = core_update_memory(mem, embedder=embedder)
+        if not success:
+            raise HTTPException(status_code=500, detail="Update failed")
+        return {"ok": True, "id": memory_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/memories/{memory_id}")
+def delete_memory_endpoint(memory_id: str) -> dict[str, Any]:
+    try:
+        success = core_delete_memory(memory_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Delete failed")
+        return {"ok": True, "id": memory_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,13 @@
 """MEMG Core - Lightweight memory system for AI agents"""
 
-from .application.memory import add_memory, get_memory_by_id, graph_search, search_memories
+from .application.memory import (
+    add_memory,
+    delete_memory,
+    get_memory_by_id,
+    graph_search,
+    search_memories,
+    update_memory,
+)
 from .version import __version__
 
 __all__ = [
@@ -9,4 +16,6 @@ __all__ = [
     "search_memories",
     "graph_search",
     "get_memory_by_id",
+    "update_memory",
+    "delete_memory",
 ]

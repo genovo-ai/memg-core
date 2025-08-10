@@ -96,3 +96,57 @@ async def get_memory_by_id(
 
     retriever = MemoryRetriever(qdrant_interface=qdrant)
     return await retriever.get_memory_by_id(memory_id)
+
+
+def update_memory(
+    memory: Memory,
+    *,
+    qdrant: QdrantInterface | None = None,
+    kuzu: KuzuInterface | None = None,
+    embedder: GenAIEmbedder | None = None,
+    collection: str | None = None,
+) -> bool:
+    """Update an existing memory (replaces content and re-computes embedding)."""
+    from datetime import UTC, datetime
+
+    from memg_core.processing.ingestion import add_memory_index
+
+    # Update timestamp
+    memory.created_at = datetime.now(UTC)
+
+    try:
+        add_memory_index(
+            memory,
+            qdrant=qdrant,
+            kuzu=kuzu,
+            embedder=embedder,
+            collection=collection,
+        )
+        return True
+    except Exception:
+        return False
+
+
+def delete_memory(
+    memory_id: str,
+    *,
+    qdrant: QdrantInterface | None = None,
+    kuzu: KuzuInterface | None = None,
+) -> bool:
+    """Delete a memory from both Qdrant and Kuzu."""
+    qdrant = qdrant or QdrantInterface()
+    kuzu = kuzu or KuzuInterface()
+
+    try:
+        # Remove from Qdrant
+        from qdrant_client.models import PointIdsList
+
+        qdrant.client.delete(
+            collection_name=qdrant.collection_name, points_selector=PointIdsList(points=[memory_id])
+        )
+
+        # Remove from Kuzu
+        kuzu.query("MATCH (m:Memory {id: $id}) DELETE m", {"id": memory_id})
+        return True
+    except Exception:
+        return False
