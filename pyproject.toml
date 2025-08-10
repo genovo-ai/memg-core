@@ -1,25 +1,26 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=77", "wheel", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "memg-core"
-# NOTE: Bump this when publishing a new version; CI uses skip-existing to avoid failures
-version = "1.0.0"
+dynamic = ["version"]
 description = "Lightweight memory system for AI agents with vector search and graph storage"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
  {name = "Genovo AI", email = "dev@genovo.ai"},
 ]
 classifiers = [
  "Development Status :: 4 - Beta",
  "Intended Audience :: Developers",
- "License :: OSI Approved :: MIT License",
  "Programming Language :: Python :: 3",
+ "Programming Language :: Python :: 3 :: Only",
  "Programming Language :: Python :: 3.11",
  "Programming Language :: Python :: 3.12",
+ "Operating System :: OS Independent",
  "Topic :: Scientific/Engineering :: Artificial Intelligence",
  "Topic :: Software Development :: Libraries :: Python Modules",
  "Topic :: Database",
@@ -70,6 +71,11 @@ test = [
 Homepage = "https://github.com/genovo-ai/memg-core"
 Repository = "https://github.com/genovo-ai/memg-core"
 Issues = "https://github.com/genovo-ai/memg-core/issues"
+
+[tool.setuptools_scm]
+write_to = "src/memory_system/version.py"   # generates version at sdist
+fallback_version = "0.0.0"                  # avoids failures when git is missing
+local_scheme = "no-local-version"           # clean wheels for PyPI
 
 # PACKAGING CONFIGURATION - Lightweight library build
 [tool.setuptools]
