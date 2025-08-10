@@ -60,16 +60,31 @@ PYTHONPATH=$(pwd)/src pytest -q
 ## Usage
 
 ```python
-from memory_system import MemorySystem
+from memg_core import add_memory, search_memories
+from memg_core.models.core import Memory, MemoryType
 
-# Initialize system
-memory = MemorySystem()
+# Add a note
+note = Memory(user_id="u1", content="Python is great for AI", memory_type=MemoryType.NOTE)
+add_memory(note)
 
-# Add memories
-memory.add_note("Python is great for AI development", user_id="user1")
+# Search
+import asyncio
+asyncio.run(search_memories("python ai", user_id="u1"))
+```
 
-# Search memories
-results = memory.search("AI development", user_id="user1")
+### YAML registries (optional)
+
+Core ships with three tiny registries under `integration/config/`:
+
+- `core.minimal.yaml`: basic types `note`, `document`, `task` with anchors and generic relations
+- `core.software_dev.yaml`: adds `bug` + `solution` and `bug_solution` relation
+- `core.knowledge.yaml`: `concept` + `document` with `mentions`/`derived_from`
+
+Enable:
+
+```bash
+export MEMG_ENABLE_YAML_SCHEMA=true
+export MEMG_YAML_SCHEMA=$(pwd)/integration/config/core.minimal.yaml
 ```
 
 ## Evaluation
