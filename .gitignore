@@ -238,3 +238,5 @@ integration/*
 
 _stash/
 artifacts/
+
+temp_data
