@@ -6,7 +6,7 @@ Basic tests for task board entity system and MCP tools
 
 from datetime import datetime, timedelta
 
-from memory_system.models.core import (
+from memg_core.models.core import (
     EntityType,
     Memory,
     MemoryType,
@@ -142,7 +142,7 @@ class TestTaskBoardMCPToolsValidation:
 
     def test_task_status_validation(self):
         """Test task status validation"""
-        from memory_system.models.core import TaskStatus
+        from memg_core.models.core import TaskStatus
 
         # Valid statuses
         valid_statuses = [
@@ -165,7 +165,7 @@ class TestTaskBoardMCPToolsValidation:
 
     def test_task_priority_validation(self):
         """Test task priority validation"""
-        from memory_system.models.core import TaskPriority
+        from memg_core.models.core import TaskPriority
 
         # Valid priorities
         valid_priorities = ["low", "medium", "high", "critical"]

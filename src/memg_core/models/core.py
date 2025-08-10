@@ -46,9 +46,7 @@ class Memory(BaseModel):
     user_id: str = Field(..., description="User ID for memory isolation")
     content: str = Field(..., description="The actual memory content")
 
-    # Optional project scoping
-    project_id: str | None = Field(None, description="Optional project ID for scoping")
-    project_name: str | None = Field(None, description="Optional project name for display")
+    # Minimal core does not include project scoping
 
     # Type classification (simple 3-type system)
     memory_type: MemoryType = Field(MemoryType.NOTE, description="Type of memory")
@@ -97,8 +95,6 @@ class Memory(BaseModel):
         """Convert memory to Qdrant point payload"""
         payload = {
             "user_id": self.user_id,
-            "project_id": self.project_id,
-            "project_name": self.project_name,
             "content": self.content,
             "memory_type": self.memory_type.value,
             "summary": self.summary,
@@ -139,8 +135,6 @@ class Memory(BaseModel):
         return {
             "id": self.id,
             "user_id": self.user_id,
-            "project_id": self.project_id or "",
-            "project_name": self.project_name or "",
             "content": self.content[:500],  # Truncate for graph storage
             "memory_type": self.memory_type.value,
             "summary": self.summary or "",
@@ -311,28 +305,7 @@ class Entity(BaseModel):
         }
 
 
-class Project(BaseModel):
-    """Simple project entity for optional memory scoping"""
-
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    user_id: str = Field(..., description="Owner user ID")
-    name: str = Field(..., description="Project name")
-    description: str | None = Field(None, description="Optional project description")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    last_used: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    is_active: bool = Field(True, description="Whether project is active")
-
-    def to_kuzu_node(self) -> dict[str, Any]:
-        """Convert to Kuzu node properties"""
-        return {
-            "id": self.id,
-            "user_id": self.user_id,
-            "name": self.name,
-            "description": self.description or "",
-            "created_at": self.created_at.isoformat(),
-            "last_used": self.last_used.isoformat(),
-            "is_active": self.is_active,
-        }
+## Removed Project model to keep the core minimal (note, document, task)
 
 
 class Relationship(BaseModel):

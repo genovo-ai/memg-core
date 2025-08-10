@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 def test_imports():
     """Test that core modules can be imported."""
     try:
-        from memory_system import config, exceptions, version
+        from memg_core import config, exceptions, version
 
         assert True
     except ImportError as e:
@@ -22,7 +22,7 @@ def test_imports():
 def test_version():
     """Test version is accessible."""
     try:
-        from memory_system.version import __version__
+        from memg_core.version import __version__
 
         assert isinstance(__version__, str)
         assert len(__version__) > 0
@@ -34,7 +34,7 @@ def test_version():
 def test_basic_config():
     """Test basic configuration loading."""
     try:
-        from memory_system.config import get_config
+        from memg_core.config import get_config
 
         config = get_config()
         assert config is not None

@@ -39,12 +39,12 @@ def _fake_kuzu_results() -> List[dict]:
 
 @pytest.mark.asyncio
 async def test_graph_search_basic_shape():
-    from memory_system.processing.memory_retriever import MemoryRetriever
+    from memg_core.processing.memory_retriever import MemoryRetriever
 
     with (
-        patch("memory_system.processing.memory_retriever.QdrantInterface"),
-        patch("memory_system.processing.memory_retriever.GenAIEmbedder"),
-        patch("memory_system.processing.memory_retriever.KuzuInterface") as MockKuzu,
+        patch("memg_core.processing.memory_retriever.QdrantInterface"),
+        patch("memg_core.processing.memory_retriever.GenAIEmbedder"),
+        patch("memg_core.processing.memory_retriever.KuzuInterface") as MockKuzu,
     ):
         instance = MockKuzu.return_value
         instance.query.return_value = _fake_kuzu_results()

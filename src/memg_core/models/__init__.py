@@ -1,6 +1,5 @@
 """Minimal export of core models for memg-core."""
 
-from .api import MemoryResultItem, SearchMemoriesResponse
 from .core import (
     EntityType,
     ImportanceLevel,
@@ -21,6 +20,4 @@ __all__ = [
     "ImportanceLevel",
     "RelationshipStrength",
     "RelationshipType",
-    "MemoryResultItem",
-    "SearchMemoriesResponse",
 ]

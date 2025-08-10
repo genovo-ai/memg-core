@@ -59,8 +59,6 @@ class KuzuInterface:
                     CREATE NODE TABLE IF NOT EXISTS Memory(
                         id STRING,
                         user_id STRING,
-                        project_id STRING,
-                        project_name STRING,
                         content STRING,
                         memory_type STRING,
                         summary STRING,
@@ -77,21 +75,7 @@ class KuzuInterface:
                     )
                 """
                 )
-            elif table == "Project":
-                self.conn.execute(
-                    """
-                    CREATE NODE TABLE IF NOT EXISTS Project(
-                        id STRING,
-                        user_id STRING,
-                        name STRING,
-                        description STRING,
-                        created_at STRING,
-                        last_used STRING,
-                        is_active BOOLEAN,
-                        PRIMARY KEY (id)
-                    )
-                """
-                )
+            # Minimal core: no Project table
 
             props = ", ".join([f"{k}: ${k}" for k in properties])
             query = f"CREATE (:{table} {{{props}}})"

@@ -23,8 +23,8 @@ try:
 except ImportError:
     app = None
 
-from memory_system.models.core import EntityType, MemoryType
-from memory_system.utils.system_info import get_system_info
+from memg_core.models.core import EntityType, MemoryType
+from memg_core.utils.system_info import get_system_info
 
 
 class TestE2EValidation:
@@ -119,8 +119,8 @@ class TestE2EValidation:
     def test_core_processing_imports_correctly(self):
         """Test core processing components can import EntityType successfully."""
         try:
-            from memory_system.models import EntityType as ImportedEntityType
-            from memory_system.processing.memory_retriever import MemoryRetriever
+            from memg_core.models import EntityType as ImportedEntityType
+            from memg_core.processing.memory_retriever import MemoryRetriever
 
             # Verify EntityType is available
             assert ImportedEntityType.TECHNOLOGY == EntityType.TECHNOLOGY
@@ -132,13 +132,13 @@ class TestE2EValidation:
     def test_memory_retriever_imports_correctly(self):
         """Test MemoryRetriever can import and use EntityType."""
         try:
-            from memory_system.processing.memory_retriever import MemoryRetriever
+            from memg_core.processing.memory_retriever import MemoryRetriever
 
             # Create retriever instance (with mocked dependencies)
             with (
-                patch("memory_system.processing.memory_retriever.QdrantInterface"),
-                patch("memory_system.processing.memory_retriever.GenAIEmbedder"),
-                patch("memory_system.processing.memory_retriever.KuzuInterface"),
+                patch("memg_core.processing.memory_retriever.QdrantInterface"),
+                patch("memg_core.processing.memory_retriever.GenAIEmbedder"),
+                patch("memg_core.processing.memory_retriever.KuzuInterface"),
             ):
                 retriever = MemoryRetriever()
                 assert retriever is not None
@@ -185,7 +185,7 @@ class TestE2EValidation:
     def test_kuzu_interface_importable(self):
         """Test KuzuInterface can be imported and initialized."""
         try:
-            from memory_system.kuzu_graph.interface import KuzuInterface
+            from memg_core.kuzu_graph.interface import KuzuInterface
 
             # Test class is importable
             assert KuzuInterface is not None
@@ -199,7 +199,7 @@ class TestE2EValidation:
     def test_qdrant_interface_importable(self):
         """Test QdrantInterface can be imported and initialized."""
         try:
-            from memory_system.qdrant.interface import QdrantInterface
+            from memg_core.qdrant.interface import QdrantInterface
 
             # Test class is importable
             assert QdrantInterface is not None
@@ -210,8 +210,8 @@ class TestE2EValidation:
     def test_core_interfaces_importable(self):
         """Test core interfaces can be imported (validation moved to _stash)."""
         try:
-            from memory_system.kuzu_graph.interface import KuzuInterface
-            from memory_system.qdrant.interface import QdrantInterface
+            from memg_core.kuzu_graph.interface import KuzuInterface
+            from memg_core.qdrant.interface import QdrantInterface
 
             # Test classes are importable
             assert KuzuInterface is not None
@@ -223,8 +223,8 @@ class TestE2EValidation:
     def test_genai_integration_importable(self):
         """Test GenAI integration for entity extraction."""
         try:
-            from memory_system.utils.embeddings import GenAIEmbedder
-            from memory_system.utils.genai import GenAI
+            from memg_core.utils.embeddings import GenAIEmbedder
+            from memg_core.utils.genai import GenAI
 
             # Test classes are importable
             assert GenAI is not None
@@ -240,7 +240,7 @@ class TestSystemReadiness:
     def test_version_defined(self):
         """Test version is properly defined."""
         try:
-            from memory_system.version import __version__
+            from memg_core.version import __version__
 
             assert isinstance(__version__, str)
             assert len(__version__) > 0
@@ -302,10 +302,10 @@ class TestSystemReadiness:
         """Test core imports work without heavy dependencies."""
         try:
             # Test core system imports
-            from memory_system.kuzu_graph.interface import KuzuInterface
-            from memory_system.models.core import Entity, EntityType, Memory
-            from memory_system.processing.memory_retriever import MemoryRetriever
-            from memory_system.qdrant.interface import QdrantInterface
+            from memg_core.kuzu_graph.interface import KuzuInterface
+            from memg_core.models.core import Entity, EntityType, Memory
+            from memg_core.processing.memory_retriever import MemoryRetriever
+            from memg_core.qdrant.interface import QdrantInterface
 
             # If all core imports succeed, we have a lean core
             assert True
@@ -318,7 +318,7 @@ class TestSystemReadiness:
         # Test memory creation is fast
         import time
 
-        from memory_system.models.core import Memory, MemoryType
+        from memg_core.models.core import Memory, MemoryType
 
         start = time.time()
 
@@ -342,7 +342,7 @@ class TestSystemReadiness:
         """Test Entity model is efficient."""
         import time
 
-        from memory_system.models.core import Entity, EntityType
+        from memg_core.models.core import Entity, EntityType
 
         start = time.time()
 

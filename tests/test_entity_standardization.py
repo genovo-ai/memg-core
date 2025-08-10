@@ -15,7 +15,7 @@ import pytest
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from memory_system.models.core import (
+from memg_core.models.core import (
     Entity,
     EntityType,
     Memory,
@@ -24,7 +24,7 @@ from memory_system.models.core import (
 )
 
 # MemoryProcessor moved to _stash - test core functionality only
-from memory_system.processing.memory_retriever import MemoryRetriever
+from memg_core.processing.memory_retriever import MemoryRetriever
 
 
 class TestEntityModelValidation:
@@ -149,13 +149,13 @@ class TestIntegrationPipeline:
     def test_entity_types_in_technology_query(self):
         """Test retriever builds correct technology search query."""
         # This tests the actual query building logic in memory_retriever.py
-        from memory_system.processing.memory_retriever import MemoryRetriever
+        from memg_core.processing.memory_retriever import MemoryRetriever
 
         # Create retriever with mocked dependencies
         with (
-            patch("memory_system.processing.memory_retriever.QdrantInterface"),
-            patch("memory_system.processing.memory_retriever.GenAIEmbedder"),
-            patch("memory_system.processing.memory_retriever.KuzuInterface") as mock_kuzu,
+            patch("memg_core.processing.memory_retriever.QdrantInterface"),
+            patch("memg_core.processing.memory_retriever.GenAIEmbedder"),
+            patch("memg_core.processing.memory_retriever.KuzuInterface") as mock_kuzu,
         ):
             retriever = MemoryRetriever()
 
@@ -183,12 +183,12 @@ class TestIntegrationPipeline:
 
     def test_entity_types_in_component_query(self):
         """Test retriever builds correct component search query."""
-        from memory_system.processing.memory_retriever import MemoryRetriever
+        from memg_core.processing.memory_retriever import MemoryRetriever
 
         with (
-            patch("memory_system.processing.memory_retriever.QdrantInterface"),
-            patch("memory_system.processing.memory_retriever.GenAIEmbedder"),
-            patch("memory_system.processing.memory_retriever.KuzuInterface") as mock_kuzu,
+            patch("memg_core.processing.memory_retriever.QdrantInterface"),
+            patch("memg_core.processing.memory_retriever.GenAIEmbedder"),
+            patch("memg_core.processing.memory_retriever.KuzuInterface") as mock_kuzu,
         ):
             retriever = MemoryRetriever()
             mock_kuzu.return_value.query.return_value = []
@@ -211,12 +211,12 @@ class TestIntegrationPipeline:
 
     def test_entity_types_in_error_solution_query(self):
         """Test retriever builds correct error solution search query."""
-        from memory_system.processing.memory_retriever import MemoryRetriever
+        from memg_core.processing.memory_retriever import MemoryRetriever
 
         with (
-            patch("memory_system.processing.memory_retriever.QdrantInterface"),
-            patch("memory_system.processing.memory_retriever.GenAIEmbedder"),
-            patch("memory_system.processing.memory_retriever.KuzuInterface") as mock_kuzu,
+            patch("memg_core.processing.memory_retriever.QdrantInterface"),
+            patch("memg_core.processing.memory_retriever.GenAIEmbedder"),
+            patch("memg_core.processing.memory_retriever.KuzuInterface") as mock_kuzu,
         ):
             retriever = MemoryRetriever()
             mock_kuzu.return_value.query.return_value = []

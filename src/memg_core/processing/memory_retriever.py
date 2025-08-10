@@ -145,7 +145,6 @@ class MemoryRetriever:
                     continue
 
                 # Reconstruct Memory object with all fields
-
                 try:
                     # Parse memory_type enum
                     memory_type_str = payload.get("memory_type", "note")
@@ -176,14 +175,12 @@ class MemoryRetriever:
                             payload.get("created_at", dt.now(UTC).isoformat())
                         ),
                         expires_at=(
-                            dt.fromisoformat(payload["expires_at"])
+                            dt.fromisoformat(payload.get("expires_at"))
                             if payload.get("expires_at")
                             else None
                         ),
                         supersedes=payload.get("supersedes"),
                         superseded_by=payload.get("superseded_by"),
-                        project_id=payload.get("project_id"),
-                        project_name=payload.get("project_name"),
                     )
                     logger.debug(f"Successfully constructed Memory object: {memory.id}")
                 except Exception as e:
@@ -319,8 +316,7 @@ class MemoryRetriever:
                 ),
                 supersedes=payload.get("supersedes"),
                 superseded_by=payload.get("superseded_by"),
-                project_id=payload.get("project_id"),
-                project_name=payload.get("project_name"),
+                # core minimal: no project fields
             )
         except Exception as e:
             logger.error(f"get_memory_by_id failed for {memory_id}: {e}")

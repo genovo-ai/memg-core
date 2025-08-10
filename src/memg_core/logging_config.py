@@ -46,10 +46,10 @@ class MemorySystemLogger:
             Main memory system logger
         """
         if cls._configured:
-            return cls.get_logger("memory_system")
+            return cls.get_logger("memg_core")
 
         # Create root logger for memory system
-        root_logger = logging.getLogger("memory_system")
+        root_logger = logging.getLogger("memg_core")
         root_logger.setLevel(logging.DEBUG)  # Capture all levels
 
         # Clear any existing handlers
@@ -96,7 +96,7 @@ class MemorySystemLogger:
         Returns:
             Logger instance for the component
         """
-        logger_name = f"memory_system.{component}"
+        logger_name = f"memg_core.{component}"
 
         if logger_name not in cls._loggers:
             logger = logging.getLogger(logger_name)

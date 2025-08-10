@@ -1,0 +1,25 @@
+services:
+  memg-mcp-server:
+    build:
+      context: ..
+      dockerfile: mcp/Dockerfile.local.mcp
+    container_name: memg-mcp-server-local-${MEMORY_SYSTEM_MCP_PORT:-8787}
+    ports:
+      - "${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787}"
+    volumes:
+      - ${BASE_MEMORY_PATH:-$HOME/.local/share/memory_system}_${MEMORY_SYSTEM_MCP_PORT:-8787}/qdrant:/qdrant
+      - ${BASE_MEMORY_PATH:-$HOME/.local/share/memory_system}_${MEMORY_SYSTEM_MCP_PORT:-8787}/kuzu:/kuzu
+    env_file:
+      - ../.env
+    environment:
+      QDRANT_STORAGE_PATH: /qdrant
+      KUZU_DB_PATH: /kuzu/memory_db
+      MEMORY_SYSTEM_MCP_PORT: ${MEMORY_SYSTEM_MCP_PORT:-8787}
+      MEMG_TEMPLATE: ${MEMG_TEMPLATE:-software_development}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
