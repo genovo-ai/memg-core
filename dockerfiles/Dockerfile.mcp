@@ -9,20 +9,21 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install the published MEMG core package
-# Install the published MEMG core package
 RUN pip install --no-cache-dir memg-core
-
-# Ensure the integration package code is on PYTHONPATH
-ENV PYTHONPATH=/app
-
-# Copy MCP integration code - ensure all integration files are included
-COPY integration/ /app/integration/
 
 # Install MCP server dependencies
 RUN pip install --no-cache-dir \
     "fastmcp>=0.2.0" \
     "uvicorn>=0.30.0" \
     "pydantic>=2.0.0"
+
+# Copy only MCP-required files from integration
+COPY integration/__init__.py /app/integration/
+COPY integration/mcp/ /app/integration/mcp/
+COPY integration/sync_wrapper.py /app/integration/
+
+# Ensure the integration package code is on PYTHONPATH
+ENV PYTHONPATH=/app
 
 # Create directories for persistent storage
 RUN mkdir -p /qdrant /kuzu

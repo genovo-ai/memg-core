@@ -227,6 +227,13 @@ test_venv/
 
 
 .local*
+
+# Integration folder - selective inclusion for MCP Docker
+# Include only MCP-required files, exclude development/optional components
 integration/*
+!integration/__init__.py
+!integration/mcp/
+!integration/sync_wrapper.py
+
 _stash/
 artifacts/
