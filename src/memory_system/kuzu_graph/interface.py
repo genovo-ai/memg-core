@@ -179,3 +179,51 @@ class KuzuInterface:
             return result.to_dict("records") if not result.empty else []
         except Exception:
             return []
+
+    def neighbors(
+        self,
+        node_label: str,
+        node_id: str,
+        rel_types: list[str] | None = None,
+        direction: str = "any",
+        limit: int = 10,
+        neighbor_label: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Fetch neighbors of a node with optional relation type filtering and direction.
+
+        direction: 'out', 'in', or 'any'
+        rel_types: if provided, only these relationship types are considered
+        neighbor_label: restrict neighbor node label and project useful columns when set
+        """
+        try:
+            rel_filter = "|".join([r.upper() for r in rel_types]) if rel_types else ""
+            neighbor = f":{neighbor_label}" if neighbor_label else ""
+            if direction == "out":
+                pattern = f"(a:{node_label} {{id: $id}})-[r:{rel_filter}]->(n{neighbor})"
+            elif direction == "in":
+                pattern = f"(a:{node_label} {{id: $id}})<-[r:{rel_filter}]-(n{neighbor})"
+            else:
+                pattern = f"(a:{node_label} {{id: $id}})-[r:{rel_filter}]-(n{neighbor})"
+
+            if neighbor_label == "Memory":
+                cypher = f"""
+                MATCH {pattern}
+                RETURN DISTINCT n.id as id,
+                                n.user_id as user_id,
+                                n.content as content,
+                                n.title as title,
+                                n.memory_type as memory_type,
+                                n.created_at as created_at,
+                                type(r) as rel_type
+                LIMIT $limit
+                """
+            else:
+                cypher = f"""
+                MATCH {pattern}
+                RETURN DISTINCT n as node, type(r) as rel_type
+                LIMIT $limit
+                """
+            params = {"id": node_id, "limit": limit}
+            return self.query(cypher, params)
+        except Exception:
+            return []

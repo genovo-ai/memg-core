@@ -11,6 +11,7 @@ from fastmcp import FastMCP
 
 from memory_system.logging_config import log_error
 from memory_system.models.api import MemoryResultItem, SearchMemoriesResponse
+from memory_system.utils.system_info import get_system_info as core_system_info
 from memory_system.utils.genai import GenAI
 
 from .mcp_server_core import get_memory_system
@@ -121,10 +122,8 @@ def register_core_tools(app: FastMCP) -> None:
             response = SearchMemoriesResponse(
                 result=formatted_results,
                 query=query,
-                total_results=len(formatted_results),
+                total_count=len(formatted_results),
                 filters_applied=filters or {},
-                search_type="semantic_search",
-                user_id=user_id,
             )
 
             return response.model_dump()
@@ -180,10 +179,8 @@ def register_core_tools(app: FastMCP) -> None:
             response = SearchMemoriesResponse(
                 result=formatted_results,
                 query=query,
-                total_results=len(formatted_results),
+                total_count=len(formatted_results),
                 filters_applied=filters_applied,
-                search_type=search_type,
-                user_id=user_id,
             )
             return response.model_dump()
 
@@ -270,6 +267,12 @@ def register_core_tools(app: FastMCP) -> None:
 
         try:
             stats = memory.get_stats()
+            # Merge with core system info (registry, neighbor caps, qdrant details)
+            try:
+                enriched = core_system_info(qdrant=memory.qdrant_interface)
+                stats.update({"core": enriched})
+            except Exception:
+                pass
             port = int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8787"))
             stats.update({"transport": "SSE", "port": port})
             return {"result": stats}

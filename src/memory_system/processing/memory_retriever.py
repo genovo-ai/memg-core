@@ -101,7 +101,7 @@ class MemoryRetriever:
                         # Direct mapping for all other filters
                         qdrant_filters[key] = value
 
-            # Single Qdrant search - clean and fast
+            # Vector search with metadata filters
             search_results = self.qdrant.search_points(
                 vector=query_vector,
                 limit=limit,
@@ -205,6 +205,62 @@ class MemoryRetriever:
                     f"(score: {search_result.score:.3f})"
                 )
 
+            # Hybrid expansion: optional graph neighbors (Memory nodes)
+            if self.graph_enabled and results:
+                try:
+                    expanded: list[SearchResult] = []
+                    # Limit neighbor fan-out conservatively (sane default); YAML can override later
+                    neighbor_limit = int(os.getenv("MEMG_GRAPH_NEIGHBORS_LIMIT", "5"))
+                    for result in results[: min(5, len(results))]:
+                        mem = result.memory
+                        if not getattr(mem, "id", None):
+                            continue
+                        # Fetch neighboring Memory nodes regardless of rel type for now
+                        neighbors = self.kuzu.neighbors(
+                            node_label="Memory",
+                            node_id=mem.id,
+                            rel_types=None,
+                            direction="any",
+                            limit=neighbor_limit,
+                            neighbor_label="Memory",
+                        )
+                        for row in neighbors:
+                            try:
+                                memory_type = MemoryType(row.get("memory_type", "note"))
+                            except Exception:
+                                memory_type = MemoryType.NOTE
+                            neighbor_memory = Memory(
+                                id=row.get("id"),
+                                user_id=row.get("user_id", ""),
+                                content=row.get("content", ""),
+                                memory_type=memory_type,
+                                title=row.get("title"),
+                                created_at=dt.fromisoformat(row.get("created_at"))
+                                if row.get("created_at")
+                                else dt.now(UTC),
+                            )
+                            expanded.append(
+                                SearchResult(
+                                    memory=neighbor_memory,
+                                    score=max(0.3, result.score * 0.9),
+                                    source="graph_neighbor",
+                                    metadata={"from": mem.id},
+                                )
+                            )
+                    # Merge and de-duplicate by memory id, keeping highest score
+                    by_id: dict[str, SearchResult] = {r.memory.id: r for r in results}
+                    for r in expanded:
+                        if not r.memory.id:
+                            continue
+                        if r.memory.id in by_id:
+                            if r.score > by_id[r.memory.id].score:
+                                by_id[r.memory.id] = r
+                        else:
+                            by_id[r.memory.id] = r
+                    results = list(by_id.values())
+                except Exception as e:
+                    logger.warning(f"Graph neighbor expansion skipped due to error: {e}")
+
             # Sort by score (highest first) and add relevance metadata
             results.sort(key=lambda x: x.score, reverse=True)
 
@@ -231,12 +287,44 @@ class MemoryRetriever:
         Returns:
             Memory object if found, None otherwise
         """
-        # Note: get_point method not implemented in current Qdrant interface
-        # This would require implementing get_point in QdrantInterface
-        logger.warning(
-            "get_memory_by_id not yet implemented - requires Qdrant interface enhancement"
-        )
-        return None
+        try:
+            doc = self.qdrant.get_point(point_id=memory_id)
+            if not doc:
+                return None
+            payload = doc.get("payload", {})
+            memory_type_str = payload.get("memory_type", "note")
+            try:
+                memory_type = MemoryType(memory_type_str)
+            except ValueError:
+                memory_type = MemoryType.NOTE
+            return Memory(
+                id=doc.get("id", memory_id),
+                user_id=payload.get("user_id", "unknown"),
+                content=payload.get("content", ""),
+                memory_type=memory_type,
+                summary=payload.get("summary"),
+                ai_verified_type=payload.get("ai_verified_type"),
+                title=payload.get("title"),
+                source=payload.get("source", "user"),
+                tags=payload.get("tags", []),
+                confidence=payload.get("confidence", 0.8),
+                is_valid=payload.get("is_valid", True),
+                created_at=dt.fromisoformat(payload.get("created_at"))
+                if payload.get("created_at")
+                else dt.now(UTC),
+                expires_at=(
+                    dt.fromisoformat(payload.get("expires_at"))
+                    if payload.get("expires_at")
+                    else None
+                ),
+                supersedes=payload.get("supersedes"),
+                superseded_by=payload.get("superseded_by"),
+                project_id=payload.get("project_id"),
+                project_name=payload.get("project_name"),
+            )
+        except Exception as e:
+            logger.error(f"get_memory_by_id failed for {memory_id}: {e}")
+            return None
 
     async def get_memories_by_category(
         self, category: str, user_id: str, limit: int = 20
@@ -252,24 +340,41 @@ class MemoryRetriever:
         Returns:
             List of Memory objects in the category
         """
-        # Note: filter_points method not implemented in current Qdrant interface
-        # For now, we'll do a broad search and filter results
-        logger.warning("get_memories_by_category using basic search - filters not yet implemented")
-
-        # Do a general search with a neutral query
-        search_results = await self.search_memories(
-            query=f"category {category}",
-            user_id=user_id,
-            limit=limit,
-            score_threshold=0.0,  # Lower threshold for category search
-        )
-
-        # Filter results by category manually
-        filtered_memories = [
-            result.memory for result in search_results if result.memory.category == category
-        ]
-
-        return filtered_memories
+        try:
+            # Use payload-only filter to fetch by category tag
+            filtered = self.qdrant.filter_points(
+                filters={"tags": [category]},
+                limit=limit,
+                user_id=user_id,
+            )
+            memories: list[Memory] = []
+            for item in filtered:
+                payload = item.get("payload", {})
+                memory_type_str = payload.get("memory_type", "note")
+                try:
+                    memory_type = MemoryType(memory_type_str)
+                except ValueError:
+                    memory_type = MemoryType.NOTE
+                mem = Memory(
+                    id=item.get("id"),
+                    user_id=payload.get("user_id", ""),
+                    content=payload.get("content", ""),
+                    memory_type=memory_type,
+                    summary=payload.get("summary"),
+                    title=payload.get("title"),
+                    source=payload.get("source", "user"),
+                    tags=payload.get("tags", []),
+                    confidence=payload.get("confidence", 0.8),
+                    is_valid=payload.get("is_valid", True),
+                    created_at=dt.fromisoformat(payload.get("created_at"))
+                    if payload.get("created_at")
+                    else dt.now(UTC),
+                )
+                memories.append(mem)
+            return memories
+        except Exception as e:
+            logger.error(f"get_memories_by_category failed: {e}")
+            return []
 
     async def get_stats(self) -> dict:
         """
