@@ -15,14 +15,14 @@ RUN pip install --no-cache-dir memg-core
 # Ensure the integration package code is on PYTHONPATH
 ENV PYTHONPATH=/app
 
-# Copy MCP integration code (paths are relative to build context, not Dockerfile)
+# Copy MCP integration code - ensure all integration files are included
 COPY integration/ /app/integration/
 
 # Install MCP server dependencies
 RUN pip install --no-cache-dir \
-    fastmcp>=0.2.0 \
-    uvicorn>=0.30.0 \
-    pydantic>=2.0.0
+    "fastmcp>=0.2.0" \
+    "uvicorn>=0.30.0" \
+    "pydantic>=2.0.0"
 
 # Create directories for persistent storage
 RUN mkdir -p /qdrant /kuzu
