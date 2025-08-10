@@ -1,5 +1,7 @@
 """MEMG Core - Lightweight memory system for AI agents"""
 
+# Import the new minimal API module for convenience
+from . import api
 from .application.memory import (
     add_memory,
     delete_memory,
@@ -18,4 +20,5 @@ __all__ = [
     "get_memory_by_id",
     "update_memory",
     "delete_memory",
+    "api",  # Expose the minimal API module
 ]

@@ -20,14 +20,17 @@ from memg_core.models.core import Memory, MemoryType, SearchResult
 
 def _resolve_relation_names() -> list[str]:
     """Resolve allowed relation type names from YAML registry if available; default to MENTIONS."""
-    if os.getenv("MEMG_ENABLE_YAML_SCHEMA", "false").lower() == "true":
-        schema_path = os.getenv("MEMG_YAML_SCHEMA")
-        if schema_path and Path(schema_path).exists():
-            with open(schema_path, encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
-            rels = data.get("relations", [])
-            names = [str(r.get("name")).upper() for r in rels if r.get("name")]
-            return names or ["MENTIONS"]
+    try:
+        if os.getenv("MEMG_ENABLE_YAML_SCHEMA", "false").lower() == "true":
+            schema_path = os.getenv("MEMG_YAML_SCHEMA")
+            if schema_path and Path(schema_path).exists():
+                with open(schema_path, encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                rels = data.get("relations", [])
+                names = [str(r.get("name")).upper() for r in rels if r.get("name")]
+                return names or ["MENTIONS"]
+    except Exception:
+        pass
     return ["MENTIONS"]
 
 

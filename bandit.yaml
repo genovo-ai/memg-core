@@ -5,4 +5,5 @@ exclude_dirs:
 skips:
   - 'B101'  # Skip assert_used test (asserts are OK in our codebase)
   - 'B104'  # Skip hardcoded_bind_all_interfaces (intentional for containerized MCP server)
+  - 'B110'  # Skip try_except_pass (appropriate for graceful fallbacks in YAML parsing)
   - 'B601'  # Skip shell_injection_process (parameterized shell usage is safe in our context)
