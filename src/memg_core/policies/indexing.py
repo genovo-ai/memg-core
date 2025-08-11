@@ -33,32 +33,32 @@ def build_index_text(memory: Memory) -> str:
     - document: summary if present else content
     - task: content (+ title if present)
     """
-    # Try YAML-driven anchor selection first (best-effort, optional)
-    try:
-        if os.getenv("MEMG_ENABLE_YAML_SCHEMA", "false").lower() == "true":
-            schema_path = os.getenv("MEMG_YAML_SCHEMA")
-            if schema_path and Path(schema_path).exists():
-                with open(schema_path, encoding="utf-8") as f:
-                    data: dict[str, Any] = yaml.safe_load(f) or {}
-                entities = data.get("entities", [])
-                target = memory.memory_type.value
-                for ent in entities:
-                    if str(ent.get("name", "")).lower() == target:
-                        anchor_field = ent.get("anchor")
-                        if isinstance(anchor_field, str) and anchor_field:
-                            # Pull attribute from memory if available
-                            val = getattr(memory, anchor_field, None)
-                            if isinstance(val, str) and val.strip():
-                                return val
-                            # Document-specific: if anchor is summary but empty, fallback to content
-                            if anchor_field != "content" and hasattr(memory, "content"):
-                                content_val = getattr(memory, "content", "")
-                                if isinstance(content_val, str) and content_val.strip():
-                                    return content_val
-                        break
-    except Exception:
-        # On any YAML issue, silently fall back to defaults
-        pass
+    # Only attempt YAML loading if explicitly enabled
+    if os.getenv("MEMG_ENABLE_YAML_SCHEMA", "false").lower() == "true":
+        schema_path = os.getenv("MEMG_YAML_SCHEMA")
+        if schema_path:
+            if not Path(schema_path).exists():
+                raise FileNotFoundError(f"YAML schema file not found: {schema_path}")
+
+            with open(schema_path, encoding="utf-8") as f:
+                data: dict[str, Any] = yaml.safe_load(f) or {}
+
+            entities = data.get("entities", [])
+            target = memory.memory_type.value
+            for ent in entities:
+                if str(ent.get("name", "")).lower() == target:
+                    anchor_field = ent.get("anchor")
+                    if isinstance(anchor_field, str) and anchor_field:
+                        # Pull attribute from memory if available
+                        val = getattr(memory, anchor_field, None)
+                        if isinstance(val, str) and val.strip():
+                            return val
+                        # Document-specific: if anchor is summary but empty, fallback to content
+                        if anchor_field != "content" and hasattr(memory, "content"):
+                            content_val = getattr(memory, "content", "")
+                            if isinstance(content_val, str) and content_val.strip():
+                                return content_val
+                    break
 
     # Defaults without YAML
     if memory.memory_type == MemoryType.NOTE:
