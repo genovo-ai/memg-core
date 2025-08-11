@@ -6,15 +6,14 @@ This test avoids hitting real databases by mocking the Kuzu interface
 and ensures result shape and basic filtering behavior.
 """
 
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
 
 
-def _fake_kuzu_results() -> List[dict]:
-    now = datetime.now(timezone.utc).isoformat()
+def _fake_kuzu_results() -> list[dict]:
+    now = datetime.now(UTC).isoformat()
     return [
         {
             "m.id": "mem-1",

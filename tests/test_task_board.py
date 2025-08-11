@@ -159,7 +159,7 @@ class TestTaskBoardMCPToolsValidation:
         # Invalid status should raise ValueError
         try:
             TaskStatus("invalid_status")
-            assert False, "Should have raised ValueError"
+            raise AssertionError("Should have raised ValueError")
         except ValueError:
             pass  # Expected
 
@@ -175,7 +175,7 @@ class TestTaskBoardMCPToolsValidation:
         # Invalid priority should raise ValueError
         try:
             TaskPriority("invalid_priority")
-            assert False, "Should have raised ValueError"
+            raise AssertionError("Should have raised ValueError")
         except ValueError:
             pass  # Expected
 

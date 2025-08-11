@@ -137,7 +137,8 @@ def delete_memory(
     from qdrant_client.models import PointIdsList
 
     qdrant.client.delete(
-        collection_name=qdrant.collection_name, points_selector=PointIdsList(points=[memory_id])
+        collection_name=qdrant.collection_name,
+        points_selector=PointIdsList(points=[memory_id]),
     )
 
     # Remove from Kuzu

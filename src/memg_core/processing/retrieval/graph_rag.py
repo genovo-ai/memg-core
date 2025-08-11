@@ -38,7 +38,10 @@ def _resolve_relation_names() -> list[str]:
 
 
 def _build_graph_query(
-    base_query: str, user_id: str | None, limit: int, entity_types: list[str] | None = None
+    base_query: str,
+    user_id: str | None,
+    limit: int,
+    entity_types: list[str] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     rel_alternatives = "|".join(_resolve_relation_names())
     cypher = f"""
@@ -143,9 +146,11 @@ def _append_neighbors(
                 content=row.get("content", ""),
                 memory_type=mtype,
                 title=row.get("title"),
-                created_at=datetime.fromisoformat(row.get("created_at"))
-                if row.get("created_at")
-                else datetime.now(UTC),
+                created_at=(
+                    datetime.fromisoformat(row.get("created_at"))
+                    if row.get("created_at")
+                    else datetime.now(UTC)
+                ),
             )
             expanded.append(
                 SearchResult(
@@ -213,9 +218,11 @@ async def graph_rag_search(
                 tags=payload.get("tags", []),
                 confidence=payload.get("confidence", 0.8),
                 is_valid=payload.get("is_valid", True),
-                created_at=datetime.fromisoformat(payload.get("created_at"))
-                if payload.get("created_at")
-                else datetime.now(UTC),
+                created_at=(
+                    datetime.fromisoformat(payload.get("created_at"))
+                    if payload.get("created_at")
+                    else datetime.now(UTC)
+                ),
             )
             results.append(
                 SearchResult(

@@ -217,9 +217,11 @@ class MemoryRetriever:
                                 content=row.get("content", ""),
                                 memory_type=memory_type,
                                 title=row.get("title"),
-                                created_at=dt.fromisoformat(row.get("created_at"))
-                                if row.get("created_at")
-                                else dt.now(UTC),
+                                created_at=(
+                                    dt.fromisoformat(row.get("created_at"))
+                                    if row.get("created_at")
+                                    else dt.now(UTC)
+                                ),
                             )
                             expanded.append(
                                 SearchResult(
@@ -290,9 +292,11 @@ class MemoryRetriever:
                 tags=payload.get("tags", []),
                 confidence=payload.get("confidence", 0.8),
                 is_valid=payload.get("is_valid", True),
-                created_at=dt.fromisoformat(payload.get("created_at"))
-                if payload.get("created_at")
-                else dt.now(UTC),
+                created_at=(
+                    dt.fromisoformat(payload.get("created_at"))
+                    if payload.get("created_at")
+                    else dt.now(UTC)
+                ),
                 expires_at=(
                     dt.fromisoformat(payload.get("expires_at"))
                     if payload.get("expires_at")
@@ -346,9 +350,11 @@ class MemoryRetriever:
                     tags=payload.get("tags", []),
                     confidence=payload.get("confidence", 0.8),
                     is_valid=payload.get("is_valid", True),
-                    created_at=dt.fromisoformat(payload.get("created_at"))
-                    if payload.get("created_at")
-                    else dt.now(UTC),
+                    created_at=(
+                        dt.fromisoformat(payload.get("created_at"))
+                        if payload.get("created_at")
+                        else dt.now(UTC)
+                    ),
                 )
                 memories.append(mem)
             return memories

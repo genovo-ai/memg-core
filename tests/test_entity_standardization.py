@@ -5,9 +5,8 @@ This test suite validates the successful implementation of the 16 standardized
 EntityTypes across the entire memory system pipeline.
 """
 
-import sys
 from pathlib import Path
-from typing import Any, Dict, List
+import sys
 from unittest.mock import Mock, patch
 
 import pytest
@@ -103,7 +102,9 @@ class TestMigrationLogic:
     def test_migration_mapping_direct_hit(self):
         """Test direct mapping of known legacy types."""
         try:
-            from scripts.migrate_entity_types import get_standardized_type  # type: ignore
+            from scripts.migrate_entity_types import (
+                get_standardized_type,  # type: ignore
+            )
         except ImportError as e:
             pytest.skip(f"Migration script not available in test environment: {e}")
 
@@ -116,7 +117,9 @@ class TestMigrationLogic:
     def test_migration_mapping_case_insensitivity(self):
         """Test mapping works with different casing."""
         try:
-            from scripts.migrate_entity_types import get_standardized_type  # type: ignore
+            from scripts.migrate_entity_types import (
+                get_standardized_type,  # type: ignore
+            )
         except ImportError as e:
             pytest.skip(f"Migration script not available in test environment: {e}")
 
@@ -127,7 +130,9 @@ class TestMigrationLogic:
     def test_migration_mapping_fallback(self):
         """Test fallback to CONCEPT for unknown types."""
         try:
-            from scripts.migrate_entity_types import get_standardized_type  # type: ignore
+            from scripts.migrate_entity_types import (
+                get_standardized_type,  # type: ignore
+            )
         except ImportError as e:
             pytest.skip(f"Migration script not available in test environment: {e}")
 
@@ -164,16 +169,19 @@ class TestIntegrationPipeline:
 
             # Call the method (async, so we need to handle that)
             import asyncio
+            import contextlib
 
-            try:
-                asyncio.run(retriever.search_by_technology("docker", user_id="test_user"))
-            except Exception:
-                pass  # We expect this to fail due to mocking, but we want to check the query
+            with contextlib.suppress(Exception):
+                asyncio.run(
+                    retriever.search_by_technology("docker", user_id="test_user")
+                )  # We expect this to fail due to mocking, but we want to check the query
 
             # Verify the query was called with correct EntityTypes
             if mock_kuzu.return_value.query.called:
                 call_args = mock_kuzu.return_value.query.call_args
-                query_string = call_args[0][0]  # First argument should be the query string
+                query_string = call_args[0][
+                    0
+                ]  # First argument should be the query string
 
                 # Check that the query contains the correct entity types for technology search
                 assert "TECHNOLOGY" in query_string
@@ -194,11 +202,12 @@ class TestIntegrationPipeline:
             mock_kuzu.return_value.query.return_value = []
 
             import asyncio
+            import contextlib
 
-            try:
-                asyncio.run(retriever.search_by_component("api-service", user_id="test_user"))
-            except Exception:
-                pass
+            with contextlib.suppress(Exception):
+                asyncio.run(
+                    retriever.search_by_component("api-service", user_id="test_user")
+                )
 
             if mock_kuzu.return_value.query.called:
                 call_args = mock_kuzu.return_value.query.call_args
@@ -222,13 +231,14 @@ class TestIntegrationPipeline:
             mock_kuzu.return_value.query.return_value = []
 
             import asyncio
+            import contextlib
 
-            try:
+            with contextlib.suppress(Exception):
                 asyncio.run(
-                    retriever.find_error_solutions("connection failed", user_id="test_user")
+                    retriever.find_error_solutions(
+                        "connection failed", user_id="test_user"
+                    )
                 )
-            except Exception:
-                pass
 
             if mock_kuzu.return_value.query.called:
                 call_args = mock_kuzu.return_value.query.call_args
@@ -250,7 +260,9 @@ class TestMemoryCreation:
         )
         assert memory.memory_type == MemoryType.DOCUMENT
 
-        memory2 = Memory(user_id="test_user", content="Test note", memory_type=MemoryType.NOTE)
+        memory2 = Memory(
+            user_id="test_user", content="Test note", memory_type=MemoryType.NOTE
+        )
         assert memory2.memory_type == MemoryType.NOTE
 
     def test_memory_serialization_preserves_types(self):

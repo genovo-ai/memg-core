@@ -1,7 +1,7 @@
 """Basic tests for Liberation AI Memory System."""
 
-import sys
 from pathlib import Path
+import sys
 
 import pytest
 
@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 def test_imports():
     """Test that core modules can be imported."""
     try:
-        from memg_core import config, exceptions, version
+        import memg_core  # noqa: F401
 
         assert True
     except ImportError as e:
