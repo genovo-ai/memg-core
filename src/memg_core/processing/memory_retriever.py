@@ -48,8 +48,6 @@ class MemoryRetriever:
             or os.getenv("MEMG_ENABLE_GRAPH_SEARCH", "true").lower() == "true"
         )
 
-        logger.info(f"MemoryRetriever initialized (graph_enabled: {self.graph_enabled})")
-
     async def search_memories(
         self,
         query: str,
@@ -81,11 +79,8 @@ class MemoryRetriever:
             List of SearchResult objects with memories and scores
         """
         try:
-            logger.info(f"Searching memories for: '{query}' (user: {user_id})")
-
             # Generate query embedding for semantic search
             query_vector = self.embedder.get_embedding(query)
-            logger.debug(f"Generated query embedding: {len(query_vector)} dimensions")
 
             # Build Qdrant filters from simple dict
             qdrant_filters = {}
@@ -109,19 +104,9 @@ class MemoryRetriever:
                 filters=qdrant_filters,
             )
 
-            logger.info(f"Qdrant returned {len(search_results)} results")
-            logger.info(f"Search results type: {type(search_results)}")
-            if search_results:
-                logger.info(
-                    f"First result type: {type(search_results[0])}, "
-                    f"keys: {list(search_results[0].keys()) if isinstance(search_results[0], dict) else 'Not a dict'}"
-                )
-            else:
-                logger.info("Search results is empty or None")
-
             # Convert to SearchResult objects and filter by score
             results = []
-            logger.info(f"Starting to process {len(search_results)} results from Qdrant")
+
             for i, result in enumerate(search_results):
                 logger.debug(
                     f"Processing result {i + 1}/{len(search_results)}: ID={result.get('id')}, "
@@ -266,7 +251,6 @@ class MemoryRetriever:
                 result.metadata["rank"] = i + 1
                 result.metadata["relevance_tier"] = self._get_relevance_tier(result.score)
 
-            logger.info(f"Retrieved {len(results)} memories for query: '{query}'")
             return results
 
         except Exception as e:
@@ -735,9 +719,6 @@ class MemoryRetriever:
             LIMIT $limit
             """
 
-            logger.info(
-                f"Executing graph search for query: '{query}' with entity_types: {entity_types}"
-            )
             results = self.kuzu.query(cypher_query, params)
 
             return await self._convert_kuzu_to_search_results(results, source="graph_search")

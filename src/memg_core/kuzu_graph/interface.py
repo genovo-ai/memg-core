@@ -28,62 +28,57 @@ class KuzuInterface:
         self.conn = kuzu.Connection(self.db)
         # Database already has schema, no setup needed
 
-    def add_node(self, table: str, properties: dict[str, Any]) -> bool:
+    def add_node(self, table: str, properties: dict[str, Any]) -> None:
         """Add a node to the graph"""
-        try:
-            # Create table if it doesn't exist with full schema
-            if table == "Entity":
-                self.conn.execute(
-                    """
-                    CREATE NODE TABLE IF NOT EXISTS Entity(
-                        id STRING,
-                        user_id STRING,
-                        name STRING,
-                        type STRING,
-                        description STRING,
-                        confidence DOUBLE,
-                        created_at STRING,
-                        last_updated STRING,
-                        is_valid BOOLEAN,
-                        source_memory_id STRING,
-                        importance STRING,
-                        context STRING,
-                        category STRING,
-                        PRIMARY KEY (id)
-                    )
+        # Create table if it doesn't exist with full schema
+        if table == "Entity":
+            self.conn.execute(
                 """
+                CREATE NODE TABLE IF NOT EXISTS Entity(
+                    id STRING,
+                    user_id STRING,
+                    name STRING,
+                    type STRING,
+                    description STRING,
+                    confidence DOUBLE,
+                    created_at STRING,
+                    last_updated STRING,
+                    is_valid BOOLEAN,
+                    source_memory_id STRING,
+                    importance STRING,
+                    context STRING,
+                    category STRING,
+                    PRIMARY KEY (id)
                 )
-            elif table == "Memory":
-                self.conn.execute(
-                    """
-                    CREATE NODE TABLE IF NOT EXISTS Memory(
-                        id STRING,
-                        user_id STRING,
-                        content STRING,
-                        memory_type STRING,
-                        summary STRING,
-                        title STRING,
-                        source STRING,
-                        tags STRING,
-                        confidence DOUBLE,
-                        is_valid BOOLEAN,
-                        created_at STRING,
-                        expires_at STRING,
-                        supersedes STRING,
-                        superseded_by STRING,
-                        PRIMARY KEY (id)
-                    )
+            """
+            )
+        elif table == "Memory":
+            self.conn.execute(
                 """
+                CREATE NODE TABLE IF NOT EXISTS Memory(
+                    id STRING,
+                    user_id STRING,
+                    content STRING,
+                    memory_type STRING,
+                    summary STRING,
+                    title STRING,
+                    source STRING,
+                    tags STRING,
+                    confidence DOUBLE,
+                    is_valid BOOLEAN,
+                    created_at STRING,
+                    expires_at STRING,
+                    supersedes STRING,
+                    superseded_by STRING,
+                    PRIMARY KEY (id)
                 )
-            # Minimal core: no Project table
+            """
+            )
+        # Minimal core: no Project table
 
-            props = ", ".join([f"{k}: ${k}" for k in properties])
-            query = f"CREATE (:{table} {{{props}}})"
-            self.conn.execute(query, parameters=properties)
-            return True
-        except Exception as e:
-            print(f"❌ add_node error: {e}")
-            return False
+        props = ", ".join([f"{k}: ${k}" for k in properties])
+        query = f"CREATE (:{table} {{{props}}})"
+        self.conn.execute(query, parameters=properties)
 
     def add_relationship(
         self,
@@ -93,76 +88,68 @@ class KuzuInterface:
         from_id: str,
         to_id: str,
         props: dict = None,
-    ) -> bool:
+    ) -> None:
         """Add relationship between nodes"""
+        props = props or {}
+
+        # Sanitize relationship type name for SQL compatibility
+        rel_type = rel_type.replace(" ", "_").replace("-", "_").upper()
+        # Remove any other problematic characters
+        rel_type = "".join(c for c in rel_type if c.isalnum() or c == "_")
+
+        # Create relationship table if it doesn't exist with proper types
+        def get_kuzu_type(key: str, value) -> str:
+            """Map Python types to Kuzu types"""
+            if key in ["confidence"]:
+                return "DOUBLE"
+            if key in ["is_valid"]:
+                return "BOOLEAN"
+            if isinstance(value, (int, float)):
+                return "DOUBLE"
+            if isinstance(value, bool):
+                return "BOOLEAN"
+            return "STRING"
+
+        prop_columns = (
+            ", ".join([f"{k} {get_kuzu_type(k, v)}" for k, v in props.items()]) if props else ""
+        )
+        extra_cols = f", {prop_columns}" if prop_columns else ""
+
+        # Try to create table, if it fails due to schema mismatch, recreate it
+        create_table_sql = (
+            f"CREATE REL TABLE IF NOT EXISTS {rel_type}"
+            f"(FROM {from_table} TO {to_table}{extra_cols})"
+        )
         try:
-            props = props or {}
+            self.conn.execute(create_table_sql)
+        except Exception as schema_error:
+            if "type" in str(schema_error).lower():
+                # Schema mismatch - drop and recreate table
+                try:
+                    self.conn.execute(f"DROP TABLE {rel_type}")
+                    self.conn.execute(create_table_sql)
+                except Exception as drop_error:
+                    raise RuntimeError(
+                        f"Failed to recreate relationship table {rel_type}"
+                    ) from drop_error
+            else:
+                raise
 
-            # Sanitize relationship type name for SQL compatibility
-            rel_type = rel_type.replace(" ", "_").replace("-", "_").upper()
-            # Remove any other problematic characters
-            rel_type = "".join(c for c in rel_type if c.isalnum() or c == "_")
-
-            # Create relationship table if it doesn't exist with proper types
-            def get_kuzu_type(key: str, value) -> str:
-                """Map Python types to Kuzu types"""
-                if key in ["confidence"]:
-                    return "DOUBLE"
-                if key in ["is_valid"]:
-                    return "BOOLEAN"
-                if isinstance(value, (int, float)):
-                    return "DOUBLE"
-                if isinstance(value, bool):
-                    return "BOOLEAN"
-                return "STRING"
-
-            prop_columns = (
-                ", ".join([f"{k} {get_kuzu_type(k, v)}" for k, v in props.items()]) if props else ""
-            )
-            extra_cols = f", {prop_columns}" if prop_columns else ""
-
-            # Try to create table, if it fails due to schema mismatch, recreate it
-            create_table_sql = (
-                f"CREATE REL TABLE IF NOT EXISTS {rel_type}"
-                f"(FROM {from_table} TO {to_table}{extra_cols})"
-            )
-            try:
-                self.conn.execute(create_table_sql)
-            except Exception as schema_error:
-                if "type" in str(schema_error).lower():
-                    # Schema mismatch - drop and recreate table
-                    print(f"🔧 Recreating relationship table {rel_type} due to schema mismatch")
-                    try:
-                        self.conn.execute(f"DROP TABLE {rel_type}")
-                        self.conn.execute(create_table_sql)
-                    except Exception as drop_error:
-                        print(f"❌ Failed to recreate table {rel_type}: {drop_error}")
-                        raise
-                else:
-                    raise
-
-            # Add the relationship
-            prop_str = ", ".join([f"{k}: ${k}" for k in props.keys()]) if props else ""
-            rel_props = f" {{{prop_str}}}" if prop_str else ""
-            query = (
-                f"MATCH (a:{from_table} {{id: $from_id}}), "
-                f"(b:{to_table} {{id: $to_id}}) "
-                f"CREATE (a)-[:{rel_type}{rel_props}]->(b)"
-            )
-            params = {"from_id": from_id, "to_id": to_id, **props}
-            self.conn.execute(query, parameters=params)
-            return True
-        except Exception as e:
-            print(f"❌ add_relationship error: {e}")
-            return False
+        # Add the relationship
+        prop_str = ", ".join([f"{k}: ${k}" for k in props.keys()]) if props else ""
+        rel_props = f" {{{prop_str}}}" if prop_str else ""
+        query = (
+            f"MATCH (a:{from_table} {{id: $from_id}}), "
+            f"(b:{to_table} {{id: $to_id}}) "
+            f"CREATE (a)-[:{rel_type}{rel_props}]->(b)"
+        )
+        params = {"from_id": from_id, "to_id": to_id, **props}
+        self.conn.execute(query, parameters=params)
 
     def query(self, cypher: str, params: dict = None) -> list[dict[str, Any]]:
         """Execute Cypher query and return results"""
-        try:
-            result = self.conn.execute(cypher, parameters=params or {}).get_as_df()
-            return result.to_dict("records") if not result.empty else []
-        except Exception:
-            return []
+        result = self.conn.execute(cypher, parameters=params or {}).get_as_df()
+        return result.to_dict("records") if not result.empty else []
 
     def neighbors(
         self,
@@ -179,35 +166,32 @@ class KuzuInterface:
         rel_types: if provided, only these relationship types are considered
         neighbor_label: restrict neighbor node label and project useful columns when set
         """
-        try:
-            rel_filter = "|".join([r.upper() for r in rel_types]) if rel_types else ""
-            neighbor = f":{neighbor_label}" if neighbor_label else ""
-            if direction == "out":
-                pattern = f"(a:{node_label} {{id: $id}})-[r:{rel_filter}]->(n{neighbor})"
-            elif direction == "in":
-                pattern = f"(a:{node_label} {{id: $id}})<-[r:{rel_filter}]-(n{neighbor})"
-            else:
-                pattern = f"(a:{node_label} {{id: $id}})-[r:{rel_filter}]-(n{neighbor})"
+        rel_filter = "|".join([r.upper() for r in rel_types]) if rel_types else ""
+        neighbor = f":{neighbor_label}" if neighbor_label else ""
+        if direction == "out":
+            pattern = f"(a:{node_label} {{id: $id}})-[r:{rel_filter}]->(n{neighbor})"
+        elif direction == "in":
+            pattern = f"(a:{node_label} {{id: $id}})<-[r:{rel_filter}]-(n{neighbor})"
+        else:
+            pattern = f"(a:{node_label} {{id: $id}})-[r:{rel_filter}]-(n{neighbor})"
 
-            if neighbor_label == "Memory":
-                cypher = f"""
-                MATCH {pattern}
-                RETURN DISTINCT n.id as id,
-                                n.user_id as user_id,
-                                n.content as content,
-                                n.title as title,
-                                n.memory_type as memory_type,
-                                n.created_at as created_at,
-                                type(r) as rel_type
-                LIMIT $limit
-                """
-            else:
-                cypher = f"""
-                MATCH {pattern}
-                RETURN DISTINCT n as node, type(r) as rel_type
-                LIMIT $limit
-                """
-            params = {"id": node_id, "limit": limit}
-            return self.query(cypher, params)
-        except Exception:
-            return []
+        if neighbor_label == "Memory":
+            cypher = f"""
+            MATCH {pattern}
+            RETURN DISTINCT n.id as id,
+                            n.user_id as user_id,
+                            n.content as content,
+                            n.title as title,
+                            n.memory_type as memory_type,
+                            n.created_at as created_at,
+                            type(r) as rel_type
+            LIMIT $limit
+            """
+        else:
+            cypher = f"""
+            MATCH {pattern}
+            RETURN DISTINCT n as node, type(r) as rel_type
+            LIMIT $limit
+            """
+        params = {"id": node_id, "limit": limit}
+        return self.query(cypher, params)

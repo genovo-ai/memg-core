@@ -161,14 +161,8 @@ memory: Optional[MinimalMemoryBridge] = None
 
 def initialize_memory_system() -> Optional[MinimalMemoryBridge]:
     global memory
-    try:
-        memory = MinimalMemoryBridge()
-        logger.info("Memory system initialized successfully (pure memg-core)")
-        return memory
-    except Exception as e:
-        log_error("mcp_server", "memory_initialization", e)
-        memory = None
-        return None
+    memory = MinimalMemoryBridge()
+    return memory
 
 
 def setup_health_endpoints(app: FastMCP) -> None:
@@ -193,64 +187,52 @@ def register_tools(app: FastMCP) -> None:
                    source: str = "mcp_api", tags: str = None):
         if not memory:
             return {"result": "❌ Memory system not initialized"}
-        try:
-            parsed_type = None
-            if memory_type:
-                name = memory_type.strip().upper()
-                if name in MemoryType.__members__:
-                    parsed_type = MemoryType[name]
-                else:
-                    return {"result": f"❌ Invalid memory_type: {memory_type}"}
+        parsed_type = None
+        if memory_type:
+            name = memory_type.strip().upper()
+            if name in MemoryType.__members__:
+                parsed_type = MemoryType[name]
+            else:
+                return {"result": f"❌ Invalid memory_type: {memory_type}"}
 
-            parsed_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
-            resp = memory.add(
-                content=content,
-                user_id=user_id,
-                memory_type=parsed_type,
-                title=title,
-                source=source,
-                tags=parsed_tags,
-            )
-            return {
-                "result": "✅ Memory added" if resp["success"] else "❌ Failed to add memory",
-                "memory_id": resp["memory_id"],
-                "final_type": resp["final_type"],
-                "word_count": resp["word_count"],
-            }
-        except Exception as e:
-            log_error("mcp_server", "add_memory", e)
-            return {"result": f"❌ Error: {e}"}
+        parsed_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+        resp = memory.add(
+            content=content,
+            user_id=user_id,
+            memory_type=parsed_type,
+            title=title,
+            source=source,
+            tags=parsed_tags,
+        )
+        return {
+            "result": "✅ Memory added" if resp["success"] else "❌ Failed to add memory",
+            "memory_id": resp["memory_id"],
+            "final_type": resp["final_type"],
+            "word_count": resp["word_count"],
+        }
 
     @app.tool("mcp_gmem_search_memories")
     def search_memories(query: str, user_id: str = None, limit: int = 5):
         if not memory:
             return {"result": "❌ Memory system not initialized"}
-        try:
-            results = memory.search(query=query, user_id=user_id, limit=limit)
-            return {"result": results}
-        except Exception as e:
-            log_error("mcp_server", "search_memories", e)
-            return {"result": f"❌ Error: {e}"}
+        results = memory.search(query=query, user_id=user_id, limit=limit)
+        return {"result": results}
 
     @app.tool("mcp_gmem_get_system_info")
     def get_system_info():
         if not memory:
             return {"result": {"components_initialized": False, "status": "Not initialized"}}
+        stats = memory.get_stats()
+        # Optionally enrich using core system info when available
         try:
-            stats = memory.get_stats()
-            # Optionally enrich using core system info when available
-            try:
-                from memg_core.utils.system_info import get_system_info as core_info
-                enriched = core_info(qdrant=memory.qdrant_interface)
-                stats.update({"core": enriched})
-            except Exception:
-                pass
-            port = int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8787"))
-            stats.update({"transport": "SSE", "port": port})
-            return {"result": stats}
-        except Exception as e:
-            log_error("mcp_server", "get_system_info", e)
-            return {"result": f"❌ Error: {e}"}
+            from memg_core.utils.system_info import get_system_info as core_info
+            enriched = core_info(qdrant=memory.qdrant_interface)
+            stats.update({"core": enriched})
+        except Exception:
+            pass
+        port = int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8787"))
+        stats.update({"transport": "SSE", "port": port})
+        return {"result": stats}
 
 
 def create_app() -> FastMCP:
@@ -265,5 +247,5 @@ app = create_app()
 
 if __name__ == "__main__":
     port = int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8787"))
-    logger.info(f"Starting MEMG MCP Server on port {port}")
+
     app.run(transport="sse", host="0.0.0.0", port=port)  # nosec

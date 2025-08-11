@@ -67,13 +67,13 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
         raw_memory_type = row.get("m.memory_type", row.get("memory_type", "note"))
         try:
             memory_type = MemoryType(raw_memory_type)
-        except Exception:
+        except ValueError:
             memory_type = MemoryType.NOTE
         created_at_raw = row.get("m.created_at", row.get("created_at"))
         if created_at_raw:
             try:
                 created_dt = datetime.fromisoformat(created_at_raw)
-            except Exception:
+            except ValueError:
                 created_dt = datetime.now(UTC)
         else:
             created_dt = datetime.now(UTC)
@@ -135,7 +135,7 @@ def _append_neighbors(
         for row in neighbors:
             try:
                 mtype = MemoryType(row.get("memory_type", "note"))
-            except Exception:
+            except ValueError:
                 mtype = MemoryType.NOTE
             neighbor_memory = Memory(
                 id=row.get("id"),
@@ -200,7 +200,7 @@ async def graph_rag_search(
             payload = r.get("payload", {})
             try:
                 mtype = MemoryType(payload.get("memory_type", "note"))
-            except Exception:
+            except ValueError:
                 mtype = MemoryType.NOTE
             mem = Memory(
                 id=r.get("id"),

@@ -105,7 +105,7 @@ def update_memory(
     kuzu: KuzuInterface | None = None,
     embedder: GenAIEmbedder | None = None,
     collection: str | None = None,
-) -> bool:
+) -> str:
     """Update an existing memory (replaces content and re-computes embedding)."""
     from datetime import UTC, datetime
 
@@ -114,17 +114,13 @@ def update_memory(
     # Update timestamp
     memory.created_at = datetime.now(UTC)
 
-    try:
-        add_memory_index(
-            memory,
-            qdrant=qdrant,
-            kuzu=kuzu,
-            embedder=embedder,
-            collection=collection,
-        )
-        return True
-    except Exception:
-        return False
+    return add_memory_index(
+        memory,
+        qdrant=qdrant,
+        kuzu=kuzu,
+        embedder=embedder,
+        collection=collection,
+    )
 
 
 def delete_memory(
@@ -132,21 +128,17 @@ def delete_memory(
     *,
     qdrant: QdrantInterface | None = None,
     kuzu: KuzuInterface | None = None,
-) -> bool:
+) -> None:
     """Delete a memory from both Qdrant and Kuzu."""
     qdrant = qdrant or QdrantInterface()
     kuzu = kuzu or KuzuInterface()
 
-    try:
-        # Remove from Qdrant
-        from qdrant_client.models import PointIdsList
+    # Remove from Qdrant
+    from qdrant_client.models import PointIdsList
 
-        qdrant.client.delete(
-            collection_name=qdrant.collection_name, points_selector=PointIdsList(points=[memory_id])
-        )
+    qdrant.client.delete(
+        collection_name=qdrant.collection_name, points_selector=PointIdsList(points=[memory_id])
+    )
 
-        # Remove from Kuzu
-        kuzu.query("MATCH (m:Memory {id: $id}) DELETE m", {"id": memory_id})
-        return True
-    except Exception:
-        return False
+    # Remove from Kuzu
+    kuzu.query("MATCH (m:Memory {id: $id}) DELETE m", {"id": memory_id})

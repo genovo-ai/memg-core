@@ -143,5 +143,8 @@ def get_config() -> MemorySystemConfig:
     try:
         return MemorySystemConfig.from_env()
     except Exception as e:
-        print(f"Warning: Failed to load config from environment: {e}")
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to load config from environment: {e}")
         return DEFAULT_SYSTEM_CONFIG
