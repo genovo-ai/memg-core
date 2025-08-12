@@ -105,7 +105,7 @@ class MemoryRetriever:
             )
 
             # Convert to SearchResult objects and filter by score
-            results = []
+            results: list[SearchResult] = []
 
             for i, result in enumerate(search_results):
                 logger.debug(

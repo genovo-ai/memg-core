@@ -451,7 +451,11 @@ class QdrantInterface:
             info = self.client.get_collection(collection)
             return {
                 "points": info.points_count,
-                "vector_size": info.config.params.vectors.size,
+                "vector_size": (
+                    info.config.params.vectors.size
+                    if isinstance(info.config.params.vectors, VectorParams)
+                    else 768
+                ),
                 "exists": True,
             }
         except (ConnectionError, TimeoutError) as e:
