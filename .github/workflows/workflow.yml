@@ -25,7 +25,9 @@ jobs:
       - name: use bandit (this is for security)
         run: |
           pip install -r requirements-dev.txt
-          bandit -r src/ 
+          echo "bandit ;)"
+          bandit -r src/
+          echo "ruff ;)"
           ruff format --check src/
           
 
