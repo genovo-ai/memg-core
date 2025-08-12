@@ -28,7 +28,7 @@ jobs:
           echo "bandit ;)"
           bandit -r src/
           echo "ruff ;)"
-          ruff format --check src/
+          ruff --check src/
           
 
 
