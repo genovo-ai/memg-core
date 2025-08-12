@@ -16,6 +16,9 @@ mypy>=1.17.0
 bandit>=1.8.6
 pre-commit>=4.2.0
 
+# Type stubs for mypy
+types-PyYAML>=6.0.12
+
 # MCP server (for running integration server locally)
 fastmcp>=2.10.6
 uvicorn>=0.30.6

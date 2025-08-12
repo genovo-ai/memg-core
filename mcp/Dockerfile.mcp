@@ -7,17 +7,17 @@ WORKDIR /app
 # System deps (curl for healthcheck; add build-base if you compile extras)
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
-# Accept version from CI tag; fallback to latest
-ARG MEMG_CORE_VERSION=
-RUN if [ -n "$MEMG_CORE_VERSION" ]; then \
-      V="$(echo "$MEMG_CORE_VERSION" | sed 's/^v//')"; \
-      pip install --no-cache-dir "memg-core==${V}"; \
+# Copy wheel if present (the workflow builds it in the same job)
+# This makes build deterministic and avoids PyPI race; if not present, fallback to PyPI.
+COPY dist/*.whl /tmp/
+RUN if ls /tmp/memg_core-*.whl >/dev/null 2>&1; then \
+      pip install --no-cache-dir /tmp/memg_core-*.whl; \
     else \
       pip install --no-cache-dir memg-core; \
     fi
 
 # MCP server deps
-RUN pip install --no-cache-dir "fastmcp>=0.2.0" "starlette>=0.37"
+RUN pip install --no-cache-dir "fastmcp>=2.10.6" "starlette>=0.37"
 
 # Copy server entry
 COPY mcp/mcp_server.py /app/
