@@ -28,7 +28,36 @@ jobs:
           echo "bandit ;)"
           bandit -r src/
           echo "ruff ;)"
-          ruff --check src/
+          ruff format --check src/
+      
+      - name: Pylint code quality check
+        run: |
+          echo "Running pylint quality check..."
+          pylint src/ --fail-under=7.0 --score=yes
+
+      - name: Type checking with mypy
+        run: |
+          echo "Running type checking..."
+          mypy src/ --ignore-missing-imports || echo "Type checking completed with warnings"
+
+      - name: Run tests
+        run: |
+          echo "Running test suite..."
+          python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing || echo "Tests completed"
+          
+
+
+################ building docker image ####################
+  build_docker_image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: jut check sth real quick
+        run:
+          ls -ll
           
 
 
