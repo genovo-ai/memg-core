@@ -62,7 +62,6 @@ jobs:
       packages: write
 
     steps:
-      - name: just check sth real quick
         ############ checkout the code ######################
       - name: checkout the code
         uses: actions/checkout@v4
