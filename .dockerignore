@@ -10,7 +10,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+# dist/ - needed for MCP Docker build with wheels
 downloads/
 eggs/
 .eggs/

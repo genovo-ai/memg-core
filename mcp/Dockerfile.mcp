@@ -1,28 +1,24 @@
-# mcp/Dockerfile.mcp
 FROM python:3.11-slim
-
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 
-# System deps (curl for healthcheck; add build-base if you compile extras)
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
-# Copy wheel if present (the workflow builds it in the same job)
-# This makes build deterministic and avoids PyPI race; if not present, fallback to PyPI.
-COPY dist/*.whl /tmp/
-RUN if ls /tmp/memg_core-*.whl >/dev/null 2>&1; then \
-      pip install --no-cache-dir /tmp/memg_core-*.whl; \
+# Copy the *directory* (works even if empty, as long as it exists in context)
+COPY dist/ /tmp/dist/
+
+# Prefer local wheel if present; else PyPI
+RUN set -e; \
+    if find /tmp/dist -maxdepth 1 -name '*.whl' -print -quit | grep -q .; then \
+        LATEST_WHEEL=$(find /tmp/dist -name '*.whl' | sort -V | tail -1); \
+        pip install --no-cache-dir "$LATEST_WHEEL"; \
     else \
-      pip install --no-cache-dir memg-core; \
+        pip install --no-cache-dir memg-core; \
     fi
 
-# MCP server deps
 RUN pip install --no-cache-dir "fastmcp>=2.10.6" "starlette>=0.37"
-
-# Copy server entry
 COPY mcp/mcp_server.py /app/
 
-# Persistence
 RUN mkdir -p /qdrant /kuzu
 ENV QDRANT_STORAGE_PATH=/qdrant KUZU_DB_PATH=/kuzu/memory_db MEMORY_SYSTEM_MCP_PORT=8787
 
