@@ -1,252 +1,113 @@
-name: MEMG Core CI/CD Pipeline
+# .github/workflows/ci-main.yml
+name: MEMG Core – Main
 
 on:
   push:
-    branches: [ main, dev ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main, dev ]
+    branches: [ main ]
+    tags: [ 'v*' ]    # release on tags
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  ##################### Security & Quality Checks ########################
-  security-and-quality:
+  quality:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install dependencies
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11', cache: 'pip' }
+      - name: Install toolchain
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -e ".[dev]"
-          # Ensure Ruff is available for the next step
-          pip install ruff
-
-      - name: Security scan with bandit
+          pip install ruff bandit mypy pylint pytest pytest-cov
+      - name: Bandit
+        run: bandit -r src/ -f json -o bandit-report.json
+      - name: Ruff
         run: |
-          echo "Running security scan with bandit..."
-          bandit -r src/ -f json -o bandit-report.json || echo "Bandit found issues but continuing..."
-          echo "Bandit report summary:"
-          bandit -r src/
-
-      - name: Code quality with ruff
-        run: |
-          echo "Running code quality checks with ruff..."
-          ruff check src/ --output-format=json > ruff-report.json || echo "Ruff found issues"
-          echo "Running ruff format check..."
           ruff format --check src/
-          echo "Running ruff linting (will fail CI on issues)..."
           ruff check src/
+      - name: Pylint
+        run: pylint src/ --fail-under=7.0 --score=yes
+      - name: MyPy
+        run: mypy src/ --ignore-missing-imports
+      - name: Tests
+        run: python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
 
-      - name: Pylint code quality check
-        run: |
-          echo "Running pylint quality check..."
-          pylint src/ --fail-under=7.0 --score=yes
-
-      - name: Type checking with mypy
-        run: |
-          echo "Running type checking..."
-          mypy src/ --ignore-missing-imports || echo "Type checking completed with warnings"
-
-      - name: Run tests
-        run: |
-          echo "Running test suite..."
-          python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing || echo "Tests completed"
-
-
-  ##################### Build Core Docker Image ########################
-  build-core-docker:
-    needs: security-and-quality
+  pypi:
+    needs: quality
+    if: startsWith(github.ref,'refs/tags/v')     # tags only
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     permissions:
-      contents: read
-      packages: write
-    outputs:
-      image-digest: ${{ steps.build.outputs.digest }}
-      image-tag: ${{ steps.meta.outputs.tags }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for Core Docker image
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ghcr.io/${{ github.repository }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-
-      - name: Build and push Core Docker image
-        id: build
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-
-  ##################### PyPI Publishing ########################
-  publish-to-pypi:
-    needs: build-core-docker
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    permissions:
-      id-token: write  # Required for Trusted Publishing
+      id-token: write     # Trusted Publishing
       contents: read
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install build dependencies
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11', cache: 'pip' }
+      - name: Build
         run: |
           python -m pip install --upgrade pip
           pip install build
-
-      - name: Build package
-        run: |
-          echo "Building Python package..."
           python -m build
-
-      - name: Publish to PyPI
+      - name: Publish to PyPI (OIDC)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           print-hash: true
           skip-existing: true
-          attestations: true  # Enable package attestations for better security
+          attestations: true
 
-
-  ##################### Build MCP Docker Image ########################
-  build-mcp-docker:
-    needs: publish-to-pypi
+  mcp-image:
+    needs: pypi
+    if: startsWith(github.ref,'refs/tags/v')     # build image after PyPI release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     permissions:
       contents: read
       packages: write
-    outputs:
-      image-digest: ${{ steps.build.outputs.digest }}
-      image-tag: ${{ steps.meta.outputs.tags }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for MCP server
-        id: meta
+      - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository }}-mcp
+          images: ghcr.io/${{ github.repository }}-mcp
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-
-      - name: Build and push MCP Docker image (uses published library)
-        id: build
-        uses: docker/build-push-action@v5
+            type=raw,value={{tag}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref,'refs/tags/') }}
+      - uses: docker/build-push-action@v5
         with:
           context: .
-          file: dockerfiles/Dockerfile.mcp
+          file: mcp/Dockerfile.mcp              # <- fixed path
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: true
+          build-args: |
+            MEMG_CORE_VERSION=${{ github.ref_name }}   # e.g., v1.2.3 (strip 'v' in Dockerfile)
 
-
-  ##################### Deployment ########################
-  deploy:
-    needs: [build-core-docker, build-mcp-docker, publish-to-pypi]
+  summary:
+    needs: [mcp-image]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    if: always()
     steps:
-      - name: Deployment Summary
-        id: deploy
-        run: |
-          echo "🎉 MEMG Core CI/CD Pipeline completed successfully!"
-          echo ""
-          echo "📦 Core Docker Image: ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
-          echo "🐳 MCP Docker Image: ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
-          echo "📚 PyPI Package: pip install memg-core"
-          echo ""
-          echo "🚀 Deploy Commands:"
-          echo "Core App: docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
-          echo "MCP Server: docker pull ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
-
-      - name: Usage Instructions
-        run: |
-          echo "📋 Usage Instructions:"
-          echo ""
-          echo "1️⃣ Install Python Library:"
-          echo "   pip install memg-core"
-          echo ""
-          echo "2️⃣ Run Core Application:"
-          echo "   docker run ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
-          echo ""
-          echo "3️⃣ Run MCP Server:"
-          echo "   cp env.example .env && edit GOOGLE_API_KEY"
-          echo "   docker run --env-file .env -p 8787:8787 ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
+      - run: |
+          echo "MCP image: ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
+          echo "PyPI     : pip install memg-core"

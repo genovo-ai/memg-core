@@ -12,7 +12,7 @@ services:
       - ${BASE_MEMORY_PATH:-$HOME/.local/share/memory_system}_${MEMORY_SYSTEM_MCP_PORT:-8787}/qdrant:/qdrant
       - ${BASE_MEMORY_PATH:-$HOME/.local/share/memory_system}_${MEMORY_SYSTEM_MCP_PORT:-8787}/kuzu:/kuzu
     env_file:
-      - ../env.example
+      - .env
     environment:
       # Override with container-specific paths
       QDRANT_STORAGE_PATH: /qdrant

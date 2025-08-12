@@ -1,1 +1,0 @@
-# MEMG MCP Integration
