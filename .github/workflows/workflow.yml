@@ -68,11 +68,11 @@ jobs:
           python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing || echo "Tests completed"
 
 
-  ##################### Build MCP Docker Image ########################
-  build-mcp-docker:
-    needs: publish-to-pypi
+  ##################### Build Core Docker Image ########################
+  build-core-docker:
+    needs: security-and-quality
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
       packages: write
@@ -95,20 +95,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKER_HUB_TOKEN_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN_PASSWORD }}
-
-      - name: Extract metadata for MCP server (GHCR + Docker Hub)
+      - name: Extract metadata for Core Docker image
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository }}-mcp
-            docker.io/${{ secrets.DOCKER_HUB_TOKEN_USERNAME }}/memg-core-mcp
+            ghcr.io/${{ github.repository }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -118,12 +110,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},enable={{is_tag}}
             type=semver,pattern={{major}},enable={{is_tag}}
 
-      - name: Build and push MCP Docker image (to GHCR + Docker Hub)
+      - name: Build and push Core Docker image
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: dockerfiles/Dockerfile.mcp
+          file: Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -131,9 +123,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+
   ##################### PyPI Publishing ########################
   publish-to-pypi:
-    needs: security-and-quality
+    needs: build-core-docker
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     permissions:
@@ -168,37 +161,92 @@ jobs:
           skip-existing: true
           attestations: true  # Enable package attestations for better security
 
+
+  ##################### Build MCP Docker Image ########################
+  build-mcp-docker:
+    needs: publish-to-pypi
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for MCP server
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}-mcp
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}},enable={{is_tag}}
+            type=semver,pattern={{major}}.{{minor}},enable={{is_tag}}
+            type=semver,pattern={{major}},enable={{is_tag}}
+
+      - name: Build and push MCP Docker image (uses published library)
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: dockerfiles/Dockerfile.mcp
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+
   ##################### Deployment ########################
   deploy:
-    needs: [build-mcp-docker, publish-to-pypi]
+    needs: [build-core-docker, build-mcp-docker, publish-to-pypi]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     steps:
-      - name: MCP Docker Image Published
+      - name: Deployment Summary
         id: deploy
         run: |
-          echo "MCP Docker image published to GitHub Container Registry"
-          echo "Image: ${{ needs.build-mcp-docker.outputs.image-tag }}"
-          echo "Image Digest: ${{ needs.build-mcp-docker.outputs.image-digest }}"
-          echo "Ready for deployment"
+          echo "🎉 MEMG Core CI/CD Pipeline completed successfully!"
           echo ""
-          echo "Pull command:"
-          echo "docker pull ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
+          echo "📦 Core Docker Image: ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
+          echo "🐳 MCP Docker Image: ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
+          echo "📚 PyPI Package: pip install memg-core"
+          echo ""
+          echo "🚀 Deploy Commands:"
+          echo "Core App: docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
+          echo "MCP Server: docker pull ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
 
-      - name: Deployment Instructions
+      - name: Usage Instructions
         run: |
-          echo "🎉 MEMG Core published successfully!"
+          echo "📋 Usage Instructions:"
           echo ""
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "📦 Core Library: pip install memg-core"
-            echo "🐳 MCP Server: docker pull ghcr.io/genovo-ai/memg-core-mcp:latest"
-          fi
+          echo "1️⃣ Install Python Library:"
+          echo "   pip install memg-core"
           echo ""
-          echo "🚀 Deploy MCP Server:"
-          echo "1. docker pull ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
-          echo "2. cp env.example .env && edit GOOGLE_API_KEY"
-          echo "3. docker run --env-file .env -p 8787:8787 ghcr.io/genovo-ai/memg-core-mcp:${{ github.ref_name }}"
+          echo "2️⃣ Run Core Application:"
+          echo "   docker run ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
           echo ""
-          echo "📚 Use Core Library:"
-          echo "1. pip install memg-core"
-          echo "2. from memory_system import MemorySystem"
+          echo "3️⃣ Run MCP Server:"
+          echo "   cp env.example .env && edit GOOGLE_API_KEY"
+          echo "   docker run --env-file .env -p 8787:8787 ghcr.io/${{ github.repository }}-mcp:${{ github.ref_name }}"
