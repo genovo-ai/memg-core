@@ -195,13 +195,13 @@ class QdrantInterface:
                     # Use type ignore for the Filter argument type mismatch
                     query_filter = Filter(must=filter_conditions)  # type: ignore
 
-            # Search
-            results = self.client.search(
+            # Search using modern API
+            results = self.client.query_points(
                 collection_name=collection,
-                query_vector=vector,
+                query=vector,
                 limit=limit,
                 query_filter=query_filter,
-            )
+            ).points
 
             # Convert to simplified results
             return [

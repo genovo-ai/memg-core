@@ -154,13 +154,26 @@ class KuzuInterface:
                 original_error=e,
             )
 
+    def _extract_query_results(self, query_result) -> list[dict[str, Any]]:
+        """Extract results from Kuzu QueryResult using raw iteration"""
+        # Type annotations disabled for QueryResult - dynamic interface from kuzu package
+        qr = query_result  # type: ignore
+
+        results = []
+        column_names = qr.get_column_names()
+        while qr.has_next():
+            row = qr.get_next()
+            result = {}
+            for i, col_name in enumerate(column_names):
+                result[col_name] = row[i] if i < len(row) else None
+            results.append(result)
+        return results
+
     def query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Execute Cypher query and return results"""
         try:
             qr = self.conn.execute(cypher, parameters=params or {})
-            # Add type ignore for the union return type issue
-            df = qr.get_as_df()  # type: ignore
-            return df.to_dict("records") if not df.empty else []
+            return self._extract_query_results(qr)
         except Exception as e:
             raise DatabaseError(
                 "Failed to execute Kuzu query",
@@ -183,12 +196,15 @@ class KuzuInterface:
             rel_filter = "|".join([r.upper() for r in rel_types]) if rel_types else ""
             neighbor = f":{neighbor_label}" if neighbor_label else ""
 
+            # Format relationship pattern properly - don't include ':' if no filter
+            rel_part = f":{rel_filter}" if rel_filter else ""
+
             if direction == "out":
-                pattern = f"(a:{node_label} {{id: $id}})-[r:{rel_filter}]->(n{neighbor})"
+                pattern = f"(a:{node_label} {{id: $id}})-[r{rel_part}]->(n{neighbor})"
             elif direction == "in":
-                pattern = f"(a:{node_label} {{id: $id}})<-[r:{rel_filter}]-(n{neighbor})"
+                pattern = f"(a:{node_label} {{id: $id}})<-[r{rel_part}]-(n{neighbor})"
             else:
-                pattern = f"(a:{node_label} {{id: $id}})-[r:{rel_filter}]-(n{neighbor})"
+                pattern = f"(a:{node_label} {{id: $id}})-[r{rel_part}]-(n{neighbor})"
 
             if neighbor_label == "Memory":
                 cypher = f"""
@@ -199,13 +215,13 @@ class KuzuInterface:
                                 n.title as title,
                                 n.memory_type as memory_type,
                                 n.created_at as created_at,
-                                type(r) as rel_type
+                                label(r) as rel_type
                 LIMIT $limit
                 """
             else:
                 cypher = f"""
                 MATCH {pattern}
-                RETURN DISTINCT n as node, type(r) as rel_type
+                RETURN DISTINCT n as node, label(r) as rel_type
                 LIMIT $limit
                 """
             params = {"id": node_id, "limit": limit}
