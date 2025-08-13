@@ -59,10 +59,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
           python -m build
-      - name: Publish to PyPI (Token-based)
+      - name: Publish to PyPI (Trusted Publishing)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
           print-hash: true
           skip-existing: true
           attestations: true
