@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from ..core.config import get_config
@@ -36,7 +37,7 @@ def get_system_info(
         "yaml_schema": {
             "enabled": yaml_enabled,
             "path": yaml_path if yaml_enabled else None,
-            "loaded": yaml_enabled and yaml_path and os.path.exists(yaml_path),
+            "loaded": yaml_enabled and yaml_path and Path(yaml_path).exists(),
         }
     }
 
@@ -74,7 +75,7 @@ def get_system_info(
             info["kuzu"] = {"available": True, "path": config.memg.kuzu_database_path}
         else:
             # Test if we can create an instance
-            test_kuzu = KuzuInterface(db_path=config.memg.kuzu_database_path)
+            KuzuInterface(db_path=config.memg.kuzu_database_path)  # Just test if it works
             info["kuzu"] = {"available": True, "path": config.memg.kuzu_database_path}
     except Exception:
         info["kuzu"] = {"available": False}
