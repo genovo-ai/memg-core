@@ -1,7 +1,7 @@
 """Basic tests for Liberation AI Memory System."""
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
 

@@ -61,25 +61,31 @@ class DatasetRow:
         return {
             "memory": json.loads(self.memory.model_dump_json()),
             "entities": [json.loads(e.model_dump_json()) for e in self.entities],
-            "relationships": [json.loads(r.model_dump_json()) for r in self.relationships],
+            "relationships": [
+                json.loads(r.model_dump_json()) for r in self.relationships
+            ],
         }
 
 
 def _generate_note_content(rng: Random, i: int) -> str:
     tech = rng.choice(["Python", "Docker", "PostgreSQL", "Qdrant", "Kuzu", "FastAPI"])
     component = rng.choice(["AuthService", "InvoiceService", "Retriever", "Processor"])
-    issue = rng.choice([
-        "ModuleNotFoundError",
-        "ConnectionTimeout",
-        "NullPointer",
-        "SchemaMismatch",
-    ])
-    solution = rng.choice([
-        "pin dependency versions",
-        "increase timeout",
-        "add null checks",
-        "migrate schema and reindex",
-    ])
+    issue = rng.choice(
+        [
+            "ModuleNotFoundError",
+            "ConnectionTimeout",
+            "NullPointer",
+            "SchemaMismatch",
+        ]
+    )
+    solution = rng.choice(
+        [
+            "pin dependency versions",
+            "increase timeout",
+            "add null checks",
+            "migrate schema and reindex",
+        ]
+    )
     return (
         f"Note {i}: Using {tech} in component {component}. Encountered {issue}, "
         f"solution was to {solution}."
@@ -97,16 +103,20 @@ def _generate_document_content(rng: Random, i: int) -> str:
 
 
 def _generate_conversation(rng: Random, i: int) -> str:
-    q = rng.choice([
-        "How do we fix the 500 error in search?",
-        "Why is embedding dimension mismatched?",
-        "Where is the MCP health endpoint?",
-    ])
-    a = rng.choice([
-        "Check Qdrant payload schema and index rebuild.",
-        "Set EMBEDDING_DIMENSION_LEN to 768 and re-embed.",
-        "Use /health on port 8787 in Docker.",
-    ])
+    q = rng.choice(
+        [
+            "How do we fix the 500 error in search?",
+            "Why is embedding dimension mismatched?",
+            "Where is the MCP health endpoint?",
+        ]
+    )
+    a = rng.choice(
+        [
+            "Check Qdrant payload schema and index rebuild.",
+            "Set EMBEDDING_DIMENSION_LEN to 768 and re-embed.",
+            "Use /health on port 8787 in Docker.",
+        ]
+    )
     return f"User: {q}\nAssistant: {a}"
 
 
@@ -124,7 +134,9 @@ def _generate_task(i: int) -> dict:
     }
 
 
-def _spawn_entities_for_content(user_id: str, content: str, rng: Random) -> list[Entity]:
+def _spawn_entities_for_content(
+    user_id: str, content: str, rng: Random
+) -> list[Entity]:
     entities: list[Entity] = []
     # Simple heuristics to cover all EntityType values over dataset
     mapping: list[tuple[str, EntityType]] = [
@@ -174,7 +186,9 @@ def _spawn_entities_for_content(user_id: str, content: str, rng: Random) -> list
     return entities
 
 
-def _make_relationships(user_id: str, memory: Memory, entities: list[Entity]) -> list[Relationship]:
+def _make_relationships(
+    user_id: str, memory: Memory, entities: list[Entity]
+) -> list[Relationship]:
     rels: list[Relationship] = []
     for e in entities:
         rels.append(
@@ -212,7 +226,9 @@ def generate_rows(
         else:
             content = _generate_note_content(rng, i)  # task uses note-like text
 
-        memory = Memory(user_id=user_id, content=content, memory_type=mtype, title=f"Example {i}")
+        memory = Memory(
+            user_id=user_id, content=content, memory_type=mtype, title=f"Example {i}"
+        )
 
         # Enrich task fields where applicable
         if mtype == MemoryType.TASK:
@@ -229,11 +245,17 @@ def generate_rows(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate synthetic MEMG dataset (JSONL)")
+    parser = argparse.ArgumentParser(
+        description="Generate synthetic MEMG dataset (JSONL)"
+    )
     parser.add_argument("--output", required=True, help="Output JSONL path")
-    parser.add_argument("--num", type=int, default=200, help="Number of rows to generate")
+    parser.add_argument(
+        "--num", type=int, default=200, help="Number of rows to generate"
+    )
     parser.add_argument("--user", default="eval_user", help="User ID to stamp in data")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument(
+        "--seed", type=int, default=42, help="Random seed for reproducibility"
+    )
     args = parser.parse_args()
 
     out_path = Path(args.output)

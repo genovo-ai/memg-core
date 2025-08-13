@@ -23,7 +23,7 @@ def main():
         text="Set up Postgres with Docker for local development",
         user_id=user,
         title="Docker Postgres Setup",
-        tags=["docker", "postgres", "dev"]
+        tags=["docker", "postgres", "dev"],
     )
     print(f"✓ Added note: {note.id} - {note.title}")
 
@@ -33,7 +33,7 @@ def main():
         user_id=user,
         title="PostgreSQL Performance Guide",
         summary="Comprehensive guide for tuning PostgreSQL performance",
-        tags=["postgres", "performance", "guide"]
+        tags=["postgres", "performance", "guide"],
     )
     print(f"✓ Added document: {doc.id} - {doc.title}")
 
@@ -43,9 +43,11 @@ def main():
         user_id=user,
         title="Cache Implementation",
         due_date=datetime(2024, 12, 31),
-        tags=["redis", "cache", "task"]
+        tags=["redis", "cache", "task"],
     )
-    print(f"✓ Added task: {task.id} - {task.title} (due: {task.due_date.strftime('%Y-%m-%d') if task.due_date else 'None'})")
+    print(
+        f"✓ Added task: {task.id} - {task.title} (due: {task.due_date.strftime('%Y-%m-%d') if task.due_date else 'None'})"
+    )
 
     print("\n=== Searching memories (GraphRAG-first) ===")
 
@@ -55,7 +57,9 @@ def main():
 
     for i, r in enumerate(results, 1):
         mem = r.memory
-        content_preview = mem.content[:60] + "..." if len(mem.content) > 60 else mem.content
+        content_preview = (
+            mem.content[:60] + "..." if len(mem.content) > 60 else mem.content
+        )
         print(f"{i}. [{mem.memory_type.value}] {mem.title or 'Untitled'}")
         print(f"   Content: {content_preview}")
         print(f"   Score: {r.score:.2f} | Source: {r.source}")

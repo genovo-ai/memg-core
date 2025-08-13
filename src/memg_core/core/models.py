@@ -99,7 +99,7 @@ class Memory(BaseModel):
             payload.update(
                 {
                     "task_status": self.task_status.value if self.task_status else None,
-                    "task_priority": self.task_priority.value if self.task_priority else None,
+                    "task_priority": (self.task_priority.value if self.task_priority else None),
                     "assignee": self.assignee,
                     "due_date": self.due_date.isoformat() if self.due_date else None,
                 }

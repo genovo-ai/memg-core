@@ -70,20 +70,30 @@ def evaluate_offline(data_path: Path) -> EvalStats:
         memory, _e, _r = to_models(row)
 
         # Validate database compatibility for each object
-        mem_q = validator.schema_validator.validate_database_compatibility(memory, "qdrant")
-        mem_k = validator.schema_validator.validate_database_compatibility(memory, "kuzu")
+        mem_q = validator.schema_validator.validate_database_compatibility(
+            memory, "qdrant"
+        )
+        mem_k = validator.schema_validator.validate_database_compatibility(
+            memory, "kuzu"
+        )
         for ent in _e:
             _ = validator.schema_validator.validate_database_compatibility(ent, "kuzu")
         for rel in _r:
-            _ = validator.schema_validator.validate_relationship_schema(rel.to_kuzu_props())
+            _ = validator.schema_validator.validate_relationship_schema(
+                rel.to_kuzu_props()
+            )
 
         # Accumulate counts
         stats.rows += 1
         stats.memories += 1
         stats.entities += len(_e)
         stats.relationships += len(_r)
-        stats.errors += sum(1 for i in mem_q.issues if i.level.name in ("ERROR", "CRITICAL"))
-        stats.errors += sum(1 for i in mem_k.issues if i.level.name in ("ERROR", "CRITICAL"))
+        stats.errors += sum(
+            1 for i in mem_q.issues if i.level.name in ("ERROR", "CRITICAL")
+        )
+        stats.errors += sum(
+            1 for i in mem_k.issues if i.level.name in ("ERROR", "CRITICAL")
+        )
         stats.warnings += sum(1 for i in mem_q.issues if i.level.name == "WARNING")
         stats.warnings += sum(1 for i in mem_k.issues if i.level.name == "WARNING")
 
@@ -132,7 +142,9 @@ def evaluate_live(data_path: Path) -> EvalStats:
         if hasattr(result, "__await__"):
             import asyncio
 
-            result = asyncio.get_event_loop().run_until_complete(processor.process_memory(req))
+            result = asyncio.get_event_loop().run_until_complete(
+                processor.process_memory(req)
+            )
 
         # Validate stored memory objects quickly (vector len checks etc.)
         val_report = validator.validate_memory_creation_flow(

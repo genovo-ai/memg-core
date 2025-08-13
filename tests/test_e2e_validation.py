@@ -5,8 +5,8 @@ This test suite performs comprehensive live testing of the memory system
 with real AI calls and graph validation as outlined in the testing proposal.
 """
 
-from pathlib import Path
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -294,7 +294,6 @@ class TestSystemReadiness:
         assert "qdrant" in info and isinstance(info["qdrant"], dict)
         assert "graph_enabled" in info
         assert "neighbor_cap_default" in info
-
 
     def test_lightweight_core_imports(self):
         """Test core imports work without heavy dependencies."""

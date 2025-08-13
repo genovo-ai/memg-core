@@ -6,22 +6,22 @@ This is a thin MCP integration that uses only the memg-core library APIs.
 No custom wrappers or sync_wrapper dependencies.
 """
 
-import os
 import asyncio
-from typing import Optional, Any
+import os
+from typing import Any, Optional
 
 from fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
 import memg_core
-from memg_core.logging_config import get_logger, log_error
 from memg_core.config import get_config
-from memg_core.qdrant.interface import QdrantInterface
 from memg_core.kuzu_graph.interface import KuzuInterface
-from memg_core.processing.memory_retriever import MemoryRetriever
-from memg_core.utils.embeddings import GenAIEmbedder
-from memg_core.models.core import MemoryType
+from memg_core.logging_config import get_logger, log_error
 from memg_core.models.api import MemoryResultItem, SearchMemoriesResponse
+from memg_core.models.core import MemoryType
+from memg_core.processing.memory_retriever import MemoryRetriever
+from memg_core.qdrant.interface import QdrantInterface
+from memg_core.utils.embeddings import GenAIEmbedder
 
 logger = get_logger("mcp_server")
 
@@ -80,9 +80,9 @@ class MinimalMemoryBridge:
             "project_name": project_name,
             "is_valid": True,
             "index_text": index_text,
-            "created_at": __import__("datetime").datetime.now(
-                __import__("datetime").timezone.utc
-            ).isoformat(),
+            "created_at": __import__("datetime")
+            .datetime.now(__import__("datetime").timezone.utc)
+            .isoformat(),
         }
 
         success, point_id = self.qdrant_interface.add_point(
@@ -122,9 +122,14 @@ class MinimalMemoryBridge:
             "word_count": len(content.split()),
         }
 
-    async def search_async(self, query: str, user_id: Optional[str], limit: int) -> list[dict[str, Any]]:
+    async def search_async(
+        self, query: str, user_id: Optional[str], limit: int
+    ) -> list[dict[str, Any]]:
         results = await self.retriever.search_memories(
-            query=query, user_id=user_id, limit=limit, score_threshold=self.memg_config.score_threshold
+            query=query,
+            user_id=user_id,
+            limit=limit,
+            score_threshold=self.memg_config.score_threshold,
         )
         return [
             {
@@ -142,7 +147,9 @@ class MinimalMemoryBridge:
             for r in results
         ]
 
-    def search(self, query: str, user_id: Optional[str], limit: int = 5) -> list[dict[str, Any]]:
+    def search(
+        self, query: str, user_id: Optional[str], limit: int = 5
+    ) -> list[dict[str, Any]]:
         return asyncio.run(self.search_async(query, user_id, limit))
 
     def get_stats(self) -> dict[str, Any]:
@@ -168,7 +175,9 @@ def initialize_memory_system() -> Optional[MinimalMemoryBridge]:
 def setup_health_endpoints(app: FastMCP) -> None:
     @app.custom_route("/", methods=["GET"])
     async def root(_req):
-        return JSONResponse({"status": "healthy", "service": f"MEMG MCP v{memg_core.__version__}"})
+        return JSONResponse(
+            {"status": "healthy", "service": f"MEMG MCP v{memg_core.__version__}"}
+        )
 
     @app.custom_route("/health", methods=["GET"])
     async def health(_req):
@@ -183,8 +192,14 @@ def setup_health_endpoints(app: FastMCP) -> None:
 
 def register_tools(app: FastMCP) -> None:
     @app.tool("mcp_gmem_add_memory")
-    def add_memory(content: str, user_id: str, memory_type: str = None, title: str = None,
-                   source: str = "mcp_api", tags: str = None):
+    def add_memory(
+        content: str,
+        user_id: str,
+        memory_type: str = None,
+        title: str = None,
+        source: str = "mcp_api",
+        tags: str = None,
+    ):
         if not memory:
             return {"result": "❌ Memory system not initialized"}
         parsed_type = None
@@ -205,7 +220,9 @@ def register_tools(app: FastMCP) -> None:
             tags=parsed_tags,
         )
         return {
-            "result": "✅ Memory added" if resp["success"] else "❌ Failed to add memory",
+            "result": (
+                "✅ Memory added" if resp["success"] else "❌ Failed to add memory"
+            ),
             "memory_id": resp["memory_id"],
             "final_type": resp["final_type"],
             "word_count": resp["word_count"],
@@ -221,11 +238,14 @@ def register_tools(app: FastMCP) -> None:
     @app.tool("mcp_gmem_get_system_info")
     def get_system_info():
         if not memory:
-            return {"result": {"components_initialized": False, "status": "Not initialized"}}
+            return {
+                "result": {"components_initialized": False, "status": "Not initialized"}
+            }
         stats = memory.get_stats()
         # Optionally enrich using core system info when available
         try:
             from memg_core.utils.system_info import get_system_info as core_info
+
             enriched = core_info(qdrant=memory.qdrant_interface)
             stats.update({"core": enriched})
         except Exception:
