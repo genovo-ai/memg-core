@@ -1,62 +1,72 @@
-"""Embedding generation interface - pure I/O only"""
+"""FastEmbed-based embedder - local, no API keys required"""
+
+from __future__ import annotations
 
 import os
 
-from google import genai  # type: ignore
+try:
+    from fastembed import TextEmbedding
+
+    _FASTEMBED_AVAILABLE = True
+except ImportError as e:
+    TextEmbedding = None
+    _FASTEMBED_AVAILABLE = False
+    _IMPORT_ERROR = str(e)
 
 from ..exceptions import NetworkError
 
 
-class GenAIEmbedder:
-    """Simple wrapper for Google GenAI embeddings - embedding generation only"""
+class Embedder:
+    """Local embedder using FastEmbed - no API keys required"""
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        use_vertex_ai: bool = False,
-        project: str | None = None,
-        location: str | None = None,
-    ):
-        """Initialize the GenAI embedder"""
-        # Set API key for authentication
-        if api_key:
-            os.environ["GOOGLE_API_KEY"] = api_key
+    def __init__(self, model_name: str | None = None):
+        """Initialize the FastEmbed embedder
+
+        Args:
+            model_name: Model to use. Defaults to env EMBEDDER_MODEL or snowflake-arctic-embed-xs
+        """
+        if TextEmbedding is None:
+            error_msg = "FastEmbed is required for Embedder. Install with: pip install fastembed"
+            if not _FASTEMBED_AVAILABLE:
+                error_msg += f" (Import error: {_IMPORT_ERROR})"
+            raise ImportError(error_msg)
+
+        # Use env variable or default to the winner model
+        self.model_name = model_name or os.getenv(
+            "EMBEDDER_MODEL", "Snowflake/snowflake-arctic-embed-xs"
+        )
 
         try:
-            # For API key usage, we don't need project/location
-            if use_vertex_ai and project and location:
-                self.client = genai.Client(
-                    vertexai=True,
-                    location=location,
-                    project=project,
-                )
-            else:
-                # Use API key mode (simpler setup)
-                self.client = genai.Client(vertexai=False)
+            self.model = TextEmbedding(model_name=self.model_name)
         except Exception as e:
             raise NetworkError(
-                "Failed to initialize GenAI client",
-                operation="init",
+                f"Failed to initialize FastEmbed model '{self.model_name}'",
                 original_error=e,
             )
 
     def get_embedding(self, text: str) -> list[float]:
-        """Generate embedding vector for text"""
+        """Get embedding for a single text"""
         try:
-            response = self.client.models.embed_content(model="text-embedding-004", contents=text)
-
-            # Return the embedding values from the response
-            if response.embeddings and response.embeddings[0]:
-                values = response.embeddings[0].values
-                if values is None:
-                    raise ValueError("Failed to generate embeddings, result was empty.")
-                return values
-
-            raise ValueError("Failed to generate embeddings, result was empty.")
+            # FastEmbed returns a generator, so we need to extract the first result
+            embeddings = list(self.model.embed([text]))
+            if embeddings:
+                return embeddings[0].tolist()
+            raise NetworkError("FastEmbed returned empty embedding")
         except Exception as e:
             raise NetworkError(
-                "Failed to generate embedding",
-                operation="get_embedding",
-                context={"text_length": len(text)},
+                "Failed to generate embedding for text",
+                context={"model": self.model_name, "text_length": len(text)},
+                original_error=e,
+            )
+
+    def get_embeddings(self, texts: list[str]) -> list[list[float]]:
+        """Get embeddings for multiple texts"""
+        try:
+            embeddings = list(self.model.embed(texts))
+            return [emb.tolist() for emb in embeddings]
+        except Exception as e:
+            raise NetworkError(
+                f"Failed to generate embeddings for {len(texts)} texts",
+                context={"model": self.model_name, "text_count": len(texts)},
                 original_error=e,
             )
