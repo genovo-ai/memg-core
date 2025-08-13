@@ -4,11 +4,22 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 from ..interfaces.embedder import GenAIEmbedder
 from ..interfaces.kuzu import KuzuInterface
 from ..interfaces.qdrant import QdrantInterface
 from ..models import Memory, MemoryType, SearchResult
+
+
+def _safe_parse_datetime(date_str: Any) -> datetime:
+    """Safely parse a datetime string or return current time."""
+    if date_str and isinstance(date_str, str):
+        try:
+            return datetime.fromisoformat(date_str)
+        except (ValueError, TypeError):
+            pass
+    return datetime.now(UTC)
 
 
 def _build_graph_query(
@@ -66,7 +77,7 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
 
         results.append(
             Memory(
-                id=row.get("m.id") or row.get("id"),
+                id=row.get("m.id") or row.get("id") or str(uuid4()),
                 user_id=row.get("m.user_id") or row.get("user_id", ""),
                 content=row.get("m.content") or row.get("content", ""),
                 memory_type=memory_type,
@@ -75,8 +86,16 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
                 source=row.get("m.source", "user"),
                 tags=(row.get("m.tags", "").split(",") if row.get("m.tags") else []),
                 confidence=float(row.get("m.confidence", 0.8)),
+                vector=None,
                 is_valid=True,
                 created_at=created_dt,
+                expires_at=None,
+                supersedes=None,
+                superseded_by=None,
+                task_status=None,
+                task_priority=None,
+                assignee=None,
+                due_date=None,
             )
         )
     return results
@@ -98,7 +117,7 @@ def _rerank_with_vectors(
     results: list[SearchResult] = []
     for mem in candidates:
         score = score_by_id.get(mem.id, 0.5)  # default mid score if not found
-        results.append(SearchResult(memory=mem, score=score, source="graph_rerank", metadata={}))
+        results.append(SearchResult(memory=mem, score=score, distance=None, source="graph_rerank", metadata={}))
 
     results.sort(key=lambda r: r.score, reverse=True)
     return results
@@ -133,22 +152,32 @@ def _append_neighbors(
                 mtype = MemoryType.NOTE
 
             neighbor_memory = Memory(
-                id=row.get("id"),
+                id=row.get("id") or str(uuid4()),
                 user_id=row.get("user_id", ""),
                 content=row.get("content", ""),
                 memory_type=mtype,
                 title=row.get("title"),
-                created_at=(
-                    datetime.fromisoformat(row.get("created_at"))
-                    if row.get("created_at")
-                    else datetime.now(UTC)
-                ),
+                summary=None,
+                source="user",
+                confidence=0.8,
+                vector=None,
+                is_valid=True,
+                created_at=_safe_parse_datetime(row.get("created_at")),
+                expires_at=None,
+                supersedes=None,
+                superseded_by=None,
+                task_status=None,
+                task_priority=None,
+                assignee=None,
+                due_date=None,
+                tags=[],
             )
 
             expanded.append(
                 SearchResult(
                     memory=neighbor_memory,
                     score=max(0.3, seed.score * 0.9),
+                    distance=None,
                     source="graph_neighbor",
                     metadata={"from": mem.id},
                 )
@@ -219,7 +248,7 @@ def graph_rag_search(
                 mtype = MemoryType.NOTE
 
             mem = Memory(
-                id=r.get("id"),
+                id=r.get("id") or str(uuid4()),
                 user_id=payload.get("user_id", ""),
                 content=payload.get("content", ""),
                 memory_type=mtype,
@@ -228,17 +257,26 @@ def graph_rag_search(
                 source=payload.get("source", "user"),
                 tags=payload.get("tags", []),
                 confidence=payload.get("confidence", 0.8),
+                vector=None,
                 is_valid=payload.get("is_valid", True),
                 created_at=(
                     datetime.fromisoformat(payload.get("created_at"))
                     if payload.get("created_at")
                     else datetime.now(UTC)
                 ),
+                expires_at=None,
+                supersedes=None,
+                superseded_by=None,
+                task_status=None,
+                task_priority=None,
+                assignee=None,
+                due_date=None,
             )
             results.append(
                 SearchResult(
                     memory=mem,
                     score=float(r.get("score", 0.0)),
+                    distance=None,
                     source="vector_fallback",
                     metadata={},
                 )

@@ -47,7 +47,10 @@ class GenAIEmbedder:
 
             # Return the embedding values from the response
             if response.embeddings and response.embeddings[0]:
-                return response.embeddings[0].values
+                values = response.embeddings[0].values
+                if values is None:
+                    raise ValueError("Failed to generate embeddings, result was empty.")
+                return values
 
             raise ValueError("Failed to generate embeddings, result was empty.")
         except Exception as e:

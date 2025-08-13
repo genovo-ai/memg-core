@@ -192,7 +192,8 @@ class QdrantInterface:
                             )
 
                 if filter_conditions:
-                    query_filter = Filter(must=filter_conditions)
+                    # Use type ignore for the Filter argument type mismatch
+                    query_filter = Filter(must=filter_conditions)  # type: ignore
 
             # Search
             results = self.client.search(
@@ -281,13 +282,31 @@ class QdrantInterface:
                 return {"exists": False}
 
             info = self.client.get_collection(collection_name=collection)
+            # Handle different types of vector params
+            vector_size = None
+            vector_distance = None
+
+            vectors_param = info.config.params.vectors
+            if vectors_param is not None:
+                if hasattr(vectors_param, "size"):
+                    vector_size = vectors_param.size  # type: ignore
+                    vector_distance = vectors_param.distance  # type: ignore
+                elif isinstance(vectors_param, dict):
+                    # For multi-vector collections, use the first vector's params
+                    if vectors_param:
+                        vector_values = list(vectors_param.values())
+                        if vector_values:
+                            first_vector = vector_values[0]
+                            vector_size = first_vector.size
+                            vector_distance = first_vector.distance
+
             return {
                 "exists": True,
                 "vectors_count": info.vectors_count,
                 "points_count": info.points_count,
                 "config": {
-                    "vector_size": info.config.params.vectors.size,
-                    "distance": info.config.params.vectors.distance,
+                    "vector_size": vector_size,
+                    "distance": vector_distance,
                 },
             }
         except Exception as e:

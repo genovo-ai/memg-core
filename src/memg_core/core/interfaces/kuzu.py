@@ -158,7 +158,8 @@ class KuzuInterface:
         """Execute Cypher query and return results"""
         try:
             qr = self.conn.execute(cypher, parameters=params or {})
-            df = qr.get_as_df()
+            # Add type ignore for the union return type issue
+            df = qr.get_as_df()  # type: ignore
             return df.to_dict("records") if not df.empty else []
         except Exception as e:
             raise DatabaseError(
