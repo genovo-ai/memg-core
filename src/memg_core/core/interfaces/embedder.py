@@ -18,8 +18,8 @@ class Embedder:
         """
 
         # Use env variable or default to the winner model
-        self.model_name = model_name or os.getenv(
-            "EMBEDDER_MODEL", "Snowflake/snowflake-arctic-embed-xs"
+        self.model_name = (
+            model_name or os.getenv("EMBEDDER_MODEL") or "Snowflake/snowflake-arctic-embed-xs"
         )
 
         self.model = TextEmbedding(model_name=self.model_name)
