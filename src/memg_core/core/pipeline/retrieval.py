@@ -117,7 +117,9 @@ def _rerank_with_vectors(
     results: list[SearchResult] = []
     for mem in candidates:
         score = score_by_id.get(mem.id, 0.5)  # default mid score if not found
-        results.append(SearchResult(memory=mem, score=score, distance=None, source="graph_rerank", metadata={}))
+        results.append(
+            SearchResult(memory=mem, score=score, distance=None, source="graph_rerank", metadata={})
+        )
 
     results.sort(key=lambda r: r.score, reverse=True)
     return results
