@@ -58,7 +58,7 @@ class QdrantInterface:
                 original_error=e,
             )
 
-    def create_collection(self, collection: str | None = None, vector_size: int = 768) -> bool:
+    def create_collection(self, collection: str | None = None, vector_size: int = 384) -> bool:
         """Create a new collection"""
         try:
             collection = collection or self.collection_name
@@ -83,7 +83,7 @@ class QdrantInterface:
                 original_error=e,
             )
 
-    def ensure_collection(self, collection: str | None = None, vector_size: int = 768) -> bool:
+    def ensure_collection(self, collection: str | None = None, vector_size: int = 384) -> bool:
         """Ensure collection exists, create if it doesn't"""
         collection = collection or self.collection_name
         if not self.collection_exists(collection):
@@ -152,7 +152,7 @@ class QdrantInterface:
             collection = collection or self.collection_name
 
             if not self.collection_exists(collection):
-                self.ensure_collection(collection, 768)
+                self.ensure_collection(collection, 384)
 
             # Build query filter
             query_filter = None

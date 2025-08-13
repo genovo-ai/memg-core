@@ -113,7 +113,7 @@ def _generate_conversation(rng: Random, i: int) -> str:
     a = rng.choice(
         [
             "Check Qdrant payload schema and index rebuild.",
-            "Set EMBEDDING_DIMENSION_LEN to 768 and re-embed.",
+            "Set EMBEDDING_DIMENSION_LEN to 384 and re-embed.",
             "Use /health on port 8787 in Docker.",
         ]
     )

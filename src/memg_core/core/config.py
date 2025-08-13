@@ -20,7 +20,7 @@ class MemGConfig:
     enable_temporal_reasoning: bool = False  # Enable temporal reasoning
 
     # Performance settings
-    vector_dimension: int = 768  # Embedding dimension
+    vector_dimension: int = 384  # Embedding dimension
     batch_processing_size: int = 50  # Batch size for bulk operations
 
     # Template settings
@@ -73,7 +73,7 @@ class MemGConfig:
                 "MEMG_ENABLE_AI_TYPE_VERIFICATION", "true"
             ).lower()
             == "true",
-            vector_dimension=int(os.getenv("EMBEDDING_DIMENSION_LEN", "768")),
+            vector_dimension=int(os.getenv("EMBEDDING_DIMENSION_LEN", "384")),
             batch_processing_size=int(os.getenv("MEMG_BATCH_SIZE", "50")),
             template_name=os.getenv("MEMG_TEMPLATE", "default"),
             qdrant_collection_name=os.getenv("MEMG_QDRANT_COLLECTION", "memories"),

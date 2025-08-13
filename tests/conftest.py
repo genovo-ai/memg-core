@@ -19,7 +19,7 @@ from memg_core.core.models import Memory, MemoryType
 class DummyEmbedder:
     """Test double for Embedder that returns deterministic vectors."""
 
-    def __init__(self, vector_size: int = 768):
+    def __init__(self, vector_size: int = 384):
         """Initialize with configurable vector size."""
         self.vector_size = vector_size
         # Skip parent initialization to avoid API key requirements
@@ -55,7 +55,7 @@ class FakeQdrant(QdrantInterface):
         collection = collection or self.collection_name
         return collection in self.collections
 
-    def create_collection(self, collection: Optional[str] = None, vector_size: int = 768) -> bool:
+    def create_collection(self, collection: Optional[str] = None, vector_size: int = 384) -> bool:
         """Create a new collection."""
         collection = collection or self.collection_name
         if collection not in self.collections:
@@ -63,7 +63,7 @@ class FakeQdrant(QdrantInterface):
             self.points[collection] = {}
         return True
 
-    def ensure_collection(self, collection: Optional[str] = None, vector_size: int = 768) -> bool:
+    def ensure_collection(self, collection: Optional[str] = None, vector_size: int = 384) -> bool:
         """Ensure collection exists, create if it doesn't."""
         collection = collection or self.collection_name
         if collection not in self.collections:
@@ -234,7 +234,7 @@ class FakeQdrant(QdrantInterface):
         points_count = len(self.points.get(collection, {}))
 
         # Get vector size from first point if available
-        vector_size = 768  # Default
+        vector_size = 384  # Default
         if points_count > 0:
             first_point_id = next(iter(self.points[collection]))
             vector_size = len(self.points[collection][first_point_id]["vector"])

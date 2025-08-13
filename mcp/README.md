@@ -61,7 +61,7 @@ MEMG_TEMPLATE=software_development
 # Storage & Performance
 BASE_MEMORY_PATH=$HOME/.local/share/memory_system
 QDRANT_COLLECTION=memories
-EMBEDDING_DIMENSION_LEN=768
+EMBEDDING_DIMENSION_LEN=384
 MEMORY_SYSTEM_DEBUG=false
 ```
 
