@@ -6,7 +6,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from ..interfaces.embedder import GenAIEmbedder
+from ..exceptions import DatabaseError
+from ..interfaces.embedder import Embedder
 from ..interfaces.kuzu import KuzuInterface
 from ..interfaces.qdrant import QdrantInterface
 from ..models import Memory, MemoryType, SearchResult
@@ -105,7 +106,7 @@ def _rerank_with_vectors(
     query: str,
     candidates: list[Memory],
     qdrant: QdrantInterface,
-    embedder: GenAIEmbedder,
+    embedder: Embedder,
 ) -> list[SearchResult]:
     """Rerank graph results using vector similarity"""
     qvec = embedder.get_embedding(query)
@@ -205,7 +206,7 @@ def graph_rag_search(
     limit: int,
     qdrant: QdrantInterface,
     kuzu: KuzuInterface,
-    embedder: GenAIEmbedder,
+    embedder: Embedder,
     filters: dict[str, Any] | None = None,
     relation_names: list[str] | None = None,
     neighbor_cap: int = 5,
@@ -227,11 +228,15 @@ def graph_rag_search(
         List of search results sorted by score
     """
     # 1) Graph candidate discovery
-    cypher, params = _build_graph_query(
-        query, user_id=user_id, limit=limit, relation_names=relation_names
-    )
-    rows = kuzu.query(cypher, params)
-    candidates = _rows_to_memories(rows)
+    try:
+        cypher, params = _build_graph_query(
+            query, user_id=user_id, limit=limit, relation_names=relation_names
+        )
+        rows = kuzu.query(cypher, params)
+        candidates = _rows_to_memories(rows)
+    except DatabaseError:
+        # If graph query fails (e.g., Entity table doesn't exist), skip to vector search
+        candidates = []
 
     # 2) Optional vector rerank if we have candidates
     results: list[SearchResult]

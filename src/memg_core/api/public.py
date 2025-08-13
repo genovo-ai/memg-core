@@ -8,7 +8,7 @@ from typing import Any
 
 from ..core.config import get_config
 from ..core.exceptions import ValidationError
-from ..core.interfaces.embedder import GenAIEmbedder
+from ..core.interfaces.embedder import Embedder
 from ..core.interfaces.kuzu import KuzuInterface
 from ..core.interfaces.qdrant import QdrantInterface
 from ..core.models import Memory, MemoryType, SearchResult
@@ -29,7 +29,7 @@ def _index_memory_with_optional_yaml(memory: Memory) -> str:
         collection_name=config.memg.qdrant_collection_name, storage_path=qdrant_path
     )
     kuzu = KuzuInterface(db_path=kuzu_path)
-    embedder = GenAIEmbedder()
+    embedder = Embedder()
 
     # Check if YAML plugin should provide index text override
     index_text_override = None
@@ -221,7 +221,7 @@ def search(
         collection_name=config.memg.qdrant_collection_name, storage_path=qdrant_path
     )
     kuzu = KuzuInterface(db_path=kuzu_path)
-    embedder = GenAIEmbedder()
+    embedder = Embedder()
 
     # Check if YAML schema is enabled to pass relation names
     relation_names = None

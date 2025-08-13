@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from ..exceptions import ProcessingError
 from ..indexing import build_index_text
-from ..interfaces.embedder import GenAIEmbedder
+from ..interfaces.embedder import Embedder
 from ..interfaces.kuzu import KuzuInterface
 from ..interfaces.qdrant import QdrantInterface
 from ..models import Memory
@@ -16,7 +16,7 @@ def add_memory_index(
     memory: Memory,
     qdrant: QdrantInterface,
     kuzu: KuzuInterface,
-    embedder: GenAIEmbedder,
+    embedder: Embedder,
     collection: str | None = None,
     index_text_override: str | None = None,
 ) -> str:
