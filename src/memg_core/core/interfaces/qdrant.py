@@ -1,0 +1,296 @@
+"""Simple Qdrant interface wrapper - pure I/O operations only"""
+
+import os
+from typing import Any
+import uuid
+
+from qdrant_client import QdrantClient
+from qdrant_client.models import (
+    Distance,
+    FieldCondition,
+    Filter,
+    MatchAny,
+    MatchValue,
+    PointStruct,
+    Range,
+    VectorParams,
+)
+
+from ..exceptions import DatabaseError, NetworkError
+
+
+class QdrantInterface:
+    """Simple wrapper around QdrantClient - CRUD and search only"""
+
+    def __init__(self, collection_name: str = "memories"):
+        # Use file-based storage - CRASH if no env variable set
+        storage_path = os.getenv("QDRANT_STORAGE_PATH")
+        if not storage_path:
+            raise RuntimeError(
+                "QDRANT_STORAGE_PATH environment variable must be set! No defaults allowed."
+            )
+
+        # Expand $HOME and ensure directory exists
+        storage_path = os.path.expandvars(storage_path)
+        os.makedirs(storage_path, exist_ok=True)
+
+        self.client = QdrantClient(path=storage_path)
+        self.collection_name = collection_name
+
+    def collection_exists(self, collection: str | None = None) -> bool:
+        """Check if collection exists"""
+        try:
+            collection = collection or self.collection_name
+            collections = self.client.get_collections()
+            return any(col.name == collection for col in collections.collections)
+        except (ConnectionError, TimeoutError) as e:
+            raise NetworkError(
+                "Failed to connect to Qdrant",
+                operation="collection_exists",
+                original_error=e,
+            )
+        except Exception as e:
+            raise DatabaseError(
+                "Qdrant collection_exists error",
+                operation="collection_exists",
+                original_error=e,
+            )
+
+    def create_collection(self, collection: str | None = None, vector_size: int = 768) -> bool:
+        """Create a new collection"""
+        try:
+            collection = collection or self.collection_name
+            if self.collection_exists(collection):
+                return True  # Already exists
+
+            self.client.create_collection(
+                collection_name=collection,
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+            )
+            return True
+        except (ConnectionError, TimeoutError) as e:
+            raise NetworkError(
+                "Failed to connect to Qdrant for collection creation",
+                operation="create_collection",
+                original_error=e,
+            )
+        except Exception as e:
+            raise DatabaseError(
+                "Qdrant create_collection error",
+                operation="create_collection",
+                original_error=e,
+            )
+
+    def ensure_collection(self, collection: str | None = None, vector_size: int = 768) -> bool:
+        """Ensure collection exists, create if it doesn't"""
+        collection = collection or self.collection_name
+        if not self.collection_exists(collection):
+            return self.create_collection(collection, vector_size)
+        return True
+
+    def add_point(
+        self,
+        vector: list[float],
+        payload: dict[str, Any],
+        point_id: str | None = None,
+        collection: str | None = None,
+    ) -> tuple[bool, str]:
+        """Add a single point to collection"""
+        try:
+            collection = collection or self.collection_name
+            self.ensure_collection(collection, len(vector))
+
+            if point_id is None:
+                point_id = str(uuid.uuid4())
+            elif not isinstance(point_id, str):
+                point_id = str(point_id)
+
+            point = PointStruct(id=point_id, vector=vector, payload=payload)
+            result = self.client.upsert(collection_name=collection, points=[point])
+
+            # Determine success from returned UpdateResult status
+            success = True
+            try:
+                status = getattr(result, "status", None)
+                if status is not None:
+                    status_str = (
+                        getattr(status, "value", None)
+                        or getattr(status, "name", None)
+                        or str(status)
+                    )
+                    status_str = str(status_str).lower()
+                    success = status_str in ("acknowledged", "completed")
+            except Exception:
+                success = True
+
+            return success, point_id
+        except (ConnectionError, TimeoutError) as e:
+            raise NetworkError(
+                "Failed to connect to Qdrant for point insertion",
+                operation="add_point",
+                original_error=e,
+            )
+        except Exception as e:
+            raise DatabaseError(
+                "Qdrant add_point error",
+                operation="add_point",
+                original_error=e,
+            )
+
+    def search_points(
+        self,
+        vector: list[float],
+        limit: int = 5,
+        collection: str | None = None,
+        user_id: str | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Search for similar points with optional filtering"""
+        try:
+            collection = collection or self.collection_name
+
+            if not self.collection_exists(collection):
+                self.ensure_collection(collection, 768)
+
+            # Build query filter
+            query_filter = None
+            filter_conditions = []
+
+            if user_id or filters:
+                # Add user_id filter
+                if user_id:
+                    filter_conditions.append(
+                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
+                    )
+
+                # Add additional filters
+                if filters:
+                    for key, value in filters.items():
+                        if value is None:
+                            continue
+                        # Handle range filters
+                        if isinstance(value, dict):
+                            range_kwargs = {}
+                            for bound_key in ("gt", "gte", "lt", "lte"):
+                                if bound_key in value and value[bound_key] is not None:
+                                    range_kwargs[bound_key] = value[bound_key]
+                            if range_kwargs:
+                                filter_conditions.append(
+                                    FieldCondition(key=key, range=Range(**range_kwargs))
+                                )
+                                continue
+                        # Handle list values
+                        if isinstance(value, list):
+                            filter_conditions.append(
+                                FieldCondition(key=key, match=MatchAny(any=value))
+                            )
+                        else:
+                            filter_conditions.append(
+                                FieldCondition(key=key, match=MatchValue(value=value))
+                            )
+
+                if filter_conditions:
+                    query_filter = Filter(must=filter_conditions)
+
+            # Search
+            results = self.client.search(
+                collection_name=collection,
+                query_vector=vector,
+                limit=limit,
+                query_filter=query_filter,
+            )
+
+            # Convert to simplified results
+            return [
+                {
+                    "id": str(result.id),
+                    "score": result.score,
+                    "payload": result.payload,
+                }
+                for result in results
+            ]
+        except (ConnectionError, TimeoutError) as e:
+            raise NetworkError(
+                "Failed to connect to Qdrant for search",
+                operation="search_points",
+                original_error=e,
+            )
+        except Exception as e:
+            raise DatabaseError(
+                "Qdrant search_points error",
+                operation="search_points",
+                original_error=e,
+            )
+
+    def get_point(self, point_id: str, collection: str | None = None) -> dict[str, Any] | None:
+        """Get a single point by ID"""
+        try:
+            collection = collection or self.collection_name
+
+            if not self.collection_exists(collection):
+                return None
+
+            result = self.client.retrieve(
+                collection_name=collection,
+                ids=[point_id],
+            )
+
+            if result:
+                point = result[0]
+                return {
+                    "id": str(point.id),
+                    "vector": point.vector,
+                    "payload": point.payload,
+                }
+            return None
+        except Exception as e:
+            raise DatabaseError(
+                "Qdrant get_point error",
+                operation="get_point",
+                original_error=e,
+            )
+
+    def delete_points(self, point_ids: list[str], collection: str | None = None) -> bool:
+        """Delete points by IDs"""
+        try:
+            collection = collection or self.collection_name
+
+            if not self.collection_exists(collection):
+                return True  # Nothing to delete
+
+            self.client.delete(
+                collection_name=collection,
+                points_selector={"points": point_ids},
+            )
+            return True
+        except Exception as e:
+            raise DatabaseError(
+                "Qdrant delete_points error",
+                operation="delete_points",
+                original_error=e,
+            )
+
+    def get_collection_info(self, collection: str | None = None) -> dict[str, Any]:
+        """Get collection information"""
+        try:
+            collection = collection or self.collection_name
+
+            if not self.collection_exists(collection):
+                return {"exists": False}
+
+            info = self.client.get_collection(collection_name=collection)
+            return {
+                "exists": True,
+                "vectors_count": info.vectors_count,
+                "points_count": info.points_count,
+                "config": {
+                    "vector_size": info.config.params.vectors.size,
+                    "distance": info.config.params.vectors.distance,
+                },
+            }
+        except Exception as e:
+            raise DatabaseError(
+                "Qdrant get_collection_info error",
+                operation="get_collection_info",
+                original_error=e,
+            )

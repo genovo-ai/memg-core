@@ -1,0 +1,1 @@
+# Interfaces module - storage adapters
