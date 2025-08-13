@@ -46,9 +46,6 @@ jobs:
     needs: quality
     if: startsWith(github.ref,'refs/tags/v')     # tags only
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write     # Trusted Publishing
-      contents: read
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -59,9 +56,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
           python -m build
-      - name: Publish to PyPI (Trusted Publishing)
+      - name: Publish to PyPI (Token-based)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
           print-hash: true
           skip-existing: true
           attestations: true
