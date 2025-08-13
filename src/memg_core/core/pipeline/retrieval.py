@@ -14,9 +14,13 @@ from ..models import Memory, MemoryType, SearchResult
 
 
 def _parse_datetime(date_str: Any) -> datetime:
-    """Parse a datetime string or return current time if None."""
+    """Parse a datetime string or return current time if None or invalid."""
     if date_str and isinstance(date_str, str):
-        return datetime.fromisoformat(date_str)
+        try:
+            return datetime.fromisoformat(date_str)
+        except (ValueError, TypeError):
+            # Fall back to current time for invalid dates
+            return datetime.now(UTC)
     return datetime.now(UTC)
 
 
@@ -59,10 +63,20 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
     results: list[Memory] = []
     for row in rows:
         raw_memory_type = row.get("m.memory_type", row.get("memory_type", "note"))
-        memory_type = MemoryType(raw_memory_type)
+        try:
+            memory_type = MemoryType(raw_memory_type)
+        except ValueError:
+            # Fall back to NOTE for invalid memory types
+            memory_type = MemoryType.NOTE
 
         created_at_raw = row.get("m.created_at", row.get("created_at"))
-        created_dt = datetime.fromisoformat(created_at_raw) if created_at_raw else datetime.now(UTC)
+        try:
+            created_dt = (
+                datetime.fromisoformat(created_at_raw) if created_at_raw else datetime.now(UTC)
+            )
+        except (ValueError, TypeError):
+            # Fall back to current time for invalid dates
+            created_dt = datetime.now(UTC)
 
         results.append(
             Memory(
@@ -137,7 +151,11 @@ def _append_neighbors(
         )
 
         for row in neighbors:
-            mtype = MemoryType(row.get("memory_type", "note"))
+            try:
+                mtype = MemoryType(row.get("memory_type", "note"))
+            except ValueError:
+                # Fall back to NOTE for invalid memory types
+                mtype = MemoryType.NOTE
 
             neighbor_memory = Memory(
                 id=row.get("id") or str(uuid4()),
@@ -234,7 +252,11 @@ def graph_rag_search(
         results = []
         for r in vec:
             payload = r.get("payload", {})
-            mtype = MemoryType(payload.get("memory_type", "note"))
+            try:
+                mtype = MemoryType(payload.get("memory_type", "note"))
+            except ValueError:
+                # Fall back to NOTE for invalid memory types
+                mtype = MemoryType.NOTE
 
             mem = Memory(
                 id=r.get("id") or str(uuid4()),

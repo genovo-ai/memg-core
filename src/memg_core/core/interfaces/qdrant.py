@@ -166,7 +166,9 @@ class QdrantInterface:
                             filter_conditions.append(
                                 FieldCondition(key=key, match=MatchAny(any=value))
                             )
-                        else:
+                        elif not isinstance(
+                            value, dict
+                        ):  # Skip dict values that weren't handled as ranges
                             filter_conditions.append(
                                 FieldCondition(key=key, match=MatchValue(value=value))
                             )
@@ -236,9 +238,11 @@ class QdrantInterface:
             if not self.collection_exists(collection):
                 return True  # Nothing to delete
 
+            from qdrant_client.models import PointIdsList
+
             self.client.delete(
                 collection_name=collection,
-                points_selector={"points": point_ids},
+                points_selector=PointIdsList(points=[str(pid) for pid in point_ids]),
             )
             return True
         except Exception as e:
