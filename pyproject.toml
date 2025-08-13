@@ -33,7 +33,7 @@ dependencies = [
  "pydantic>=2.11.7,<3.0.0",
  "pydantic-core>=2.33.0,<3.0.0",
  "python-dotenv>=1.0.1",
- "google-genai>=1.0.0", # Modern Google GenAI SDK
+ "fastembed>=0.4.0",  # Local embeddings - no API keys needed
   "pyyaml>=6.0.0",
  "typing-extensions>=4.12.0",
  "httpx>=0.28.0",
@@ -119,18 +119,16 @@ exclude = [
     "start_server.sh",
 ]
 
-# PYLINT CONFIGURATION - PREVENT GOOGLE-GENAI CONFUSION
+# PYLINT CONFIGURATION - CLEAN DEPENDENCIES
 [tool.pylint.main]
 # Add all required packages to recognized imports
 extension-pkg-allow-list = [
-    "google.genai",
-    "google",
     "kuzu",
     "qdrant_client",
     "pydantic",
-    "dotenv"
+    "dotenv",
+    "fastembed"
 ]
-ignored-modules = ["google.generativeai"] # Ignore the deprecated package
 
 # Only lint the src directory, not integration (has separate config)
 source-roots = ["src"]
@@ -188,14 +186,13 @@ fail-under = 9.5
 [tool.pylint.imports]
 # Declare all third-party packages
 known-third-party = [
-    "google",
-    "google.genai",
     "kuzu",
     "qdrant_client",
     "pydantic",
     "dotenv",
     "httpx",
     "typing_extensions",
+    "fastembed",
     "fastmcp",
     "uvicorn",
     "starlette"
@@ -211,7 +208,7 @@ python_version = "3.11"
 warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false  # Too strict for current codebase
-ignore_missing_imports = true # Ignore missing stubs for google-genai
+ignore_missing_imports = true # Ignore missing stubs for some packages
 no_implicit_optional = false  # Allow implicit Optional for now
 
 # BLACK CONFIGURATION
@@ -238,7 +235,7 @@ extend-exclude = '''
 profile = "black"
 multi_line_output = 3
 line_length = 88
-known_third_party = ["google", "google.genai", "qdrant_client", "kuzu", "fastmcp"]
+known_third_party = ["qdrant_client", "kuzu", "fastembed", "fastmcp"]
 
 # PYTEST CONFIGURATION
 [tool.pytest.ini_options]

@@ -40,7 +40,7 @@ disable=
 
 [IMPORTS]
 # Known third-party packages
-known-third-party=google,google.genai,kuzu,qdrant_client,pydantic,dotenv,httpx,typing_extensions,fastmcp,uvicorn,starlette
+known-third-party=kuzu,qdrant_client,pydantic,dotenv,httpx,typing_extensions,fastembed,fastmcp,uvicorn,starlette
 
 [DESIGN]
 # Reasonable limits for production code
