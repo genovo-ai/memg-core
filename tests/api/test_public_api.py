@@ -144,7 +144,7 @@ def test_search_plugin_absent_does_not_crash():
         with patch("memg_core.api.public.get_config") as mock_config, \
              patch("memg_core.api.public.QdrantInterface") as mock_qdrant, \
              patch("memg_core.api.public.KuzuInterface") as mock_kuzu, \
-             patch("memg_core.api.public.GenAIEmbedder") as mock_embedder, \
+             patch("memg_core.api.public.Embedder") as mock_embedder, \
              patch("memg_core.api.public.graph_rag_search") as mock_search, \
              patch("importlib.import_module") as mock_import:
 
@@ -197,7 +197,7 @@ def test_api_reads_neighbor_cap_env_and_passes_to_pipeline(monkeypatch):
     with patch("memg_core.api.public.get_config") as mock_config, \
          patch("memg_core.api.public.QdrantInterface") as mock_qdrant, \
          patch("memg_core.api.public.KuzuInterface") as mock_kuzu, \
-         patch("memg_core.api.public.GenAIEmbedder") as mock_embedder, \
+         patch("memg_core.api.public.Embedder") as mock_embedder, \
          patch("memg_core.api.public.graph_rag_search") as mock_search:
 
         # Configure mocks

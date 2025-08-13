@@ -10,14 +10,14 @@ from uuid import uuid4
 import pytest
 from pydantic import BaseModel
 
-from memg_core.core.interfaces.embedder import GenAIEmbedder
+from memg_core.core.interfaces.embedder import Embedder
 from memg_core.core.interfaces.kuzu import KuzuInterface
 from memg_core.core.interfaces.qdrant import QdrantInterface
 from memg_core.core.models import Memory, MemoryType
 
 
-class DummyEmbedder(GenAIEmbedder):
-    """Test double for GenAIEmbedder that returns deterministic vectors."""
+class DummyEmbedder:
+    """Test double for Embedder that returns deterministic vectors."""
 
     def __init__(self, vector_size: int = 768):
         """Initialize with configurable vector size."""

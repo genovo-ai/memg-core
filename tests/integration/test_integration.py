@@ -9,7 +9,7 @@ import os
 import pytest
 from datetime import UTC, datetime
 
-from memg_core.core.interfaces.embedder import GenAIEmbedder
+from memg_core.core.interfaces.embedder import Embedder
 from memg_core.core.interfaces.kuzu import KuzuInterface
 from memg_core.core.interfaces.qdrant import QdrantInterface
 from memg_core.core.models import Memory, MemoryType
@@ -20,9 +20,7 @@ from memg_core.core.pipeline.retrieval import graph_rag_search
 @pytest.mark.integration
 def test_index_and_search_with_real_qdrant():
     """Test indexing and searching with a real Qdrant instance."""
-    # Skip if no API key
-    if not os.environ.get("GOOGLE_API_KEY"):
-        pytest.skip("GOOGLE_API_KEY environment variable not set")
+    # No API key needed for FastEmbed - it's offline!
 
     # Skip if no Qdrant path
     if not os.environ.get("QDRANT_STORAGE_PATH"):
@@ -30,11 +28,11 @@ def test_index_and_search_with_real_qdrant():
 
     # Create real interfaces
     qdrant = QdrantInterface(collection_name="test_memories")
-    embedder = GenAIEmbedder()
+    embedder = Embedder()
 
     # Create a test memory
     memory = Memory(
-        id="test-integration-1",
+        id="12345678-1234-5678-1234-567812345678",  # Valid UUID format
         user_id="test-user",
         content="This is an integration test memory",
         memory_type=MemoryType.NOTE,
@@ -52,7 +50,7 @@ def test_index_and_search_with_real_qdrant():
         )
 
         assert success is True
-        assert point_id == "test-integration-1"
+        assert point_id == "12345678-1234-5678-1234-567812345678"
 
         # Search
         results = qdrant.search_points(
@@ -62,12 +60,12 @@ def test_index_and_search_with_real_qdrant():
         )
 
         assert len(results) > 0
-        assert results[0]["id"] == "test-integration-1"
+        assert results[0]["id"] == "12345678-1234-5678-1234-567812345678"
         assert results[0]["payload"]["content"] == "This is an integration test memory"
 
     finally:
         # Clean up
-        qdrant.delete_points(["test-integration-1"])
+                    qdrant.delete_points(["12345678-1234-5678-1234-567812345678"])
 
 
 @pytest.mark.integration

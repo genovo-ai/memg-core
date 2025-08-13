@@ -118,9 +118,9 @@ def test_search_raises_networkerror_on_connection_failure():
     """Test that search_points raises NetworkError on connection failure."""
     # Create a QdrantInterface with a mocked client
     with patch("memg_core.core.interfaces.qdrant.QdrantClient") as mock_client:
-        # Configure the mock to raise ConnectionError on search
+        # Configure the mock to raise ConnectionError on query_points
         mock_instance = MagicMock()
-        mock_instance.search.side_effect = ConnectionError("Connection failed")
+        mock_instance.query_points.side_effect = ConnectionError("Connection failed")
         mock_client.return_value = mock_instance
 
         qdrant = QdrantInterface(storage_path="/tmp/qdrant_test1")

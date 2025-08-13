@@ -51,7 +51,7 @@ def test_api_safe_plugin_import_missing():
         with patch("memg_core.api.public.get_config") as mock_config, \
              patch("memg_core.api.public.QdrantInterface") as mock_qdrant, \
              patch("memg_core.api.public.KuzuInterface") as mock_kuzu, \
-             patch("memg_core.api.public.GenAIEmbedder") as mock_embedder, \
+             patch("memg_core.api.public.Embedder") as mock_embedder, \
              patch("memg_core.api.public.graph_rag_search") as mock_search, \
              patch("importlib.import_module") as mock_import:
 
