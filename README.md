@@ -6,7 +6,7 @@
 
 - **Vector Search**: Fast semantic search with Qdrant
 - **Graph Storage**: Optional relationship analysis with Kuzu
-- **AI Integration**: Automated entity extraction with Google Gemini
+- **Offline-First**: 100% local embeddings with FastEmbed - no API keys needed
 - **MCP Compatible**: Ready-to-use MCP server for AI agents
 - **Lightweight**: Minimal dependencies, optimized for performance
 
@@ -14,9 +14,8 @@
 
 ### Option 1: Docker (Recommended)
 ```bash
-# 1. Create configuration
+# 1. Create configuration (no API key needed!)
 cp env.example .env
-# Edit .env and set your GOOGLE_API_KEY
 
 # 2. Run MEMG MCP Server (359MB)
 docker run -d \
@@ -32,12 +31,12 @@ curl http://localhost:8787/health
 ```bash
 pip install memg-core
 
-# Set up environment (for examples/tests)
-cp env.example .env
-# Edit .env and set your GOOGLE_API_KEY
+# Set up environment variables for storage paths
+export QDRANT_STORAGE_PATH="/path/to/qdrant"
+export KUZU_DB_PATH="/path/to/kuzu.db"
 
-# Use the core library in your app; the MCP server is provided via Docker image
-# Example usage shown below in the Usage section.
+# Use the core library in your app
+# Example usage shown below in the Usage section
 ```
 
 ### Development setup
@@ -60,16 +59,20 @@ PYTHONPATH=$(pwd)/src pytest -q
 ## Usage
 
 ```python
-from memg_core import add_memory, search_memories
-from memg_core.models.core import Memory, MemoryType
+from memg_core.api.public import add_note, add_document, add_task, search
 
 # Add a note
-note = Memory(user_id="u1", content="Python is great for AI", memory_type=MemoryType.NOTE)
-add_memory(note)
+note = add_note(
+    text="Set up Postgres with Docker for local development",
+    user_id="demo_user",
+    title="Docker Postgres Setup",
+    tags=["docker", "postgres", "dev"],
+)
 
-# Search
-import asyncio
-asyncio.run(search_memories("python ai", user_id="u1"))
+# Search (GraphRAG-first pipeline)
+results = search("postgres performance", user_id="demo_user", limit=5)
+for r in results:
+    print(f"[{r.memory.memory_type.value}] {r.memory.title} - Score: {r.score:.2f}")
 ```
 
 ### YAML registries (optional)
@@ -85,6 +88,16 @@ Enable:
 ```bash
 export MEMG_ENABLE_YAML_SCHEMA=true
 export MEMG_YAML_SCHEMA=$(pwd)/integration/config/core.minimal.yaml
+```
+
+## Embedding Configuration
+
+MEMG Core uses FastEmbed for 100% offline, local embeddings. By default, it uses the highly efficient Snowflake Arctic model:
+
+```bash
+# Optional: Configure a different FastEmbed model
+export EMBEDDER_MODEL="Snowflake/snowflake-arctic-embed-xs"  # Default
+# Other options: intfloat/e5-small, BAAI/bge-small-en-v1.5, etc.
 ```
 
 ## Evaluation
@@ -112,7 +125,7 @@ python scripts/evaluate_memg.py --data ./data/memg_synth.jsonl --mode offline
 Output summary includes rows, counts, and error/warning totals to track across iterations.
 
 ### 3) Live processing (embeddings + storage)
-Requires environment configured (e.g., `GOOGLE_API_KEY`) and storage reachable. It runs the Unified pipeline and validates the resulting memories.
+No API keys needed! Just ensure storage paths are set.
 ```bash
 python scripts/evaluate_memg.py --data ./data/memg_synth.jsonl --mode live
 ```
@@ -124,24 +137,23 @@ Tip: Commit the dataset and compare results over time in CI to catch regressions
 Configure via `.env` file (copy from `env.example`):
 
 ```bash
-# Required
-GOOGLE_API_KEY=your_google_api_key_here
-
 # Core settings
-GEMINI_MODEL=gemini-2.0-flash
 MEMORY_SYSTEM_MCP_PORT=8787
 MEMG_TEMPLATE=software_development
+
+# Embeddings (optional)
+EMBEDDER_MODEL=Snowflake/snowflake-arctic-embed-xs
 
 # Storage
 BASE_MEMORY_PATH=$HOME/.local/share/memory_system
 QDRANT_COLLECTION=memories
-EMBEDDING_DIMENSION_LEN=768
+EMBEDDING_DIMENSION_LEN=384
 ```
 
 ## Requirements
 
 - Python 3.11+
-- Google API key for Gemini
+- No API keys required!
 
 ## Links
 
