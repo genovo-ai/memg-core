@@ -2,7 +2,7 @@
 
 import os
 
-from google import genai
+from google import genai  # type: ignore
 
 from ..exceptions import NetworkError
 

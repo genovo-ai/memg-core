@@ -18,10 +18,17 @@ from ..core.pipeline.retrieval import graph_rag_search
 
 def _index_memory_with_optional_yaml(memory: Memory) -> str:
     """Helper to index a memory with optional YAML plugin support"""
-    # Initialize interfaces
+    # Initialize interfaces with explicit paths from config
     config = get_config()
-    qdrant = QdrantInterface(collection_name=config.memg.qdrant_collection_name)
-    kuzu = KuzuInterface(db_path=config.memg.kuzu_database_path)
+
+    # Get storage paths from environment (API layer responsibility)
+    qdrant_path = os.getenv("QDRANT_STORAGE_PATH")
+    kuzu_path = os.getenv("KUZU_DB_PATH", config.memg.kuzu_database_path)
+
+    qdrant = QdrantInterface(
+        collection_name=config.memg.qdrant_collection_name, storage_path=qdrant_path
+    )
+    kuzu = KuzuInterface(db_path=kuzu_path)
     embedder = GenAIEmbedder()
 
     # Check if YAML plugin should provide index text override
@@ -169,10 +176,17 @@ def search(
     if not user_id:
         raise ValidationError("User ID is required for search")
 
-    # Initialize interfaces
+    # Initialize interfaces with explicit paths from config
     config = get_config()
-    qdrant = QdrantInterface(collection_name=config.memg.qdrant_collection_name)
-    kuzu = KuzuInterface(db_path=config.memg.kuzu_database_path)
+
+    # Get storage paths from environment (API layer responsibility)
+    qdrant_path = os.getenv("QDRANT_STORAGE_PATH")
+    kuzu_path = os.getenv("KUZU_DB_PATH", config.memg.kuzu_database_path)
+
+    qdrant = QdrantInterface(
+        collection_name=config.memg.qdrant_collection_name, storage_path=qdrant_path
+    )
+    kuzu = KuzuInterface(db_path=kuzu_path)
     embedder = GenAIEmbedder()
 
     # Check if YAML schema is enabled to pass relation names

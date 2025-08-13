@@ -22,13 +22,15 @@ from ..exceptions import DatabaseError, NetworkError
 class QdrantInterface:
     """Simple wrapper around QdrantClient - CRUD and search only"""
 
-    def __init__(self, collection_name: str = "memories"):
-        # Use file-based storage - CRASH if no env variable set
-        storage_path = os.getenv("QDRANT_STORAGE_PATH")
-        if not storage_path:
-            raise RuntimeError(
-                "QDRANT_STORAGE_PATH environment variable must be set! No defaults allowed."
-            )
+    def __init__(self, collection_name: str = "memories", storage_path: str | None = None):
+        # Use provided storage path or read from env
+        if storage_path is None:
+            storage_path = os.getenv("QDRANT_STORAGE_PATH")
+            if not storage_path:
+                raise DatabaseError(
+                    "QDRANT_STORAGE_PATH environment variable must be set! No defaults allowed.",
+                    operation="__init__",
+                )
 
         # Expand $HOME and ensure directory exists
         storage_path = os.path.expandvars(storage_path)

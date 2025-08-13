@@ -4,29 +4,16 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from ..api.public import search
-from ..core.config import get_config
-from ..core.interfaces.embedder import GenAIEmbedder
-from ..core.interfaces.kuzu import KuzuInterface
-from ..core.interfaces.qdrant import QdrantInterface
 from ..core.models import MemoryType, SearchResult
 
 
 class MemoryRetriever:
     """Convenience wrapper for memory retrieval with specialized search methods"""
 
-    def __init__(
-        self,
-        qdrant_interface: QdrantInterface | None = None,
-        kuzu_interface: KuzuInterface | None = None,
-        embedder: GenAIEmbedder | None = None,
-    ):
-        """Initialize the Memory Retriever with optional interfaces"""
-        config = get_config()
-        self.qdrant = qdrant_interface or QdrantInterface(
-            collection_name=config.memg.qdrant_collection_name
-        )
-        self.kuzu = kuzu_interface or KuzuInterface(db_path=config.memg.kuzu_database_path)
-        self.embedder = embedder or GenAIEmbedder()
+    def __init__(self):
+        """Initialize the Memory Retriever - uses API layer for all operations"""
+        # No direct interface access - all operations go through API
+        pass
 
     def search_memories(
         self,
@@ -165,28 +152,17 @@ class MemoryRetriever:
     def get_category_stats(self, user_id: str) -> dict[str, int]:
         """Get memory count statistics by category
 
+        Note: This is a placeholder - direct database queries are not supported
+        in the showcase layer. Use the system info API for statistics.
+
         Args:
             user_id: User ID for filtering
 
         Returns:
-            Dictionary with memory type counts
+            Dictionary with memory type counts (placeholder implementation)
         """
-        # Query Kuzu for memory type counts
-        cypher = """
-        MATCH (m:Memory)
-        WHERE m.user_id = $user_id
-        RETURN m.memory_type as type, COUNT(*) as count
-        """
-
-        results = self.kuzu.query(cypher, {"user_id": user_id})
-
-        stats = {}
-        for row in results:
-            memory_type = row.get("type", "unknown")
-            count = row.get("count", 0)
-            stats[memory_type] = count
-
-        return stats
+        # Placeholder implementation - real stats would require system API
+        return {mt.value: 0 for mt in MemoryType}
 
     def list_categories(self) -> list[str]:
         """List available memory categories (types)"""
@@ -200,60 +176,17 @@ class MemoryRetriever:
     ) -> list[SearchResult]:
         """Expand search results with graph neighbors
 
+        Note: This is a placeholder - neighbor expansion is handled automatically
+        by the core search pipeline. This method just returns the original results.
+
         Args:
             results: Initial search results
             user_id: User ID for filtering
-            neighbor_limit: Max neighbors per result
+            neighbor_limit: Max neighbors per result (ignored)
 
         Returns:
-            Expanded list of SearchResult objects
+            Original results (neighbor expansion handled by core pipeline)
         """
-        expanded = []
-        seen_ids = {r.memory.id for r in results}
-
-        for result in results[:5]:  # Limit to top 5 for expansion
-            if not result.memory.id:
-                continue
-
-            # Get neighbors from graph
-            neighbors = self.kuzu.neighbors(
-                node_label="Memory",
-                node_id=result.memory.id,
-                limit=neighbor_limit,
-                neighbor_label="Memory",
-            )
-
-            for neighbor in neighbors:
-                neighbor_id = neighbor.get("id")
-                if neighbor_id and neighbor_id not in seen_ids:
-                    # Create minimal memory from neighbor data
-                    from ..core.models import Memory
-
-                    memory = Memory(
-                        id=neighbor_id,
-                        user_id=neighbor.get("user_id", user_id),
-                        content=neighbor.get("content", ""),
-                        memory_type=MemoryType(neighbor.get("memory_type", "note")),
-                        title=neighbor.get("title"),
-                        created_at=(
-                            datetime.fromisoformat(neighbor.get("created_at"))
-                            if neighbor.get("created_at")
-                            else datetime.now(UTC)
-                        ),
-                    )
-
-                    expanded.append(
-                        SearchResult(
-                            memory=memory,
-                            score=result.score * 0.8,  # Slightly lower score for neighbors
-                            source="graph_neighbor",
-                            metadata={"expanded_from": result.memory.id},
-                        )
-                    )
-                    seen_ids.add(neighbor_id)
-
-        # Combine and sort by score
-        all_results = results + expanded
-        all_results.sort(key=lambda r: r.score, reverse=True)
-
-        return all_results
+        # The core pipeline already handles neighbor expansion
+        # This method is kept for API compatibility but does nothing
+        return results
