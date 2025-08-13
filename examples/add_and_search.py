@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from memg_core import api
+from memg_core.api.public import add_note, add_document, add_task, search
 
 
 def main():
@@ -19,7 +19,7 @@ def main():
     print("=== Adding memories using minimal API ===")
 
     # Add a note
-    note = api.add_note(
+    note = add_note(
         text="Set up Postgres with Docker for local development",
         user_id=user,
         title="Docker Postgres Setup",
@@ -28,7 +28,7 @@ def main():
     print(f"✓ Added note: {note.id} - {note.title}")
 
     # Add a document
-    doc = api.add_document(
+    doc = add_document(
         text="PostgreSQL tuning guide covering indexing, vacuum settings, connection pooling, and performance monitoring...",
         user_id=user,
         title="PostgreSQL Performance Guide",
@@ -38,7 +38,7 @@ def main():
     print(f"✓ Added document: {doc.id} - {doc.title}")
 
     # Add a task
-    task = api.add_task(
+    task = add_task(
         text="Implement Redis cache layer for user sessions and frequently accessed data",
         user_id=user,
         title="Cache Implementation",
@@ -52,7 +52,7 @@ def main():
     print("\n=== Searching memories (GraphRAG-first) ===")
 
     # Search for postgres-related memories
-    results = api.search("postgres performance", user_id=user, limit=5)
+    results = search("postgres performance", user_id=user, limit=5)
     print(f"Found {len(results)} results for 'postgres performance':")
 
     for i, r in enumerate(results, 1):
@@ -67,7 +67,7 @@ def main():
 
     # Search for cache-related memories
     print("=== Searching for 'cache' ===")
-    cache_results = api.search("cache", user_id=user, limit=3)
+    cache_results = search("cache", user_id=user, limit=3)
     print(f"Found {len(cache_results)} results for 'cache':")
 
     for i, r in enumerate(cache_results, 1):
