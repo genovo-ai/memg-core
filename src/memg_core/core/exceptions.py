@@ -40,12 +40,6 @@ class DatabaseError(MemorySystemError):
     pass
 
 
-class NetworkError(MemorySystemError):
-    """Network/API operation failures (embeddings, external APIs)"""
-
-    pass
-
-
 class ValidationError(MemorySystemError):
     """Data validation failures (schema, input format)"""
 
@@ -65,13 +59,6 @@ def wrap_exception(
     error_message = str(original_error)
 
     # Map common exceptions to our hierarchy
-    if isinstance(original_error, (ConnectionError, TimeoutError)):
-        return NetworkError(
-            f"Network operation failed: {error_message}",
-            operation=operation,
-            context=context,
-            original_error=original_error,
-        )
 
     if isinstance(original_error, (FileNotFoundError, PermissionError)):
         return DatabaseError(

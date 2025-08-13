@@ -16,7 +16,7 @@ from qdrant_client.models import (
     VectorParams,
 )
 
-from ..exceptions import DatabaseError, NetworkError
+from ..exceptions import DatabaseError
 
 
 class QdrantInterface:
@@ -45,12 +45,7 @@ class QdrantInterface:
             collection = collection or self.collection_name
             collections = self.client.get_collections()
             return any(col.name == collection for col in collections.collections)
-        except (ConnectionError, TimeoutError) as e:
-            raise NetworkError(
-                "Failed to connect to Qdrant",
-                operation="collection_exists",
-                original_error=e,
-            )
+
         except Exception as e:
             raise DatabaseError(
                 "Qdrant collection_exists error",
@@ -70,12 +65,7 @@ class QdrantInterface:
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
             )
             return True
-        except (ConnectionError, TimeoutError) as e:
-            raise NetworkError(
-                "Failed to connect to Qdrant for collection creation",
-                operation="create_collection",
-                original_error=e,
-            )
+
         except Exception as e:
             raise DatabaseError(
                 "Qdrant create_collection error",
@@ -112,26 +102,16 @@ class QdrantInterface:
 
             # Determine success from returned UpdateResult status
             success = True
-            try:
-                status = getattr(result, "status", None)
-                if status is not None:
-                    status_str = (
-                        getattr(status, "value", None)
-                        or getattr(status, "name", None)
-                        or str(status)
-                    )
-                    status_str = str(status_str).lower()
-                    success = status_str in ("acknowledged", "completed")
-            except Exception:
-                success = True
+            status = getattr(result, "status", None)
+            if status is not None:
+                status_str = (
+                    getattr(status, "value", None) or getattr(status, "name", None) or str(status)
+                )
+                status_str = str(status_str).lower()
+                success = status_str in ("acknowledged", "completed")
 
             return success, point_id
-        except (ConnectionError, TimeoutError) as e:
-            raise NetworkError(
-                "Failed to connect to Qdrant for point insertion",
-                operation="add_point",
-                original_error=e,
-            )
+
         except Exception as e:
             raise DatabaseError(
                 "Qdrant add_point error",
@@ -212,12 +192,7 @@ class QdrantInterface:
                 }
                 for result in results
             ]
-        except (ConnectionError, TimeoutError) as e:
-            raise NetworkError(
-                "Failed to connect to Qdrant for search",
-                operation="search_points",
-                original_error=e,
-            )
+
         except Exception as e:
             raise DatabaseError(
                 "Qdrant search_points error",

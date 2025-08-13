@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 pytestmark = pytest.mark.adapter
 
-from memg_core.core.exceptions import DatabaseError, NetworkError
+from memg_core.core.exceptions import DatabaseError
 from memg_core.core.interfaces.qdrant import QdrantInterface
 
 
@@ -115,7 +115,7 @@ def test_delete_point_removes_document(qdrant_fake):
 
 
 def test_search_raises_networkerror_on_connection_failure():
-    """Test that search_points raises NetworkError on connection failure."""
+    """Test that search_points raises DatabaseError on connection failure."""
     # Create a QdrantInterface with a mocked client
     with patch("memg_core.core.interfaces.qdrant.QdrantClient") as mock_client:
         # Configure the mock to raise ConnectionError on query_points
@@ -126,7 +126,7 @@ def test_search_raises_networkerror_on_connection_failure():
         qdrant = QdrantInterface(storage_path="/tmp/qdrant_test1")
 
         # Attempt to search
-        with pytest.raises(NetworkError) as exc_info:
+        with pytest.raises(DatabaseError) as exc_info:
             qdrant.search_points(vector=[0.1, 0.2, 0.3])
 
         assert "Connection failed" in str(exc_info.value)

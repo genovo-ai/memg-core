@@ -13,13 +13,10 @@ from ..interfaces.qdrant import QdrantInterface
 from ..models import Memory, MemoryType, SearchResult
 
 
-def _safe_parse_datetime(date_str: Any) -> datetime:
-    """Safely parse a datetime string or return current time."""
+def _parse_datetime(date_str: Any) -> datetime:
+    """Parse a datetime string or return current time if None."""
     if date_str and isinstance(date_str, str):
-        try:
-            return datetime.fromisoformat(date_str)
-        except (ValueError, TypeError):
-            pass
+        return datetime.fromisoformat(date_str)
     return datetime.now(UTC)
 
 
@@ -62,19 +59,10 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
     results: list[Memory] = []
     for row in rows:
         raw_memory_type = row.get("m.memory_type", row.get("memory_type", "note"))
-        try:
-            memory_type = MemoryType(raw_memory_type)
-        except ValueError:
-            memory_type = MemoryType.NOTE
+        memory_type = MemoryType(raw_memory_type)
 
         created_at_raw = row.get("m.created_at", row.get("created_at"))
-        if created_at_raw:
-            try:
-                created_dt = datetime.fromisoformat(created_at_raw)
-            except ValueError:
-                created_dt = datetime.now(UTC)
-        else:
-            created_dt = datetime.now(UTC)
+        created_dt = datetime.fromisoformat(created_at_raw) if created_at_raw else datetime.now(UTC)
 
         results.append(
             Memory(
@@ -149,10 +137,7 @@ def _append_neighbors(
         )
 
         for row in neighbors:
-            try:
-                mtype = MemoryType(row.get("memory_type", "note"))
-            except ValueError:
-                mtype = MemoryType.NOTE
+            mtype = MemoryType(row.get("memory_type", "note"))
 
             neighbor_memory = Memory(
                 id=row.get("id") or str(uuid4()),
@@ -165,7 +150,7 @@ def _append_neighbors(
                 confidence=0.8,
                 vector=None,
                 is_valid=True,
-                created_at=_safe_parse_datetime(row.get("created_at")),
+                created_at=_parse_datetime(row.get("created_at")),
                 expires_at=None,
                 supersedes=None,
                 superseded_by=None,
@@ -249,10 +234,7 @@ def graph_rag_search(
         results = []
         for r in vec:
             payload = r.get("payload", {})
-            try:
-                mtype = MemoryType(payload.get("memory_type", "note"))
-            except ValueError:
-                mtype = MemoryType.NOTE
+            mtype = MemoryType(payload.get("memory_type", "note"))
 
             mem = Memory(
                 id=r.get("id") or str(uuid4()),

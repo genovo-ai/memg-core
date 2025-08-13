@@ -11,7 +11,6 @@ from memg_core.core.exceptions import (
     ConfigurationError,
     DatabaseError,
     MemorySystemError,
-    NetworkError,
     ProcessingError,
     ValidationError,
     wrap_exception,
@@ -37,12 +36,12 @@ def test_wrap_exception_maps_valueerror_to_validationerror():
 
 
 def test_wrap_exception_maps_connection_error_to_networkerror():
-    """Test that wrap_exception maps ConnectionError to NetworkError."""
-    original_error = ConnectionError("Connection failed")
+    """Test that wrap_exception maps FileNotFoundError to DatabaseError."""
+    original_error = FileNotFoundError("Database file not found")
     wrapped_error = wrap_exception(original_error, "test_operation")
 
-    assert isinstance(wrapped_error, NetworkError)
-    assert "Connection failed" in str(wrapped_error)
+    assert isinstance(wrapped_error, DatabaseError)
+    assert "Database file not found" in str(wrapped_error)
     assert wrapped_error.operation == "test_operation"
     assert wrapped_error.original_error is original_error
 

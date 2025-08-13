@@ -121,11 +121,4 @@ DEFAULT_SYSTEM_CONFIG = MemorySystemConfig()
 
 def get_config() -> MemorySystemConfig:
     """Get system configuration, preferring environment variables"""
-    try:
-        return MemorySystemConfig.from_env()
-    except Exception as e:
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to load config from environment: {e}")
-        return DEFAULT_SYSTEM_CONFIG
+    return MemorySystemConfig.from_env()
