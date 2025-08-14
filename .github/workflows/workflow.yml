@@ -47,37 +47,55 @@ jobs:
           KUZU_DB_PATH: temp_data/kuzu/ci_test.db
         run: python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
 
-  pypi:
+  build:
     needs: quality
-    # Run on any push to main branch
+    # Build wheel for download (PyPI publishing temporarily disabled)
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write  # Required for trusted publishing
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: actions/setup-python@v5
         with: { python-version: '3.11', cache: 'pip' }
-      - name: Build
+      - name: Build wheel and sdist
         run: |
           python -m pip install --upgrade pip
           pip install build
           python -m build
-      - name: Publish to PyPI (Trusted Publishing)
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          print-hash: true
-          skip-existing: true
-          attestations: true
-      - name: Upload wheel artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/*
+          path: dist
+          retention-days: 30
+      - name: Show build info
+        run: |
+          echo "Build completed successfully!"
+          echo "Wheel files:"
+          ls -la dist/
+          echo ""
+          echo "To download: Go to Actions > This workflow run > Artifacts section"
+
+  # PyPI publishing temporarily disabled for faster development
+  # To re-enable: uncomment this job and change mcp-image dependency below
+  # pypi:
+  #   needs: build
+  #   if: github.ref == 'refs/heads/main'
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     id-token: write  # Required for trusted publishing
+  #   steps:
+  #     - uses: actions/download-artifact@v4
+  #       with:
+  #         name: dist
+  #         path: dist
+  #     - name: Publish to PyPI (Trusted Publishing)
+  #       uses: pypa/gh-action-pypi-publish@release/v1
+  #       with:
+  #         print-hash: true
 
   mcp-image:
-    needs: pypi
+    needs: build  # Changed from pypi since PyPI publishing is disabled
     # Run on any push to main branch
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
