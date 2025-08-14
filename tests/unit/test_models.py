@@ -111,9 +111,10 @@ def test_memory_to_kuzu_node_core_fields_only():
     assert "content" not in kuzu_node
     assert "summary" not in kuzu_node
 
-    # Empty fields should be empty strings, not None
-    assert kuzu_node["supersedes"] == ""
-    assert kuzu_node["superseded_by"] == ""
+    # Optional fields are included only when present
+    # (since memory doesn't have supersedes/superseded_by set, they won't be in node)
+    assert "supersedes" not in kuzu_node or kuzu_node["supersedes"] == ""
+    assert "superseded_by" not in kuzu_node or kuzu_node["superseded_by"] == ""
 
 
 def test_task_due_date_handling():

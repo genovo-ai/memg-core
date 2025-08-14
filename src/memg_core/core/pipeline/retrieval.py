@@ -151,12 +151,32 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
         else:
             tags = list(tags_raw)
 
+        # Build payload from available row fields
+        payload = {"statement": statement}
+
+        # Include other available fields in payload
+        title = row.get("m.title") or row.get("title")
+        if title:
+            payload["title"] = title
+
+        summary = row.get("m.summary") or row.get("summary")
+        if summary:
+            payload["summary"] = summary
+
+        task_status = row.get("m.task_status") or row.get("task_status")
+        if task_status:
+            payload["task_status"] = task_status
+
+        assignee = row.get("m.assignee") or row.get("assignee")
+        if assignee:
+            payload["assignee"] = assignee
+
         out.append(
             Memory(
                 id=row.get("m.id") or row.get("id") or str(uuid4()),
                 user_id=row.get("m.user_id") or row.get("user_id", ""),
                 memory_type=mtype,
-                payload={"statement": statement},
+                payload=payload,
                 tags=tags,
                 confidence=0.8,
                 is_valid=True,

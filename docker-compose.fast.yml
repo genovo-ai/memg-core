@@ -1,11 +1,12 @@
 version: '3.8'
 
 services:
-  ci-runner:
+  # Fast CI runner using Python base image
+  ci-runner-fast:
     build:
       context: .
-      dockerfile: Dockerfile.ci
-    container_name: memg-ci-runner
+      dockerfile: Dockerfile.ci-fast
+    container_name: memg-ci-runner-fast
     volumes:
       # Mount source for live development
       - ./src:/workspace/src
@@ -14,16 +15,16 @@ services:
       - ./requirements.txt:/workspace/requirements.txt
       - ./requirements-dev.txt:/workspace/requirements-dev.txt
       # Mount temp data for persistence
-      - ci-qdrant-data:/workspace/temp_data/qdrant
-      - ci-kuzu-data:/workspace/temp_data/kuzu
+      - ci-fast-qdrant-data:/workspace/temp_data/qdrant
+      - ci-fast-kuzu-data:/workspace/temp_data/kuzu
     environment:
       - PYTHONPATH=/workspace/src
       - QDRANT_STORAGE_PATH=/workspace/temp_data/qdrant
       - KUZU_DB_PATH=/workspace/temp_data/kuzu/ci_test.db
     command: >
       bash -c "
-        echo '🐳 MEMG Core - Local CI Pipeline' &&
-        echo '=================================' &&
+        echo '🚀 MEMG Core - Fast CI Pipeline' &&
+        echo '================================' &&
         echo '' &&
         echo '📋 Environment Info:' &&
         echo '  Python: $$(python --version)' &&
@@ -49,20 +50,20 @@ services:
         echo '🧪 Step 5: Running Test Suite' &&
         python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing &&
         echo '' &&
-        echo '🎉 LOCAL CI PIPELINE COMPLETED SUCCESSFULLY!' &&
+        echo '🎉 FAST CI PIPELINE COMPLETED SUCCESSFULLY!' &&
         echo '   All checks passed - ready for GitHub CI! 🚀'
       "
 
-  # Interactive development container
-  ci-dev:
+  # Interactive fast development container
+  ci-dev-fast:
     build:
       context: .
-      dockerfile: Dockerfile.ci
-    container_name: memg-ci-dev
+      dockerfile: Dockerfile.ci-fast
+    container_name: memg-ci-dev-fast
     volumes:
       - ./:/workspace
-      - ci-qdrant-data:/workspace/temp_data/qdrant
-      - ci-kuzu-data:/workspace/temp_data/kuzu
+      - ci-fast-qdrant-data:/workspace/temp_data/qdrant
+      - ci-fast-kuzu-data:/workspace/temp_data/kuzu
     environment:
       - PYTHONPATH=/workspace/src
       - QDRANT_STORAGE_PATH=/workspace/temp_data/qdrant
@@ -71,28 +72,26 @@ services:
     stdin_open: true
     tty: true
 
-  # FastAPI development server
-  api-server:
+  # Fast FastAPI development server
+  api-server-fast:
     build:
       context: .
-      dockerfile: Dockerfile.ci
-    container_name: memg-api-server
+      dockerfile: Dockerfile.ci-fast
+    container_name: memg-api-server-fast
     ports:
       - "8000:8000"
     volumes:
       - ./src:/workspace/src
       - ./tests:/workspace/tests
-      - ci-qdrant-data:/workspace/temp_data/qdrant
-      - ci-kuzu-data:/workspace/temp_data/kuzu
+      - ci-fast-qdrant-data:/workspace/temp_data/qdrant
+      - ci-fast-kuzu-data:/workspace/temp_data/kuzu
     environment:
       - PYTHONPATH=/workspace/src
       - QDRANT_STORAGE_PATH=/workspace/temp_data/qdrant
       - KUZU_DB_PATH=/workspace/temp_data/kuzu/api_test.db
-      - MEMG_API_HOST=0.0.0.0
-      - MEMG_API_PORT=8000
     command: >
       bash -c "
-        echo '🚀 Starting MEMG Core FastAPI Server...' &&
+        echo '🚀 Starting MEMG Core FastAPI Server (Fast Build)...' &&
         echo 'API will be available at: http://localhost:8000' &&
         echo 'Docs available at: http://localhost:8000/docs' &&
         echo 'Health check: http://localhost:8000/health' &&
@@ -106,5 +105,5 @@ services:
       retries: 3
 
 volumes:
-  ci-qdrant-data:
-  ci-kuzu-data:
+  ci-fast-qdrant-data:
+  ci-fast-kuzu-data:

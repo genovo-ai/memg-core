@@ -231,13 +231,19 @@ def add_memory(
     if not payload:
         raise ValidationError("Payload cannot be empty")
 
-    # Merge tags without mutating original
-    if tags:
-        payload = dict(payload)
-        existing = payload.get("tags", [])
-        payload["tags"] = list({*existing, *tags})
+    # Normalize tags early to a list[str]
+    norm_tags: list[str] = [t for t in (tags or []) if isinstance(t, str) and t.strip()]
+    if norm_tags:
+        # keep a copy in payload for callers/tests that look there
+        payload = dict(payload)  # shallow copy to avoid mutating caller dict
+        payload.setdefault("tags", norm_tags)
 
+    # Build the Memory via YAML translator (validates payload)
     memory = create_memory_from_yaml(memory_type.strip(), payload, user_id)
+
+    # TEMP back-compat: ensure top-level Memory.tags reflects API input
+    if norm_tags:
+        memory.tags = norm_tags
 
     # Index and attach id
     memory.id = _index_memory_with_optional_yaml(memory)

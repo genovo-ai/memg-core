@@ -443,7 +443,7 @@ def mem_factory() -> Callable[..., Memory]:
             "user_id": "test-user",
             "memory_type": "note",
             "payload": {
-                "content": "Test memory content",
+                "statement": "Test memory content",  # Current core expects statement for notes
                 "title": "Test Title",
                 "source": "user",
             },

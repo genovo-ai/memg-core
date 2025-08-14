@@ -34,9 +34,11 @@ def test_index_and_search_with_real_qdrant():
     memory = Memory(
         id="12345678-1234-5678-1234-567812345678",  # Valid UUID format
         user_id="test-user",
-        content="This is an integration test memory",
         memory_type="note",
-        title="Integration Test",
+        payload={
+            "statement": "This is an integration test memory",  # Current core uses payload.statement
+            "title": "Integration Test",
+        },
         created_at=datetime.now(UTC),
     )
 

@@ -1,36 +1,12 @@
-# Dockerfile.ci - Exact replica of GitHub Actions Ubuntu environment
-FROM ubuntu:22.04
+# Dockerfile.ci-fast - Faster build using Python base image (still matches CI environment)
+FROM python:3.11-slim-bullseye
 
-# Prevent interactive prompts during package installation
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install system dependencies matching GitHub Actions runner
+# Install system dependencies (minimal set)
 RUN apt-get update && apt-get install -y \
-    software-properties-common \
     curl \
-    wget \
     git \
     build-essential \
-    libssl-dev \
-    libffi-dev \
-    python3-dev \
-    python3-pip \
-    python3-venv \
-    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Python 3.11 (matching CI)
-RUN add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set Python 3.11 as default
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
-    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
-
-# Install pip for Python 3.11
-RUN curl https://bootstrap.pypa.io/get-pip.py | python3.11
 
 # Set working directory
 WORKDIR /workspace
@@ -38,7 +14,7 @@ WORKDIR /workspace
 # Copy requirements first for better Docker layer caching
 COPY requirements.txt requirements-dev.txt pyproject.toml ./
 
-# Install dependencies exactly like CI workflow
+# Install Python dependencies (same as CI workflow)
 RUN python -m pip install --upgrade pip && \
     pip install -r requirements.txt && \
     pip install ruff bandit mypy pylint pytest pytest-cov types-PyYAML fastapi fastembed uvicorn
@@ -58,7 +34,7 @@ COPY . .
 RUN pip install -e ".[dev]"
 
 # Default command runs the full CI pipeline
-CMD ["bash", "-c", "echo '🐳 Starting local CI pipeline...' && \
+CMD ["bash", "-c", "echo '🐳 Starting fast CI pipeline...' && \
      echo '1️⃣ Security scan...' && \
      bandit -r src/ -f json -o bandit-report.json && \
      echo '2️⃣ Code formatting...' && \
@@ -69,4 +45,4 @@ CMD ["bash", "-c", "echo '🐳 Starting local CI pipeline...' && \
      mypy src/ --ignore-missing-imports && \
      echo '5️⃣ Running tests...' && \
      python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing && \
-     echo '✅ Local CI pipeline completed successfully!'"]
+     echo '✅ Fast CI pipeline completed successfully!'"]

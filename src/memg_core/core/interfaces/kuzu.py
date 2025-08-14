@@ -74,6 +74,10 @@ class KuzuInterface:
                         expires_at STRING,
                         supersedes STRING,
                         superseded_by STRING,
+                        hrid STRING,
+                        statement STRING,
+                        task_status STRING,
+                        assignee STRING,
                         PRIMARY KEY (id)
                     )
                 """

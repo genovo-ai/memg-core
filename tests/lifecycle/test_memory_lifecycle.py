@@ -84,40 +84,46 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
     memory = mem_factory(
         id="memory-1",
         user_id="test-user",
-        content="Initial content",
         memory_type="note",
-        title="Initial Title",
+        payload={
+            "statement": "Initial content",  # Current core uses payload.statement
+            "title": "Initial Title",
+        },
     )
 
     # Add to index
     add_memory_index(memory, qdrant_fake, kuzu_fake, embedder)
 
-    # Verify initial state
+    # Verify initial state - check current payload structure
     qdrant_point = qdrant_fake.get_point("memory-1")
-    assert qdrant_point["payload"]["content"] == "Initial content"
-    assert qdrant_point["payload"]["title"] == "Initial Title"
+    assert qdrant_point["payload"]["entity"]["statement"] == "Initial content"
+    assert qdrant_point["payload"]["entity"]["title"] == "Initial Title"
 
     kuzu_node = kuzu_fake.nodes["Memory"]["memory-1"]
-    assert kuzu_node["content"] == "Initial content"
+    # Current core doesn't store content in Kuzu, only title
+    assert "content" not in kuzu_node
     assert kuzu_node["title"] == "Initial Title"
 
     # Update memory with same ID
     updated_memory = mem_factory(
         id="memory-1",
         user_id="test-user",
-        content="Updated content",
         memory_type="note",
-        title="Updated Title",
+        payload={
+            "statement": "Updated content",  # Current core uses payload.statement
+            "title": "Updated Title",
+        },
     )
 
     # Re-add to index
     add_memory_index(updated_memory, qdrant_fake, kuzu_fake, embedder)
 
-    # Verify updated state
+    # Verify updated state - check current payload structure
     qdrant_point = qdrant_fake.get_point("memory-1")
-    assert qdrant_point["payload"]["content"] == "Updated content"
-    assert qdrant_point["payload"]["title"] == "Updated Title"
+    assert qdrant_point["payload"]["entity"]["statement"] == "Updated content"
+    assert qdrant_point["payload"]["entity"]["title"] == "Updated Title"
 
     kuzu_node = kuzu_fake.nodes["Memory"]["memory-1"]
-    assert kuzu_node["content"] == "Updated content"
+    # Current core doesn't store content in Kuzu, only title
+    assert "content" not in kuzu_node
     assert kuzu_node["title"] == "Updated Title"
