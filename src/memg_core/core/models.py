@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Memory(BaseModel):
@@ -32,23 +32,38 @@ class Memory(BaseModel):
             raise ValueError("memory_type cannot be empty")
         return v.strip()
 
-    # Back-compat convenience properties for tests/tools
+    @model_validator(mode="before")
+    @classmethod
+    def _merge_top_level_into_payload(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """
+        TEMP back-compat: Some tests construct Memory() with top-level fields
+        like content/title/assignee. Mirror them into payload for now.
+        Remove once all callers are updated to use payload directly.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        payload = data.get("payload") or {}
+        if not isinstance(payload, dict):
+            payload = {}
+
+        for key in ("content", "statement", "title", "task_status", "assignee"):
+            if key in data and data[key] is not None and key not in payload:
+                payload[key] = data[key]
+
+        data["payload"] = payload
+        return data
+
     @property
     def content(self) -> str | None:
-        """
-        Back-compat convenience for tests and old callers.
-        Prefer 'details' (documents), then 'content', then 'statement' (notes/tasks).
-        """
+        """TEMP back-compat: allow .content even if only in payload."""
         entity = self.payload or {}
         return entity.get("details") or entity.get("content") or entity.get("statement")
 
     @property
     def title(self) -> str | None:
-        """
-        Back-compat convenience to expose title at the top level.
-        """
-        entity = self.payload or {}
-        return entity.get("title")
+        """TEMP back-compat: allow .title even if only in payload."""
+        return (self.payload or {}).get("title")
 
     @property
     def summary(self) -> str | None:
@@ -87,33 +102,25 @@ class Memory(BaseModel):
         return payload
 
     def to_kuzu_node(self) -> dict[str, Any]:
-        # Flatten selected, queryable fields for graph queries
+        """
+        Core Kuzu node: minimal metadata.
+        TEMP back-compat: also include assignee & tags as comma string for tests.
+        """
+        entity = self.payload or {}
         node = {
             "id": self.id,
             "user_id": self.user_id,
             "memory_type": self.memory_type,
-            "created_at": self.created_at.isoformat(),
-            "is_valid": self.is_valid,
             "tags": ",".join(self.tags) if isinstance(self.tags, list) else (self.tags or ""),
-            "confidence": self.confidence,
         }
-        if self.hrid:
-            node["hrid"] = self.hrid
-
-        # Make statement/title and a few common task fields directly filterable
-        stmt = self.payload.get("statement")
-        if isinstance(stmt, str) and stmt:
-            node["statement"] = stmt
-
-        title = self.payload.get("title")
-        if isinstance(title, str) and title:
-            node["title"] = title
-
-        # Task-like fields (optional)
-        for k in ("task_status", "task_priority", "due_date", "status", "priority"):
-            if k in self.payload and self.payload[k] is not None:
-                node[k] = self.payload[k]
-
+        if entity.get("title"):
+            node["title"] = str(entity["title"])[:256]
+        if entity.get("task_status"):
+            node["task_status"] = entity["task_status"]
+        if entity.get("assignee"):
+            node["assignee"] = entity["assignee"]
+        if entity.get("statement"):
+            node["statement"] = entity["statement"]
         return node
 
 
