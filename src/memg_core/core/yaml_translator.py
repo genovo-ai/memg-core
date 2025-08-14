@@ -1,13 +1,28 @@
-"""YAML to Memory translator - converts YAML entity definitions to current Memory model"""
+"""YAML Translator: validates payloads and resolves anchor text for embeddings.
+This module makes the core type-agnostic by reading entity definitions from a YAML registry.
+
+Supported registry shapes (flexible to ease migration):
+- entities as a dict: {"note": {...}, "document": {...}}
+- or entities as a list: [{"name"|"type": "...", "anchor": "...", "fields": {...}}, ...]
+
+Each entity spec should define:
+- name/type: the entity type string used by Memory.memory_type
+- anchor: the payload field considered the anchor (mapped to embedding text)
+- fields: a dict with "required"/"optional" or a flat dict of field specs
+
+If the YAML is missing or a type is unknown, we fallback to common names:
+  statement > summary > content > description > title > text
+"""
 
 from __future__ import annotations
 
+import contextlib
 from functools import lru_cache
 import os
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import yaml
 
 from .exceptions import MemorySystemError
@@ -15,179 +30,180 @@ from .models import Memory
 
 
 class YamlTranslatorError(MemorySystemError):
-    """YAML translator specific errors"""
-
     pass
 
 
 class EntitySpec(BaseModel):
-    """Entity specification from YAML"""
-
     name: str
-    description: str
-    anchor: str
-    fields: dict[str, Any]
+    description: str | None = None
+    anchor: str = Field(default="statement")
+    fields: dict[str, Any] | None = None  # flexible; may contain required/optional/etc.
 
 
 class YamlTranslator:
-    """Translates YAML entity definitions into current Memory model"""
-
-    def __init__(self, yaml_path: str | None = None):
+    def __init__(self, yaml_path: str | None = None) -> None:
+        # Prefer explicit arg, then env
         self.yaml_path = yaml_path or os.getenv("MEMG_YAML_SCHEMA")
         self._schema: dict[str, Any] | None = None
 
     @property
     def schema(self) -> dict[str, Any]:
-        """Load and cache YAML schema"""
-        if self._schema is None:
-            self._schema = self._load_schema()
-        return self._schema
-
-    def _load_schema(self) -> dict[str, Any]:
-        """Load YAML schema from file"""
+        if self._schema is not None:
+            return self._schema
         if not self.yaml_path:
-            raise YamlTranslatorError("No YAML schema path provided")
-
+            # Soft fail: allow operation without YAML, but restricted
+            raise YamlTranslatorError(
+                "MEMG_YAML_SCHEMA not set; YAML schema required for strict mode"
+            )
         path = Path(self.yaml_path)
         if not path.exists():
-            raise YamlTranslatorError(f"YAML schema file not found: {self.yaml_path}")
-
+            raise YamlTranslatorError(f"YAML schema not found at {path}")
         try:
-            with open(path, encoding="utf-8") as f:
-                schema = yaml.safe_load(f)
-            if not schema:
+            with path.open(encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            if not data:
                 raise YamlTranslatorError("Empty YAML schema")
-            return schema
+            if not isinstance(data, dict):
+                raise YamlTranslatorError("YAML schema root must be a mapping")
+            self._schema = data
+            return self._schema
         except yaml.YAMLError as e:
             raise YamlTranslatorError(f"Invalid YAML syntax: {e}") from e
-        except Exception as e:
-            raise YamlTranslatorError(f"Failed to load YAML schema: {e}") from e
+
+    def _entities_map(self) -> dict[str, dict[str, Any]]:
+        sch = self.schema
+        ents = sch.get("entities")
+        if not ents:
+            return {}
+        if isinstance(ents, dict):
+            # Normalize keys to lower
+            return {str(k).lower(): v for k, v in ents.items()}
+        # list form
+        out: dict[str, dict[str, Any]] = {}
+        for item in ents:
+            if not isinstance(item, dict):
+                continue
+            key = (item.get("name") or item.get("type") or "").lower()
+            if key:
+                out[key] = item
+        return out
 
     def get_entity_spec(self, entity_name: str) -> EntitySpec:
-        """Get entity specification from YAML"""
-        entities = self.schema.get("entities", [])
-        for entity in entities:
-            if entity.get("name") == entity_name:
-                return EntitySpec(**entity)
-        raise YamlTranslatorError(f"Entity '{entity_name}' not found in YAML schema")
+        if not entity_name:
+            raise YamlTranslatorError("Empty entity name")
+        name_l = entity_name.lower()
+        emap = self._entities_map()
+        spec_raw = emap.get(name_l)
+        if not spec_raw:
+            raise YamlTranslatorError(f"Entity '{entity_name}' not found in YAML schema")
+        # Normalize
+        anchor = spec_raw.get("anchor") or "statement"
+        # fields may be in different shapes; pass-through
+        return EntitySpec(
+            name=name_l,
+            description=spec_raw.get("description"),
+            anchor=anchor,
+            fields=spec_raw.get("fields"),
+        )
 
     def get_anchor_field(self, entity_name: str) -> str:
-        """Get anchor field for entity type"""
-        spec = self.get_entity_spec(entity_name)
-        return spec.anchor
+        try:
+            return self.get_entity_spec(entity_name).anchor
+        except YamlTranslatorError:
+            # Fallback path for unknown types if strict schema not required
+            return "statement"
 
     def build_anchor_text(self, memory: Memory) -> str:
-        """Build anchor text from Memory using YAML definition"""
-        entity_name = str(memory.memory_type)
+        # Determine anchor field from YAML (preferred) with robust fallback
+        mem_type = getattr(memory, "memory_type", None) or getattr(memory, "type", None)
+        payload: dict[str, Any] = getattr(memory, "payload", {}) or {}
+        anchor_field = None
 
-        try:
-            anchor_field = self.get_anchor_field(entity_name)
-        except YamlTranslatorError:
-            # Fallback for unknown types - try common fields
-            if "content" in memory.payload:
-                return str(memory.payload["content"])
-            if "summary" in memory.payload:
-                return str(memory.payload["summary"])
-            raise YamlTranslatorError(
-                f"Unknown entity type '{entity_name}' and no fallback text found"
-            )
+        with contextlib.suppress(Exception):
+            anchor_field = self.get_anchor_field(str(mem_type))
 
-        # Get anchor field value from memory payload
-        anchor_value = memory.payload.get(anchor_field)
-        if anchor_value and isinstance(anchor_value, str) and anchor_value.strip():
-            return anchor_value.strip()
+        candidates = []
+        if anchor_field:
+            candidates.append(payload.get(anchor_field))
+        # reasonable fallbacks
+        for k in ("statement", "summary", "content", "description", "title", "text"):
+            if anchor_field != k:
+                candidates.append(payload.get(k))
 
-        # Fallback strategies
-        if anchor_field == "summary" and "content" in memory.payload:
-            content_val = memory.payload.get("content")
-            if content_val and isinstance(content_val, str) and content_val.strip():
-                return content_val.strip()
+        # first non-empty string wins
+        for c in candidates:
+            if isinstance(c, str):
+                c = c.strip()
+                if c:
+                    return c
 
-        if "content" in memory.payload:
-            content_val = memory.payload.get("content")
-            if content_val and isinstance(content_val, str) and content_val.strip():
-                return content_val.strip()
+        raise YamlTranslatorError(
+            "Unable to resolve anchor text",
+            operation="build_anchor_text",
+            context={"memory_type": mem_type, "available_keys": list(payload.keys())},
+        )
 
-        raise YamlTranslatorError(f"No valid anchor text found for memory {memory.id}")
+    def _fields_contract(self, spec: dict[str, Any]) -> tuple[list[str], list[str]]:
+        # supports either fields: {required:[...], optional:[...]} OR flat dict
+        fields = spec.get("fields") or {}
+        if "required" in fields or "optional" in fields:
+            req = [str(x) for x in fields.get("required", [])]
+            opt = [str(x) for x in fields.get("optional", [])]
+            return req, opt
+        # flat dict case: treat all as optional except anchor
+        anchor = spec.get("anchor") or "statement"
+        keys = list(fields.keys())
+        if anchor in keys:
+            req = [anchor]
+            opt = [k for k in keys if k != anchor]
+        else:
+            req = []
+            opt = keys
+        return req, opt
 
     def validate_memory_against_yaml(
         self, memory_type: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
-        """Validate memory payload against YAML entity specification"""
-        try:
-            spec = self.get_entity_spec(memory_type)
-        except YamlTranslatorError:
-            # If entity not in YAML, return payload as-is
-            return payload
+        if not memory_type:
+            raise YamlTranslatorError("memory_type is required")
+        if payload is None:
+            raise YamlTranslatorError("payload is required")
 
-        validated = {}
+        emap = self._entities_map()
+        spec = emap.get(memory_type.lower())
+        if not spec:
+            # pass-through if unknown; caller may still index
+            return dict(payload)
 
-        # Check each field in the spec
-        for field_name, field_spec in spec.fields.items():
-            if field_spec.get("system", False):
-                # Skip system fields - they're managed by core
-                continue
+        req, _opt = self._fields_contract(spec)
+        missing = [k for k in req if not payload.get(k)]
+        if missing:
+            raise YamlTranslatorError(
+                f"Missing required fields: {missing}", context={"memory_type": memory_type}
+            )
 
-            is_required = field_spec.get("required", False)
-            field_type = field_spec.get("type", "string")
-
-            if field_name in payload:
-                value = payload[field_name]
-
-                # Validate enum types
-                if field_type == "enum":
-                    choices = field_spec.get("choices", [])
-                    if choices and value not in choices:
-                        raise YamlTranslatorError(
-                            f"Invalid value '{value}' for enum field '{field_name}'. "
-                            f"Must be one of: {choices}"
-                        )
-
-                validated[field_name] = value
-            elif "default" in field_spec:
-                validated[field_name] = field_spec["default"]
-            elif is_required:
-                raise YamlTranslatorError(
-                    f"Required field '{field_name}' missing for entity '{memory_type}'"
-                )
-
-        return validated
+        # Strip system-reserved fields if present
+        cleaned = dict(payload)
+        for syskey in ("id", "user_id", "created_at", "updated_at", "vector"):
+            cleaned.pop(syskey, None)
+        return cleaned
 
     def create_memory_from_yaml(
         self, memory_type: str, payload: dict[str, Any], user_id: str
     ) -> Memory:
-        """Create Memory object from YAML-validated payload"""
-        # Validate payload against YAML spec
-        validated_payload = self.validate_memory_against_yaml(memory_type, payload)
-
-        # Extract core fields from payload (don't duplicate them)
-        core_tags = validated_payload.pop("tags", [])
-        core_confidence = validated_payload.pop("confidence", 0.8)
-
-        # Build Memory object with core fields + validated payload
-        return Memory(
-            user_id=user_id,
-            memory_type=memory_type,
-            payload=validated_payload,  # All entity-specific fields
-            tags=core_tags,
-            confidence=core_confidence,
-        )
+        validated = self.validate_memory_against_yaml(memory_type, payload)
+        # Construct Memory; the model is type-agnostic
+        return Memory(memory_type=memory_type, payload=validated, user_id=user_id)
 
 
-# Global translator instance
 @lru_cache(maxsize=1)
 def get_yaml_translator() -> YamlTranslator:
-    """Get cached YAML translator instance"""
     return YamlTranslator()
 
 
 def build_anchor_text(memory: Memory) -> str:
-    """Build anchor text for memory using YAML translator"""
-    translator = get_yaml_translator()
-    return translator.build_anchor_text(memory)
+    return get_yaml_translator().build_anchor_text(memory)
 
 
 def create_memory_from_yaml(memory_type: str, payload: dict[str, Any], user_id: str) -> Memory:
-    """Create Memory from YAML-defined type and payload"""
-    translator = get_yaml_translator()
-    return translator.create_memory_from_yaml(memory_type, payload, user_id)
+    return get_yaml_translator().create_memory_from_yaml(memory_type, payload, user_id)

@@ -1,15 +1,22 @@
-"""Indexer: deterministic add-memory pipeline - single writer"""
+# memg_core/core/pipeline/indexer.py
+"""Indexer: deterministic add-memory pipeline - single writer (refactored)
+- Anchor text comes from YAML translator (unified: per-type anchor_field → anchor text).
+- No dependency on deprecated core/indexing.py.
+- Embedding is always computed from anchor text.
+- Upserts to Qdrant, mirrors node to Kuzu.
+"""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from ..exceptions import ProcessingError
-from ..indexing import build_index_text
-from ..interfaces.embedder import Embedder
-from ..interfaces.kuzu import KuzuInterface
-from ..interfaces.qdrant import QdrantInterface
-from ..models import Memory
+from memg_core.core.exceptions import ProcessingError
+from memg_core.core.interfaces.embedder import Embedder
+from memg_core.core.interfaces.kuzu import KuzuInterface
+from memg_core.core.interfaces.qdrant import QdrantInterface
+from memg_core.core.models import Memory
+from memg_core.core.yaml_translator import build_anchor_text
+from memg_core.utils import generate_hrid
 
 
 def add_memory_index(
@@ -20,42 +27,61 @@ def add_memory_index(
     collection: str | None = None,
     index_text_override: str | None = None,
 ) -> str:
-    """Add memory to both Qdrant and Kuzu stores - single writer pattern
+    """Index a Memory into Qdrant (vector) and Kuzu (graph).
 
-    Args:
-        memory: The memory to index
-        qdrant: Qdrant interface instance
-        kuzu: Kuzu interface instance
-        embedder: Embedder interface instance
-        collection: Optional Qdrant collection name
-        index_text_override: Optional override for index text (bypasses build_index_text)
+    Behavior:
+      - Anchor text = `index_text_override` if provided, else YAML-defined anchor for the memory type.
+      - Embedding from anchor text only.
+      - Qdrant upsert with payload from `Memory.to_qdrant_payload()`.
+      - Kuzu upsert as node with `Memory.to_kuzu_node()`.
 
     Returns:
-        The point ID of the indexed memory
-
-    Raises:
-        ProcessingError: If indexing fails
+      Qdrant point ID (string), which should equal `memory.id` if provided.
     """
     try:
-        # Build index text based on memory type
-        index_text = index_text_override or build_index_text(memory)
+        # Determine anchor text
+        anchor = (index_text_override or build_anchor_text(memory)).strip()
+        if not anchor:
+            raise ProcessingError(
+                "Empty anchor text after resolution",
+                operation="add_memory_index",
+                context={
+                    "memory_id": memory.id,
+                    "memory_type": getattr(memory, "memory_type", None),
+                },
+            )
 
-        # Generate embedding
-        vector = embedder.get_embedding(index_text)
+        # Stamp time if the model provides created_at; do not mutate schema otherwise.
+        now = datetime.now(UTC)
+        if hasattr(memory, "created_at") and memory.created_at is None:
+            memory.created_at = now
 
-        # Prepare Qdrant payload
+        # Ensure HRID exists (flows into both stores via payload/node)
+        if not getattr(memory, "hrid", None):
+            try:
+                memory.hrid = generate_hrid(memory.memory_type)
+            except Exception as gen_err:
+                raise ProcessingError(
+                    "Failed to generate HRID",
+                    operation="add_memory_index",
+                    context={"memory_type": memory.memory_type},
+                    original_error=gen_err,
+                )
+
+        # Compute vector
+        vector = embedder.get_embedding(anchor)
+
+        # Ensure collection exists (vector size default handled by interface)
+        qdrant.ensure_collection(collection=collection)
+
+        # Build payload and upsert into Qdrant
         payload = memory.to_qdrant_payload()
-        payload["index_text"] = index_text
-        payload.setdefault("created_at", datetime.now(UTC).isoformat())
-
-        # Write to Qdrant
         success, point_id = qdrant.add_point(
             vector=vector,
             payload=payload,
-            point_id=memory.id,
+            point_id=getattr(memory, "id", None),
             collection=collection,
         )
-
         if not success:
             raise ProcessingError(
                 "Failed to upsert memory into Qdrant",
@@ -63,7 +89,7 @@ def add_memory_index(
                 context={"memory_id": memory.id},
             )
 
-        # Write to Kuzu
+        # Mirror node into Kuzu
         kuzu.add_node("Memory", memory.to_kuzu_node())
 
         return point_id
@@ -74,6 +100,9 @@ def add_memory_index(
         raise ProcessingError(
             "Failed to index memory",
             operation="add_memory_index",
-            context={"memory_id": memory.id, "memory_type": memory.memory_type.value},
+            context={
+                "memory_id": getattr(memory, "id", None),
+                "memory_type": getattr(memory, "memory_type", None),
+            },
             original_error=e,
         )

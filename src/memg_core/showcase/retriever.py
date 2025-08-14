@@ -3,8 +3,8 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from ..api.public import search
-from ..core.models import MemoryType, SearchResult
+from memg_core.api.public import search
+from memg_core.core.models import SearchResult
 
 
 class MemoryRetriever:
@@ -162,11 +162,11 @@ class MemoryRetriever:
             Dictionary with memory type counts (placeholder implementation)
         """
         # Placeholder implementation - real stats would require system API
-        return {mt.value: 0 for mt in MemoryType}
+        return {"note": 0, "document": 0, "task": 0}
 
     def list_categories(self) -> list[str]:
         """List available memory categories (types)"""
-        return [mt.value for mt in MemoryType]
+        return ["note", "document", "task"]
 
     def expand_with_graph_neighbors(
         self,

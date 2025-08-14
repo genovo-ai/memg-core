@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 
 from memg_core.core.exceptions import ProcessingError
 from memg_core.core.pipeline.indexer import add_memory_index
-from memg_core.core.models import Memory, MemoryType
+from memg_core.core.models import Memory
 
 
 def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake, mem_factory):
@@ -16,9 +16,11 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
     memory = mem_factory(
         id="test-memory-1",
         user_id="test-user",
-        content="This is a test memory",
-        memory_type=MemoryType.NOTE,
-        title="Test Memory"
+        memory_type="note",
+        payload={
+            "statement": "This is a test memory",
+            "title": "Test Memory"
+        }
     )
 
     # Add to index
@@ -29,19 +31,17 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
     # Check that it's in Qdrant
     qdrant_point = qdrant_fake.get_point(point_id)
     assert qdrant_point is not None
-    assert qdrant_point["payload"]["user_id"] == "test-user"
-    assert qdrant_point["payload"]["content"] == "This is a test memory"
-    assert qdrant_point["payload"]["memory_type"] == "note"
-    assert qdrant_point["payload"]["title"] == "Test Memory"
-    assert "index_text" in qdrant_point["payload"]
-    assert qdrant_point["payload"]["index_text"] == "This is a test memory"
+    assert qdrant_point["payload"]["core"]["user_id"] == "test-user"
+    assert qdrant_point["payload"]["entity"]["statement"] == "This is a test memory"
+    assert qdrant_point["payload"]["core"]["memory_type"] == "note"
+    assert qdrant_point["payload"]["entity"]["title"] == "Test Memory"
 
     # Check that it's in Kuzu
     assert "test-memory-1" in kuzu_fake.nodes["Memory"]
     kuzu_node = kuzu_fake.nodes["Memory"]["test-memory-1"]
     assert kuzu_node["user_id"] == "test-user"
-    assert kuzu_node["content"] == "This is a test memory"
     assert kuzu_node["memory_type"] == "note"
+    assert kuzu_node["statement"] == "This is a test memory"
     assert kuzu_node["title"] == "Test Memory"
 
 
@@ -51,9 +51,11 @@ def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuz
     memory = mem_factory(
         id="test-memory-1",
         user_id="test-user",
-        content="This is a test memory",
-        memory_type=MemoryType.NOTE,
-        title="Test Memory"
+        memory_type="note",
+        payload={
+            "statement": "This is a test memory",
+            "title": "Test Memory"
+        }
     )
 
     # Add to index with override
@@ -63,10 +65,10 @@ def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuz
         index_text_override=override_text
     )
 
-    # Check that the override was used in Qdrant
+    # Check that the memory was stored in Qdrant
     qdrant_point = qdrant_fake.get_point(point_id)
     assert qdrant_point is not None
-    assert qdrant_point["payload"]["index_text"] == override_text
+    # Note: index_text_override affects embedding generation, not payload storage
 
     # The embedding should be based on the override text
     # We can verify this by comparing with a direct embedding

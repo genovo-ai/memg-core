@@ -241,3 +241,6 @@ artifacts/
 
 temp_data
 src/memg_core/version.py
+
+# temp - remove later
+docs/*

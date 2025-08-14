@@ -1,4 +1,11 @@
-"""Minimal public API for memory system - 4 sync functions only"""
+"""
+Minimal public API exposing generic add_memory and unified search.
+- Uses YAML translator to validate payloads and resolve anchor → statement.
+- add_note/add_document/add_task are thin shims that build normalized payloads
+  with `statement` as the anchor and optional `details`.
+- search() supports vector-first, graph-first, or hybrid via `mode`, and
+  accepts date scoping via `modified_within_days`.
+"""
 
 from __future__ import annotations
 
@@ -6,23 +13,28 @@ from datetime import datetime
 import os
 from typing import Any
 
-from ..core.config import get_config
-from ..core.exceptions import ValidationError
-from ..core.interfaces.embedder import Embedder
-from ..core.interfaces.kuzu import KuzuInterface
-from ..core.interfaces.qdrant import QdrantInterface
-from ..core.models import Memory, SearchResult
-from ..core.pipeline.indexer import add_memory_index
-from ..core.pipeline.retrieval import graph_rag_search
-from ..core.yaml_translator import build_anchor_text, create_memory_from_yaml
+from memg_core.core.config import get_config
+from memg_core.core.exceptions import ValidationError
+from memg_core.core.interfaces.embedder import Embedder
+from memg_core.core.interfaces.kuzu import KuzuInterface
+from memg_core.core.interfaces.qdrant import QdrantInterface
+from memg_core.core.models import Memory, SearchResult
+from memg_core.core.pipeline.indexer import add_memory_index
+from memg_core.core.pipeline.retrieval import graph_rag_search
+from memg_core.core.yaml_translator import build_anchor_text, create_memory_from_yaml
+
+# ----------------------------- indexing helper -----------------------------
 
 
 def _index_memory_with_optional_yaml(memory: Memory) -> str:
-    """Helper to index a memory with optional YAML plugin support"""
-    # Initialize interfaces with explicit paths from config
+    """Helper to index a memory with YAML-driven anchor if available.
+
+    - Initializes interfaces using config/env.
+    - Resolves anchor text via YAML translator (fallback suppressed).
+    - Upserts into Qdrant and mirrors to Kuzu.
+    """
     config = get_config()
 
-    # Get storage paths from environment (API layer responsibility)
     qdrant_path = os.getenv("QDRANT_STORAGE_PATH")
     kuzu_path = os.getenv("KUZU_DB_PATH", config.memg.kuzu_database_path)
 
@@ -32,15 +44,23 @@ def _index_memory_with_optional_yaml(memory: Memory) -> str:
     kuzu = KuzuInterface(db_path=kuzu_path)
     embedder = Embedder()
 
-    # Use YAML translator for anchor text if schema is available
-    import contextlib
-
     index_text_override = None
-    with contextlib.suppress(Exception):
+    try:
         index_text_override = build_anchor_text(memory)
+    except Exception:
+        # If YAML not configured or anchor missing, allow indexer to fail if truly empty
+        index_text_override = None
 
-    # Index the memory
-    return add_memory_index(memory, qdrant, kuzu, embedder, index_text_override=index_text_override)
+    return add_memory_index(
+        memory,
+        qdrant,
+        kuzu,
+        embedder,
+        index_text_override=index_text_override,
+    )
+
+
+# ----------------------------- public adders -----------------------------
 
 
 def add_note(
@@ -49,24 +69,14 @@ def add_note(
     title: str | None = None,
     tags: list[str] | None = None,
 ) -> Memory:
-    """Add a note-type memory.
-
-    Args:
-        text: The note content
-        user_id: User identifier for isolation
-        title: Optional title
-        tags: Optional list of tags
-
-    Returns:
-        The created Memory object
-    """
+    """Add a note-type memory (anchor = `statement`)."""
     if not text or not text.strip():
         raise ValidationError("Note content cannot be empty")
     if not user_id:
         raise ValidationError("User ID is required")
 
-    payload = {
-        "content": text.strip(),
+    payload: dict[str, Any] = {
+        "statement": text.strip(),
         "source": "user",
     }
     if title:
@@ -84,32 +94,27 @@ def add_document(
 ) -> Memory:
     """Add a document-type memory.
 
-    Args:
-        text: The document content (stored as 'body' in new schema)
-        user_id: User identifier for isolation
-        title: Optional title
-        summary: Optional AI-generated summary (used as anchor for embedding)
-        tags: Optional list of tags
-
-    Returns:
-        The created Memory object
+    Normalization:
+    - `statement` = provided summary or truncated text
+    - `details`   = full text body
     """
     if not text or not text.strip():
         raise ValidationError("Document content cannot be empty")
     if not user_id:
         raise ValidationError("User ID is required")
 
-    payload = {
-        "body": text.strip(),  # Note: 'body' not 'content' in new schema
+    text_clean = text.strip()
+    payload: dict[str, Any] = {
+        "statement": (
+            summary.strip()
+            if summary and summary.strip()
+            else (text_clean[:200] + "..." if len(text_clean) > 200 else text_clean)
+        ),
+        "details": text_clean,
         "source": "user",
     }
     if title:
         payload["title"] = title
-    if summary:
-        payload["summary"] = summary
-    else:
-        # Generate a basic summary from the first part of the document
-        payload["summary"] = text.strip()[:200] + "..." if len(text.strip()) > 200 else text.strip()
 
     return add_memory("document", payload, user_id, tags)
 
@@ -121,28 +126,16 @@ def add_task(
     due_date: datetime | None = None,
     tags: list[str] | None = None,
 ) -> Memory:
-    """Add a task-type memory.
-
-    Args:
-        text: The task description (used as summary in Jira-style)
-        user_id: User identifier for isolation
-        title: Optional title
-        due_date: Optional due date
-        tags: Optional list of tags
-
-    Returns:
-        The created Memory object
-    """
+    """Add a task-type memory (anchor = `statement`, with lifecycle fields)."""
     if not text or not text.strip():
         raise ValidationError("Task content cannot be empty")
     if not user_id:
         raise ValidationError("User ID is required")
 
-    payload = {
-        "summary": text.strip(),  # Jira-style: text becomes the summary (anchor)
+    payload: dict[str, Any] = {
+        "statement": text.strip(),
         "source": "user",
-        "task_status": "todo",  # Default status
-        "task_priority": "medium",  # Default priority
+        "status": "OPEN",
     }
     if title:
         payload["title"] = title
@@ -152,32 +145,30 @@ def add_task(
     return add_memory("task", payload, user_id, tags)
 
 
+# ----------------------------- public search -----------------------------
+
+
 def search(
-    query: str,
+    query: str | None,
     user_id: str,
     limit: int = 20,
     filters: dict[str, Any] | None = None,
+    *,
+    memo_type: str | None = None,
+    modified_within_days: int | None = None,
+    mode: str | None = None,  # 'vector' | 'graph' | 'hybrid'
 ) -> list[SearchResult]:
-    """Search memories using GraphRAG (graph-first with vector fallback).
+    """Unified search over memories (Graph+Vector).
 
-    Args:
-        query: Search query string
-        user_id: User ID for filtering (required)
-        limit: Maximum number of results
-        filters: Optional additional filters for vector search
-
-    Returns:
-        List of SearchResult objects, ranked by relevance
+    Requirements: at least one of `query` or `memo_type`.
     """
-    if not query or not query.strip():
-        raise ValidationError("Search query cannot be empty")
+    if (not query or not query.strip()) and not memo_type:
+        raise ValidationError("Provide `query` or `memo_type`.")
     if not user_id:
         raise ValidationError("User ID is required for search")
 
-    # Initialize interfaces with explicit paths from config
     config = get_config()
 
-    # Get storage paths from environment (API layer responsibility)
     qdrant_path = os.getenv("QDRANT_STORAGE_PATH")
     kuzu_path = os.getenv("KUZU_DB_PATH", config.memg.kuzu_database_path)
 
@@ -187,23 +178,20 @@ def search(
     kuzu = KuzuInterface(db_path=kuzu_path)
     embedder = Embedder()
 
-    # Check if YAML schema is enabled to pass relation names
+    # Optional relation whitelist from YAML registry (if present)
     relation_names = None
     if os.getenv("MEMG_ENABLE_YAML_SCHEMA", "false").lower() == "true":
         try:
             from ..plugins.yaml_schema import get_relation_names
 
             relation_names = get_relation_names()
-        except ImportError:
-            # Plugin is optional, continue without it
+        except Exception:
             relation_names = None
 
-    # Read neighbor cap here (API layer)
     neighbor_cap = int(os.getenv("MEMG_GRAPH_NEIGHBORS_LIMIT", "5"))
 
-    # Perform search
     return graph_rag_search(
-        query=query.strip(),
+        query=(query.strip() if query else None),
         user_id=user_id,
         limit=limit,
         qdrant=qdrant,
@@ -212,7 +200,13 @@ def search(
         filters=filters,
         relation_names=relation_names,
         neighbor_cap=neighbor_cap,
+        memo_type=memo_type,
+        modified_within_days=modified_within_days,
+        mode=mode,
     )
+
+
+# ----------------------------- generic add -----------------------------
 
 
 def add_memory(
@@ -221,22 +215,10 @@ def add_memory(
     user_id: str,
     tags: list[str] | None = None,
 ) -> Memory:
-    """Add a memory using YAML-defined entity type and payload.
+    """Create a memory using YAML-defined type + payload and index it.
 
-    This is the generic memory creation function that validates against
-    YAML schema and creates Memory objects from arbitrary entity types.
-
-    Args:
-        memory_type: Entity type name (e.g., "note", "document", "task")
-        payload: Dictionary of field values for the entity
-        user_id: User identifier for isolation
-        tags: Optional list of tags to add
-
-    Returns:
-        The created Memory object
-
-    Raises:
-        ValidationError: If payload is invalid for the entity type
+    Normalizes tags, validates against YAML, builds anchor via translator,
+    and indexes into both stores. Returns the populated Memory.
     """
     if not memory_type or not memory_type.strip():
         raise ValidationError("Memory type cannot be empty")
@@ -245,15 +227,14 @@ def add_memory(
     if not payload:
         raise ValidationError("Payload cannot be empty")
 
-    # Add tags to payload if provided
+    # Merge tags without mutating original
     if tags:
-        payload = dict(payload)  # Don't modify original
-        existing_tags = payload.get("tags", [])
-        payload["tags"] = list(set(existing_tags + tags))
+        payload = dict(payload)
+        existing = payload.get("tags", [])
+        payload["tags"] = list({*existing, *tags})
 
-    # Create memory using YAML translator
     memory = create_memory_from_yaml(memory_type.strip(), payload, user_id)
 
-    # Index the memory
+    # Index and attach id
     memory.id = _index_memory_with_optional_yaml(memory)
     return memory

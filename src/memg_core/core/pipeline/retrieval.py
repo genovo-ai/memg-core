@@ -1,130 +1,166 @@
-"""Graph-first retrieval pipeline with vector rerank and neighbor append"""
+# memg_core/core/pipeline/retrieval.py
+"""Unified retrieval pipeline with automatic mode selection and neighbor expansion.
+- Anchor-first: uses `statement` as the only textual anchor.
+- Modes: vector-first (Qdrant), graph-first (Kuzu), hybrid (merge).
+- Filters: user_id, memo_type, modified_within_days, arbitrary filters.
+- Deterministic ordering: score DESC, then hrid index ASC, then id ASC.
+"""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
+from ...utils.hrid import hrid_to_index  # NEW
 from ..exceptions import DatabaseError
 from ..interfaces.embedder import Embedder
 from ..interfaces.kuzu import KuzuInterface
 from ..interfaces.qdrant import QdrantInterface
 from ..models import Memory, SearchResult
 
+# ----------------------------- helpers ---------------------------------
 
-def _parse_datetime(date_str: Any) -> datetime:
-    """Parse a datetime string or return current time if None or invalid."""
-    if date_str and isinstance(date_str, str):
-        try:
-            return datetime.fromisoformat(date_str)
-        except (ValueError, TypeError):
-            # Fall back to current time for invalid dates
-            return datetime.now(UTC)
+
+def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _build_graph_query(
-    base_query: str,
+def _iso(dt: datetime | None) -> str:
+    return (dt or _now()).isoformat()
+
+
+def _cutoff(days: int | None) -> datetime | None:
+    if days is None or days <= 0:
+        return None
+    return _now() - timedelta(days=days)
+
+
+def _parse_datetime(date_str: Any) -> datetime:
+    if isinstance(date_str, str):
+        try:
+            return datetime.fromisoformat(date_str)
+        except (ValueError, TypeError):
+            return _now()
+    return _now()
+
+
+def _sort_key(r: SearchResult) -> tuple:
+    """Stable ordering: score DESC, then hrid index ASC, then id ASC."""
+    mem = r.memory
+    try:
+        idx = hrid_to_index(getattr(mem, "hrid", "") or "ZZZ_ZZZ999")
+    except Exception:
+        idx = 26**3 * 1000 + 999  # worst case
+    return (-float(r.score or 0.0), idx, mem.id or "")
+
+
+# ----------------------------- Kuzu ------------------------------------
+
+
+def _build_graph_query_for_memos(
     user_id: str | None,
     limit: int,
-    entity_types: list[str] | None = None,
-    relation_names: list[str] | None = None,
+    memo_type: str | None,
+    modified_within_days: int | None,
 ) -> tuple[str, dict[str, Any]]:
-    """Build graph query for entity-based search"""
-    # Use provided relation names or default to MENTIONS
-    rel_alternatives = "|".join(relation_names or ["MENTIONS"])
-
-    cypher = f"""
-    MATCH (m:Memory)-[r:{rel_alternatives}]->(e:Entity)
-    WHERE toLower(e.name) CONTAINS toLower($q)
+    """Graph-first: fetch Memo nodes by filters (no Entity matching).
+    Returns m.* fields only; neighbors will be fetched separately.
     """
-    params: dict[str, Any] = {"q": base_query, "limit": limit}
+    params: dict[str, Any] = {"limit": limit}
 
-    if entity_types:
-        type_conditions = " OR ".join([f"e.type = '{t}'" for t in entity_types])
-        cypher += f" AND ({type_conditions})"
-
+    cypher = "MATCH (m:Memory)\nWHERE 1=1"
     if user_id:
         cypher += " AND m.user_id = $user_id"
         params["user_id"] = user_id
+    if memo_type:
+        cypher += " AND m.memory_type = $memo_type"
+        params["memo_type"] = memo_type
+    cut = _cutoff(modified_within_days)
+    if cut is not None:
+        cypher += " AND coalesce(m.updated_at, m.created_at) >= $cutoff"
+        params["cutoff"] = _iso(cut)
 
-    cypher += """
-    RETURN DISTINCT m.id, m.user_id, m.content, m.title, m.memory_type,
-           m.created_at, m.summary, m.source, m.tags, m.confidence
-    ORDER BY m.created_at DESC
-    LIMIT $limit
-    """
+    cypher += (
+        "\nRETURN DISTINCT "
+        "m.id, m.user_id, m.memory_type, m.hrid, m.statement, m.tags, m.created_at, m.updated_at\n"
+        "ORDER BY coalesce(m.updated_at, m.created_at) DESC\n"
+        "LIMIT $limit"
+    )
     return cypher, params
 
 
 def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
-    """Convert graph query rows to Memory objects"""
-    results: list[Memory] = []
+    out: list[Memory] = []
     for row in rows:
-        memory_type = row.get("m.memory_type", row.get("memory_type", "note"))
+        mtype = row.get("m.memory_type") or row.get("memory_type") or "memo"
+        statement = row.get("m.statement") or row.get("statement") or ""
+        created_at_raw = row.get("m.created_at") or row.get("created_at")
+        # updated_at_raw = row.get("m.updated_at") or row.get("updated_at")
+        tags_raw = row.get("m.tags") or row.get("tags") or []
+        hrid = row.get("m.hrid") or row.get("hrid")  # NEW
 
-        created_at_raw = row.get("m.created_at", row.get("created_at"))
-        try:
-            created_dt = (
-                datetime.fromisoformat(created_at_raw) if created_at_raw else datetime.now(UTC)
-            )
-        except (ValueError, TypeError):
-            # Fall back to current time for invalid dates
-            created_dt = datetime.now(UTC)
+        if isinstance(tags_raw, str):
+            tags = [t for t in tags_raw.split(",") if t]
+        else:
+            tags = list(tags_raw)
 
-        # Build minimal payload from available Kuzu fields
-        payload = {}
-        if row.get("m.title") or row.get("title"):
-            payload["title"] = row.get("m.title") or row.get("title", "")
-
-        # Add task-specific fields if available (stored in Kuzu for relationship purposes)
-        if memory_type == "task":
-            if row.get("m.task_status") or row.get("task_status"):
-                payload["task_status"] = row.get("m.task_status") or row.get("task_status", "")
-            if row.get("m.assignee") or row.get("assignee"):
-                payload["assignee"] = row.get("m.assignee") or row.get("assignee", "")
-            if row.get("m.due_date") or row.get("due_date"):
-                payload["due_date"] = row.get("m.due_date") or row.get("due_date", "")
-
-        results.append(
+        out.append(
             Memory(
                 id=row.get("m.id") or row.get("id") or str(uuid4()),
                 user_id=row.get("m.user_id") or row.get("user_id", ""),
-                memory_type=memory_type,
-                payload=payload,
-                tags=(row.get("m.tags", "").split(",") if row.get("m.tags") else []),
-                confidence=float(row.get("m.confidence", 0.8)),
-                is_valid=bool(row.get("m.is_valid", True)),
-                created_at=created_dt,
-                supersedes=row.get("m.supersedes") or None,
-                superseded_by=row.get("m.superseded_by") or None,
+                memory_type=mtype,
+                payload={"statement": statement},
+                tags=tags,
+                confidence=0.8,
+                is_valid=True,
+                created_at=_parse_datetime(created_at_raw),
+                supersedes=None,
+                superseded_by=None,
+                vector=None,
+                hrid=hrid,  # NEW
             )
         )
-    return results
+    return out
+
+
+# ----------------------------- Qdrant ----------------------------------
+
+
+def _qdrant_filters(
+    user_id: str | None,
+    memo_type: str | None,
+    modified_within_days: int | None,
+    extra: dict[str, Any] | None,
+) -> dict[str, Any]:
+    f: dict[str, Any] = extra.copy() if extra else {}
+    if user_id:
+        f["core.user_id"] = user_id
+    if memo_type:
+        f["core.memory_type"] = memo_type
+    cut = _cutoff(modified_within_days)
+    if cut is not None:
+        f["core.updated_at_from"] = _iso(cut)  # adapter layer should translate to a proper Range
+    return f
+
+
+# ----------------------------- Rerank/Neighbors ------------------------
 
 
 def _rerank_with_vectors(
-    query: str,
-    candidates: list[Memory],
-    qdrant: QdrantInterface,
-    embedder: Embedder,
+    query: str, candidates: list[Memory], qdrant: QdrantInterface, embedder: Embedder
 ) -> list[SearchResult]:
-    """Rerank graph results using vector similarity"""
     qvec = embedder.get_embedding(query)
     vec_results = qdrant.search_points(vector=qvec, limit=max(10, len(candidates)))
-
-    # Map scores to candidate ids
     score_by_id = {r.get("id"): float(r.get("score", 0.0)) for r in vec_results}
 
     results: list[SearchResult] = []
     for mem in candidates:
-        score = score_by_id.get(mem.id, 0.5)  # default mid score if not found
+        score = score_by_id.get(mem.id, 0.5)
         results.append(
             SearchResult(memory=mem, score=score, distance=None, source="graph_rerank", metadata={})
         )
-
-    results.sort(key=lambda r: r.score, reverse=True)
+    results.sort(key=_sort_key)
     return results
 
 
@@ -132,48 +168,42 @@ def _append_neighbors(
     seeds: list[SearchResult],
     kuzu: KuzuInterface,
     neighbor_limit: int,
+    relation_names: list[str] | None,
 ) -> list[SearchResult]:
-    """Append graph neighbors to results"""
     expanded: list[SearchResult] = []
+    rels = relation_names or None
 
     for seed in seeds[: min(5, len(seeds))]:
         mem = seed.memory
         if not mem.id:
             continue
-
-        neighbors = kuzu.neighbors(
+        rows = kuzu.neighbors(
             node_label="Memory",
             node_id=mem.id,
-            rel_types=None,
+            rel_types=rels,
             direction="any",
             limit=neighbor_limit,
             neighbor_label="Memory",
         )
-
-        for row in neighbors:
-            mtype = row.get("memory_type", "note")
-
-            # Build minimal payload for neighbor
-            neighbor_payload = {}
-            if row.get("title"):
-                neighbor_payload["title"] = row.get("title", "")
-
-            neighbor_memory = Memory(
+        for row in rows:
+            statement = row.get("statement", "")
+            neighbor = Memory(
                 id=row.get("id") or str(uuid4()),
                 user_id=row.get("user_id", ""),
-                memory_type=mtype,
-                payload=neighbor_payload,
+                memory_type=row.get("memory_type", "memo"),
+                payload={"statement": statement},
                 confidence=0.8,
                 is_valid=True,
                 created_at=_parse_datetime(row.get("created_at")),
                 supersedes=None,
                 superseded_by=None,
+                vector=None,
                 tags=[],
+                hrid=row.get("hrid"),  # NEW: if present
             )
-
             expanded.append(
                 SearchResult(
-                    memory=neighbor_memory,
+                    memory=neighbor,
                     score=max(0.3, seed.score * 0.9),
                     distance=None,
                     source="graph_neighbor",
@@ -181,22 +211,22 @@ def _append_neighbors(
                 )
             )
 
-    # Merge by id, keep highest score
+    # merge by id keep max score
     by_id: dict[str, SearchResult] = {r.memory.id: r for r in seeds}
     for r in expanded:
-        if not r.memory.id:
-            continue
-        if r.memory.id in by_id:
-            if r.score > by_id[r.memory.id].score:
-                by_id[r.memory.id] = r
-        else:
+        cur = by_id.get(r.memory.id)
+        if cur is None or r.score > cur.score:
             by_id[r.memory.id] = r
+    out = list(by_id.values())
+    out.sort(key=_sort_key)
+    return out
 
-    return list(by_id.values())
+
+# ----------------------------- Entry Point -----------------------------
 
 
 def graph_rag_search(
-    query: str,
+    query: str | None,
     user_id: str,
     limit: int,
     qdrant: QdrantInterface,
@@ -205,79 +235,177 @@ def graph_rag_search(
     filters: dict[str, Any] | None = None,
     relation_names: list[str] | None = None,
     neighbor_cap: int = 5,
+    *,
+    memo_type: str | None = None,
+    modified_within_days: int | None = None,
+    mode: str | None = None,  # 'vector' | 'graph' | 'hybrid'
 ) -> list[SearchResult]:
-    """Graph-first retrieval with vector rerank and neighbor append
+    """Unified retrieval with automatic mode selection.
 
-    Args:
-        query: Search query
-        user_id: User ID for filtering
-        limit: Maximum results to return
-        qdrant: Qdrant interface instance
-        kuzu: Kuzu interface instance
-        embedder: Embedder interface instance
-        filters: Optional filters for vector search
-        relation_names: Optional list of relation types (defaults to ["MENTIONS"])
-        neighbor_cap: Maximum neighbors per result (default: 5)
-
-    Returns:
-        List of search results sorted by score
+    - If `query` is provided → vector-first.
+    - If no `query` but `memo_type/filters/date` are provided → graph-first.
+    - If both and `mode='hybrid'` → merge by id with stable ordering.
     """
-    # 1) Graph candidate discovery
+    # ---------------- validation ----------------
+    has_query = bool(query and query.strip())
+    has_scope = bool(memo_type or (filters and len(filters) > 0) or modified_within_days)
+    if not has_query and not has_scope:
+        return []
+
+    # decide mode
+    eff_mode = mode or ("vector" if has_query else "graph")
+
+    results: list[SearchResult] = []
+
     try:
-        cypher, params = _build_graph_query(
-            query, user_id=user_id, limit=limit, relation_names=relation_names
-        )
-        rows = kuzu.query(cypher, params)
-        candidates = _rows_to_memories(rows)
-    except DatabaseError:
-        # If graph query fails (e.g., Entity table doesn't exist), skip to vector search
-        candidates = []
-
-    # 2) Optional vector rerank if we have candidates
-    results: list[SearchResult]
-    if candidates:
-        results = _rerank_with_vectors(query, candidates, qdrant, embedder)
-    else:
-        # 4) Fallback: vector-only
-        qvec = embedder.get_embedding(query)
-        vec = qdrant.search_points(vector=qvec, limit=limit, user_id=user_id, filters=filters or {})
-        results = []
-        for r in vec:
-            payload = r.get("payload", {})
-            core_data = payload.get("core", {})
-            entity_data = payload.get("entity", {})
-
-            mtype = core_data.get("memory_type", "note")
-
-            mem = Memory(
-                id=r.get("id") or str(uuid4()),
-                user_id=core_data.get("user_id", ""),
-                memory_type=mtype,
-                payload=entity_data,  # All entity-specific fields
-                tags=core_data.get("tags", []),
-                confidence=core_data.get("confidence", 0.8),
-                is_valid=core_data.get("is_valid", True),
-                created_at=(
-                    datetime.fromisoformat(core_data.get("created_at"))
-                    if core_data.get("created_at")
-                    else datetime.now(UTC)
-                ),
-                supersedes=core_data.get("supersedes"),
-                superseded_by=core_data.get("superseded_by"),
+        if eff_mode == "graph":
+            cypher, params = _build_graph_query_for_memos(
+                user_id=user_id,
+                limit=limit,
+                memo_type=memo_type,
+                modified_within_days=modified_within_days,
             )
-            results.append(
-                SearchResult(
-                    memory=mem,
-                    score=float(r.get("score", 0.0)),
-                    distance=None,
-                    source="vector_fallback",
-                    metadata={},
+            rows = kuzu.query(cypher, params)
+            candidates = _rows_to_memories(rows)
+            if has_query and candidates:
+                results = _rerank_with_vectors(query or "", candidates, qdrant, embedder)
+            else:
+                results = [
+                    SearchResult(memory=m, score=0.5, distance=None, source="graph", metadata={})
+                    for m in candidates
+                ]
+        elif eff_mode == "vector":
+            qf = _qdrant_filters(user_id, memo_type, modified_within_days, filters)
+            qvec = embedder.get_embedding(query or "")
+            vec = qdrant.search_points(vector=qvec, limit=limit, user_id=user_id, filters=qf)
+            for r in vec:
+                payload = r.get("payload", {})
+                core = payload.get("core", {})
+                entity = payload.get("entity", {})
+                statement = entity.get("statement") or core.get("statement") or ""
+                m = Memory(
+                    id=r.get("id") or str(uuid4()),
+                    user_id=core.get("user_id", ""),
+                    memory_type=core.get("memory_type", "memo"),
+                    payload={
+                        "statement": statement,
+                        **{k: v for k, v in entity.items() if k != "statement"},
+                    },
+                    tags=core.get("tags", []),
+                    confidence=core.get("confidence", 0.8),
+                    is_valid=core.get("is_valid", True),
+                    created_at=_parse_datetime(core.get("created_at")),
+                    supersedes=core.get("supersedes"),
+                    superseded_by=core.get("superseded_by"),
+                    vector=None,
+                    hrid=core.get("hrid"),  # NEW
                 )
+                results.append(
+                    SearchResult(
+                        memory=m,
+                        score=float(r.get("score", 0.0)),
+                        distance=None,
+                        source="qdrant",
+                        metadata={},
+                    )
+                )
+        else:  # hybrid
+            cypher, params = _build_graph_query_for_memos(
+                user_id=user_id,
+                limit=limit,
+                memo_type=memo_type,
+                modified_within_days=modified_within_days,
             )
+            rows = kuzu.query(cypher, params)
+            candidates = _rows_to_memories(rows)
+            qf = _qdrant_filters(user_id, memo_type, modified_within_days, filters)
+            qvec = embedder.get_embedding(query or "")
+            vec = qdrant.search_points(vector=qvec, limit=limit, user_id=user_id, filters=qf)
 
-    # 3) Neighbor append
-    results = _append_neighbors(results, kuzu, neighbor_cap)
+            vec_mems: list[SearchResult] = []
+            for r in vec:
+                payload = r.get("payload", {})
+                core = payload.get("core", {})
+                entity = payload.get("entity", {})
+                statement = entity.get("statement") or core.get("statement") or ""
+                m = Memory(
+                    id=r.get("id") or str(uuid4()),
+                    user_id=core.get("user_id", ""),
+                    memory_type=core.get("memory_type", "memo"),
+                    payload={
+                        "statement": statement,
+                        **{k: v for k, v in entity.items() if k != "statement"},
+                    },
+                    tags=core.get("tags", []),
+                    confidence=core.get("confidence", 0.8),
+                    is_valid=core.get("is_valid", True),
+                    created_at=_parse_datetime(core.get("created_at")),
+                    supersedes=core.get("supersedes"),
+                    superseded_by=core.get("superseded_by"),
+                    vector=None,
+                    hrid=core.get("hrid"),  # NEW
+                )
+                vec_mems.append(
+                    SearchResult(
+                        memory=m,
+                        score=float(r.get("score", 0.0)),
+                        distance=None,
+                        source="qdrant",
+                        metadata={},
+                    )
+                )
 
-    # Sort and clamp
-    results.sort(key=lambda r: r.score, reverse=True)
+            by_id: dict[str, SearchResult] = {r.memory.id: r for r in vec_mems}
+            for m in candidates:
+                sr = by_id.get(m.id)
+                if sr is None or sr.score < 0.5:
+                    by_id[m.id] = SearchResult(
+                        memory=m, score=0.5, distance=None, source="graph", metadata={}
+                    )
+            results = list(by_id.values())
+
+    except DatabaseError:
+        if has_query:
+            qf = _qdrant_filters(user_id, memo_type, modified_within_days, filters)
+            qvec = embedder.get_embedding(query or "")
+            vec = qdrant.search_points(vector=qvec, limit=limit, user_id=user_id, filters=qf)
+            for r in vec:
+                payload = r.get("payload", {})
+                core = payload.get("core", {})
+                entity = payload.get("entity", {})
+                statement = entity.get("statement") or core.get("statement") or ""
+                m = Memory(
+                    id=r.get("id") or str(uuid4()),
+                    user_id=core.get("user_id", ""),
+                    memory_type=core.get("memory_type", "memo"),
+                    payload={
+                        "statement": statement,
+                        **{k: v for k, v in entity.items() if k != "statement"},
+                    },
+                    tags=core.get("tags", []),
+                    confidence=core.get("confidence", 0.8),
+                    is_valid=core.get("is_valid", True),
+                    created_at=_parse_datetime(core.get("created_at")),
+                    supersedes=core.get("supersedes"),
+                    superseded_by=core.get("superseded_by"),
+                    vector=None,
+                    hrid=core.get("hrid"),  # NEW
+                )
+                results.append(
+                    SearchResult(
+                        memory=m,
+                        score=float(r.get("score", 0.0)),
+                        distance=None,
+                        source="qdrant",
+                        metadata={},
+                    )
+                )
+        else:
+            results = []
+
+    # neighbors (anchors only)
+    results = _append_neighbors(results, kuzu, neighbor_cap, relation_names)
+
+    # final order & clamp
+    results.sort(key=_sort_key)
     return results[:limit]

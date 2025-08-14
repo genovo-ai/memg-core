@@ -16,7 +16,7 @@ from qdrant_client.models import (
     VectorParams,
 )
 
-from ..exceptions import DatabaseError
+from memg_core.core.exceptions import DatabaseError
 
 
 class QdrantInterface:

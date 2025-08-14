@@ -6,9 +6,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from ..core.config import get_config
-from ..core.interfaces.kuzu import KuzuInterface
-from ..core.interfaces.qdrant import QdrantInterface
+from memg_core.core.config import get_config
+from memg_core.core.interfaces.kuzu import KuzuInterface
+from memg_core.core.interfaces.qdrant import QdrantInterface
 
 
 def get_system_info(

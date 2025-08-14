@@ -5,7 +5,7 @@ from typing import Any
 
 import kuzu
 
-from ..exceptions import DatabaseError
+from memg_core.core.exceptions import DatabaseError
 
 
 class KuzuInterface:

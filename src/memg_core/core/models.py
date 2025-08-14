@@ -1,4 +1,4 @@
-"""Core data models for memory system - minimal and stable"""
+from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
@@ -8,88 +8,79 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Memory(BaseModel):
-    """Type-agnostic Memory model - core fields only"""
-
-    # Core identification
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    user_id: str = Field(..., description="User ID for memory isolation")
-    memory_type: str = Field(..., description="Entity type name from YAML schema")
-
-    # Generic payload for entity-specific fields
-    payload: dict[str, Any] = Field(
-        default_factory=dict, description="Entity-specific fields from YAML"
-    )
-
-    # Core metadata (minimal but stable)
-    tags: list[str] = Field(default_factory=list, description="Flexible tagging")
-    confidence: float = Field(0.8, ge=0.0, le=1.0, description="Storage confidence")
-    vector: list[float] | None = Field(None, description="Embedding vector")
-
-    # Temporal fields
-    is_valid: bool = Field(True, description="Whether memory is currently valid")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-    # Version tracking
-    supersedes: str | None = Field(None, description="ID of memory this supersedes")
-    superseded_by: str | None = Field(None, description="ID of memory that supersedes this")
-
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def to_qdrant_payload(self) -> dict[str, Any]:
-        """Convert memory to Qdrant point payload with nested structure"""
-        return {
-            "core": {
-                "id": self.id,
-                "user_id": self.user_id,
-                "memory_type": self.memory_type,
-                "tags": self.tags,
-                "confidence": self.confidence,
-                "is_valid": self.is_valid,
-                "created_at": self.created_at.isoformat(),
-                "supersedes": self.supersedes,
-                "superseded_by": self.superseded_by,
-            },
-            "entity": self.payload,  # All entity-specific fields from YAML
-        }
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    user_id: str = ""
+    memory_type: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+    confidence: float = 0.8
+    vector: list[float] | None = None
+    is_valid: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    supersedes: str | None = None
+    superseded_by: str | None = None
 
-    def to_kuzu_node(self) -> dict[str, Any]:
-        """Convert memory to Kuzu node properties - core metadata only"""
-        kuzu_data = {
-            "id": self.id,
-            "user_id": self.user_id,
-            "memory_type": self.memory_type,
-            "tags": ",".join(self.tags),
-            "confidence": self.confidence,
-            "is_valid": self.is_valid,
-            "created_at": self.created_at.isoformat(),
-            "supersedes": self.supersedes or "",
-            "superseded_by": self.superseded_by or "",
-        }
-
-        # Add specific fields that are useful for graph queries
-        # Title for display purposes
-        if "title" in self.payload:
-            kuzu_data["title"] = str(self.payload["title"])[:200] or ""
-        else:
-            kuzu_data["title"] = ""
-
-        # Task-specific fields for relationship potential
-        if self.memory_type == "task":
-            kuzu_data["task_status"] = self.payload.get("task_status", "")
-            kuzu_data["assignee"] = self.payload.get("assignee", "")
-            if "due_date" in self.payload and self.payload["due_date"]:
-                kuzu_data["due_date"] = str(self.payload["due_date"])
-            else:
-                kuzu_data["due_date"] = ""
-
-        return kuzu_data
+    # NEW: human-readable id (e.g., TASK_AAA001)
+    hrid: str | None = None
 
     @field_validator("memory_type")
     @classmethod
-    def memory_type_not_empty(cls, v):
+    def memory_type_not_empty(cls, v: str) -> str:
         if not v or not v.strip():
-            raise ValueError("Memory type cannot be empty")
+            raise ValueError("memory_type cannot be empty")
         return v.strip()
+
+    def to_qdrant_payload(self) -> dict[str, Any]:
+        core = {
+            "id": self.id,
+            "user_id": self.user_id,
+            "memory_type": self.memory_type,
+            "tags": self.tags,
+            "confidence": self.confidence,
+            "is_valid": self.is_valid,
+            "created_at": self.created_at.isoformat(),
+            "supersedes": self.supersedes,
+            "superseded_by": self.superseded_by,
+        }
+        if self.hrid:
+            core["hrid"] = self.hrid
+
+        # entity fields live under "entity"
+        entity = dict(self.payload)
+
+        return {"core": core, "entity": entity}
+
+    def to_kuzu_node(self) -> dict[str, Any]:
+        # Flatten selected, queryable fields for graph queries
+        node = {
+            "id": self.id,
+            "user_id": self.user_id,
+            "memory_type": self.memory_type,
+            "created_at": self.created_at.isoformat(),
+            "is_valid": self.is_valid,
+            "tags": self.tags,
+            "confidence": self.confidence,
+        }
+        if self.hrid:
+            node["hrid"] = self.hrid
+
+        # Make statement/title and a few common task fields directly filterable
+        stmt = self.payload.get("statement")
+        if isinstance(stmt, str) and stmt:
+            node["statement"] = stmt
+
+        title = self.payload.get("title")
+        if isinstance(title, str) and title:
+            node["title"] = title
+
+        # Task-like fields (optional)
+        for k in ("task_status", "task_priority", "due_date", "status", "priority"):
+            if k in self.payload and self.payload[k] is not None:
+                node[k] = self.payload[k]
+
+        return node
 
 
 class Entity(BaseModel):
