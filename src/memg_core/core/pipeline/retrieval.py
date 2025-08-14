@@ -102,10 +102,13 @@ def _sort_key(r: SearchResult) -> tuple:
 
 
 def _build_graph_query_for_memos(
+    query: str | None,
+    *,
     user_id: str | None,
     limit: int,
-    memo_type: str | None,
-    modified_within_days: int | None,
+    relation_names: list[str] | None = None,
+    memo_type: str | None = None,
+    modified_within_days: int | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Graph-first: fetch Memo nodes by filters (no Entity matching).
     Returns m.* fields only; neighbors will be fetched separately.
@@ -306,8 +309,10 @@ def graph_rag_search(
     try:
         if eff_mode == "graph":
             cypher, params = _build_graph_query_for_memos(
+                query,
                 user_id=user_id,
                 limit=limit,
+                relation_names=relation_names,
                 memo_type=memo_type,
                 modified_within_days=modified_within_days,
             )
@@ -372,8 +377,10 @@ def graph_rag_search(
                 )
         else:  # hybrid
             cypher, params = _build_graph_query_for_memos(
+                query,
                 user_id=user_id,
                 limit=limit,
+                relation_names=relation_names,
                 memo_type=memo_type,
                 modified_within_days=modified_within_days,
             )

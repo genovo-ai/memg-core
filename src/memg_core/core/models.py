@@ -32,6 +32,20 @@ class Memory(BaseModel):
             raise ValueError("memory_type cannot be empty")
         return v.strip()
 
+    # Back-compat convenience properties for tests/tools
+    @property
+    def content(self) -> str | None:
+        # Back-compat shim; prefer payload["details"] or ["content"] if present
+        if isinstance(self.payload, dict):
+            return self.payload.get("content") or self.payload.get("details")
+        return None
+
+    @property
+    def summary(self) -> str | None:
+        if isinstance(self.payload, dict):
+            return self.payload.get("summary") or self.payload.get("statement")
+        return None
+
     def to_qdrant_payload(self) -> dict[str, Any]:
         core = {
             "id": self.id,
@@ -50,7 +64,17 @@ class Memory(BaseModel):
         # entity fields live under "entity"
         entity = dict(self.payload)
 
-        return {"core": core, "entity": entity}
+        payload = {
+            "core": core,
+            "entity": entity,
+            # --- Back-compat flat mirrors (only for common keys) ---
+            # Tests reference payload["content"], payload["title"]
+            **({"content": entity.get("content")} if "content" in entity else {}),
+            **({"title": entity.get("title")} if "title" in entity else {}),
+            **({"statement": entity.get("statement")} if "statement" in entity else {}),
+            **({"summary": entity.get("summary")} if "summary" in entity else {}),
+        }
+        return payload
 
     def to_kuzu_node(self) -> dict[str, Any]:
         # Flatten selected, queryable fields for graph queries
@@ -60,7 +84,7 @@ class Memory(BaseModel):
             "memory_type": self.memory_type,
             "created_at": self.created_at.isoformat(),
             "is_valid": self.is_valid,
-            "tags": self.tags,
+            "tags": ",".join(self.tags) if isinstance(self.tags, list) else (self.tags or ""),
             "confidence": self.confidence,
         }
         if self.hrid:

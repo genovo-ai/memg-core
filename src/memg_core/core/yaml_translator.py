@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import contextlib
 from functools import lru_cache
+from importlib.resources import files as pkg_files
 import os
 from pathlib import Path
 from typing import Any
@@ -50,11 +51,23 @@ class YamlTranslator:
     def schema(self) -> dict[str, Any]:
         if self._schema is not None:
             return self._schema
-        if not self.yaml_path:
-            # Soft fail: allow operation without YAML, but restricted
-            raise YamlTranslatorError(
-                "MEMG_YAML_SCHEMA not set; YAML schema required for strict mode"
-            )
+
+        # If explicit path is present, use it (strict)
+        if self.yaml_path:
+            self._schema = self._load_schema()
+            return self._schema
+
+        # Fallback to packaged minimal schema (keeps module usable in tests/dev)
+        try:
+            fallback_path = str(pkg_files("memg_core.core._defaults") / "entities.min.yaml")
+            self.yaml_path = fallback_path
+            self._schema = self._load_schema()
+            return self._schema
+        except Exception as e:
+            raise YamlTranslatorError("MEMG_YAML_SCHEMA not set and fallback schema failed") from e
+
+    def _load_schema(self) -> dict[str, Any]:
+        """Load schema from the current yaml_path."""
         path = Path(self.yaml_path)
         if not path.exists():
             raise YamlTranslatorError(f"YAML schema not found at {path}")
@@ -65,8 +78,7 @@ class YamlTranslator:
                 raise YamlTranslatorError("Empty YAML schema")
             if not isinstance(data, dict):
                 raise YamlTranslatorError("YAML schema root must be a mapping")
-            self._schema = data
-            return self._schema
+            return data
         except yaml.YAMLError as e:
             raise YamlTranslatorError(f"Invalid YAML syntax: {e}") from e
 
