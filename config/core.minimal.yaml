@@ -1,0 +1,88 @@
+version: v1
+
+id_policy:
+  kind: uuid
+  field: id
+
+defaults:
+  vector:
+    metric: cosine
+    normalize: true
+    dim: 384
+  timestamps:
+    auto_create: true
+    auto_update: true
+
+entities:
+  - name: note
+    description: "Short free-form note"
+    anchor: content
+    fields:
+      id:          { type: string, required: true, system: true }
+      user_id:     { type: string, required: true, system: true }
+      content:     { type: string, required: true, max_length: 8000 }
+      title:       { type: string }
+      source:      { type: string, default: "user" }
+      tags:        { type: tags }
+      confidence:  { type: float, default: 0.8, system: true }
+      is_valid:    { type: bool, default: true, system: true }
+      created_at:  { type: datetime, required: true, system: true }
+      supersedes:  { type: string }
+      superseded_by: { type: string }
+      vector:      { type: vector, dim: 384, derived_from: content, system: true }
+
+  - name: document
+    description: "Document with AI summary as anchor"
+    anchor: summary
+    fields:
+      id:          { type: string, required: true, system: true }
+      user_id:     { type: string, required: true, system: true }
+      summary:     { type: string, required: true, max_length: 4000 }
+      body:        { type: string, required: true }
+      title:       { type: string }
+      source:      { type: string, default: "user" }
+      tags:        { type: tags }
+      confidence:  { type: float, default: 0.8, system: true }
+      is_valid:    { type: bool, default: true, system: true }
+      created_at:  { type: datetime, required: true, system: true }
+      expires_at:  { type: datetime }
+      supersedes:  { type: string }
+      superseded_by: { type: string }
+      vector:      { type: vector, dim: 384, derived_from: summary, system: true }
+
+  - name: task
+    description: "Task with status and priority (Jira-style for AI agents)"
+    anchor: summary
+    fields:
+      id:          { type: string, required: true, system: true }
+      user_id:     { type: string, required: true, system: true }
+      summary:     { type: string, required: true, max_length: 500 }
+      content:     { type: string }
+      title:       { type: string }
+      source:      { type: string, default: "user" }
+      tags:        { type: tags }
+      confidence:  { type: float, default: 0.8, system: true }
+      is_valid:    { type: bool, default: true, system: true }
+      created_at:  { type: datetime, required: true, system: true }
+      supersedes:  { type: string }
+      superseded_by: { type: string }
+      task_status: { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled], default: todo }
+      task_priority: { type: enum, choices: [low, medium, high, critical], default: medium }
+      assignee:    { type: string }
+      due_date:    { type: datetime }
+      vector:      { type: vector, dim: 384, derived_from: summary, system: true }
+
+relations:
+  - name: has_note
+    description: "Attach notes to any entity"
+    directed: true
+    predicates: [HAS_NOTE]
+    source: "*"
+    target: note
+
+  - name: has_document
+    description: "Attach documents to any entity"
+    directed: true
+    predicates: [HAS_DOCUMENT]
+    source: "*"
+    target: document

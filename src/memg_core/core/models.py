@@ -1,136 +1,94 @@
 """Core data models for memory system - minimal and stable"""
 
 from datetime import UTC, datetime
-from enum import Enum
 from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class MemoryType(str, Enum):
-    """Simple, stable memory types for production system"""
-
-    DOCUMENT = "document"  # Technical documentation, articles, guides with AI summary
-    NOTE = "note"  # Brief notes, observations, ideas
-    TASK = "task"  # Task-related memories with status tracking
-
-
-class TaskStatus(str, Enum):
-    """Task status for workflow management"""
-
-    BACKLOG = "backlog"
-    TODO = "todo"
-    IN_PROGRESS = "in_progress"
-    IN_REVIEW = "in_review"
-    DONE = "done"
-    CANCELLED = "cancelled"
-
-
-class TaskPriority(str, Enum):
-    """Task priority levels"""
-
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
 class Memory(BaseModel):
-    """Simple, stable Memory model for production system"""
+    """Type-agnostic Memory model - core fields only"""
 
     # Core identification
     id: str = Field(default_factory=lambda: str(uuid4()))
     user_id: str = Field(..., description="User ID for memory isolation")
-    content: str = Field(..., description="The actual memory content")
+    memory_type: str = Field(..., description="Entity type name from YAML schema")
 
-    # Type classification (simple 3-type system)
-    memory_type: MemoryType = Field(MemoryType.NOTE, description="Type of memory")
+    # Generic payload for entity-specific fields
+    payload: dict[str, Any] = Field(
+        default_factory=dict, description="Entity-specific fields from YAML"
+    )
 
-    # AI-generated fields (based on type)
-    summary: str | None = Field(None, description="AI-generated summary (for documents)")
-
-    # Metadata (minimal but flexible)
-    title: str | None = Field(None, description="Optional title")
-    source: str = Field("user", description="Source of memory")
+    # Core metadata (minimal but stable)
     tags: list[str] = Field(default_factory=list, description="Flexible tagging")
-
-    # Processing metadata
     confidence: float = Field(0.8, ge=0.0, le=1.0, description="Storage confidence")
     vector: list[float] | None = Field(None, description="Embedding vector")
 
-    # Temporal fields (simplified)
+    # Temporal fields
     is_valid: bool = Field(True, description="Whether memory is currently valid")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    expires_at: datetime | None = Field(None, description="Optional expiration for documents")
 
-    # Version tracking (for document supersession)
+    # Version tracking
     supersedes: str | None = Field(None, description="ID of memory this supersedes")
     superseded_by: str | None = Field(None, description="ID of memory that supersedes this")
-
-    # Task-specific optional fields (only used when memory_type = TASK)
-    task_status: TaskStatus | None = Field(None, description="Task status for TASK memory type")
-    task_priority: TaskPriority | None = Field(None, description="Task priority level")
-    assignee: str | None = Field(None, description="Task assignee username/email")
-    due_date: datetime | None = Field(None, description="Task due date")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def to_qdrant_payload(self) -> dict[str, Any]:
-        """Convert memory to Qdrant point payload"""
-        payload = {
-            "user_id": self.user_id,
-            "content": self.content,
-            "memory_type": self.memory_type.value,
-            "summary": self.summary,
-            "title": self.title,
-            "source": self.source,
-            "tags": self.tags,
-            "confidence": self.confidence,
-            "is_valid": self.is_valid,
-            "created_at": self.created_at.isoformat(),
-            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
-            "supersedes": self.supersedes,
-            "superseded_by": self.superseded_by,
+        """Convert memory to Qdrant point payload with nested structure"""
+        return {
+            "core": {
+                "id": self.id,
+                "user_id": self.user_id,
+                "memory_type": self.memory_type,
+                "tags": self.tags,
+                "confidence": self.confidence,
+                "is_valid": self.is_valid,
+                "created_at": self.created_at.isoformat(),
+                "supersedes": self.supersedes,
+                "superseded_by": self.superseded_by,
+            },
+            "entity": self.payload,  # All entity-specific fields from YAML
         }
 
-        # Add task-specific fields if this is a task memory
-        if self.memory_type == MemoryType.TASK:
-            payload.update(
-                {
-                    "task_status": self.task_status.value if self.task_status else None,
-                    "task_priority": (self.task_priority.value if self.task_priority else None),
-                    "assignee": self.assignee,
-                    "due_date": self.due_date.isoformat() if self.due_date else None,
-                }
-            )
-
-        return payload
-
     def to_kuzu_node(self) -> dict[str, Any]:
-        """Convert memory to Kuzu node properties"""
-        return {
+        """Convert memory to Kuzu node properties - core metadata only"""
+        kuzu_data = {
             "id": self.id,
             "user_id": self.user_id,
-            "content": self.content[:500],  # Truncate for graph storage
-            "memory_type": self.memory_type.value,
-            "summary": self.summary or "",
-            "title": self.title or "",
-            "source": self.source,
+            "memory_type": self.memory_type,
             "tags": ",".join(self.tags),
             "confidence": self.confidence,
             "is_valid": self.is_valid,
             "created_at": self.created_at.isoformat(),
-            "expires_at": self.expires_at.isoformat() if self.expires_at else "",
             "supersedes": self.supersedes or "",
             "superseded_by": self.superseded_by or "",
         }
 
-    @field_validator("content")
+        # Add specific fields that are useful for graph queries
+        # Title for display purposes
+        if "title" in self.payload:
+            kuzu_data["title"] = str(self.payload["title"])[:200] or ""
+        else:
+            kuzu_data["title"] = ""
+
+        # Task-specific fields for relationship potential
+        if self.memory_type == "task":
+            kuzu_data["task_status"] = self.payload.get("task_status", "")
+            kuzu_data["assignee"] = self.payload.get("assignee", "")
+            if "due_date" in self.payload and self.payload["due_date"]:
+                kuzu_data["due_date"] = str(self.payload["due_date"])
+            else:
+                kuzu_data["due_date"] = ""
+
+        return kuzu_data
+
+    @field_validator("memory_type")
     @classmethod
-    def content_not_empty(cls, v):
+    def memory_type_not_empty(cls, v):
         if not v or not v.strip():
-            raise ValueError("Content cannot be empty")
+            raise ValueError("Memory type cannot be empty")
         return v.strip()
 
 

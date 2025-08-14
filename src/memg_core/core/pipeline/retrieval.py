@@ -10,7 +10,7 @@ from ..exceptions import DatabaseError
 from ..interfaces.embedder import Embedder
 from ..interfaces.kuzu import KuzuInterface
 from ..interfaces.qdrant import QdrantInterface
-from ..models import Memory, MemoryType, SearchResult
+from ..models import Memory, SearchResult
 
 
 def _parse_datetime(date_str: Any) -> datetime:
@@ -62,12 +62,7 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
     """Convert graph query rows to Memory objects"""
     results: list[Memory] = []
     for row in rows:
-        raw_memory_type = row.get("m.memory_type", row.get("memory_type", "note"))
-        try:
-            memory_type = MemoryType(raw_memory_type)
-        except ValueError:
-            # Fall back to NOTE for invalid memory types
-            memory_type = MemoryType.NOTE
+        memory_type = row.get("m.memory_type", row.get("memory_type", "note"))
 
         created_at_raw = row.get("m.created_at", row.get("created_at"))
         try:
@@ -78,27 +73,32 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
             # Fall back to current time for invalid dates
             created_dt = datetime.now(UTC)
 
+        # Build minimal payload from available Kuzu fields
+        payload = {}
+        if row.get("m.title") or row.get("title"):
+            payload["title"] = row.get("m.title") or row.get("title", "")
+
+        # Add task-specific fields if available (stored in Kuzu for relationship purposes)
+        if memory_type == "task":
+            if row.get("m.task_status") or row.get("task_status"):
+                payload["task_status"] = row.get("m.task_status") or row.get("task_status", "")
+            if row.get("m.assignee") or row.get("assignee"):
+                payload["assignee"] = row.get("m.assignee") or row.get("assignee", "")
+            if row.get("m.due_date") or row.get("due_date"):
+                payload["due_date"] = row.get("m.due_date") or row.get("due_date", "")
+
         results.append(
             Memory(
                 id=row.get("m.id") or row.get("id") or str(uuid4()),
                 user_id=row.get("m.user_id") or row.get("user_id", ""),
-                content=row.get("m.content") or row.get("content", ""),
                 memory_type=memory_type,
-                summary=row.get("m.summary"),
-                title=row.get("m.title"),
-                source=row.get("m.source", "user"),
+                payload=payload,
                 tags=(row.get("m.tags", "").split(",") if row.get("m.tags") else []),
                 confidence=float(row.get("m.confidence", 0.8)),
-                vector=None,
-                is_valid=True,
+                is_valid=bool(row.get("m.is_valid", True)),
                 created_at=created_dt,
-                expires_at=None,
-                supersedes=None,
-                superseded_by=None,
-                task_status=None,
-                task_priority=None,
-                assignee=None,
-                due_date=None,
+                supersedes=row.get("m.supersedes") or None,
+                superseded_by=row.get("m.superseded_by") or None,
             )
         )
     return results
@@ -151,31 +151,23 @@ def _append_neighbors(
         )
 
         for row in neighbors:
-            try:
-                mtype = MemoryType(row.get("memory_type", "note"))
-            except ValueError:
-                # Fall back to NOTE for invalid memory types
-                mtype = MemoryType.NOTE
+            mtype = row.get("memory_type", "note")
+
+            # Build minimal payload for neighbor
+            neighbor_payload = {}
+            if row.get("title"):
+                neighbor_payload["title"] = row.get("title", "")
 
             neighbor_memory = Memory(
                 id=row.get("id") or str(uuid4()),
                 user_id=row.get("user_id", ""),
-                content=row.get("content", ""),
                 memory_type=mtype,
-                title=row.get("title"),
-                summary=None,
-                source="user",
+                payload=neighbor_payload,
                 confidence=0.8,
-                vector=None,
                 is_valid=True,
                 created_at=_parse_datetime(row.get("created_at")),
-                expires_at=None,
                 supersedes=None,
                 superseded_by=None,
-                task_status=None,
-                task_priority=None,
-                assignee=None,
-                due_date=None,
                 tags=[],
             )
 
@@ -252,36 +244,26 @@ def graph_rag_search(
         results = []
         for r in vec:
             payload = r.get("payload", {})
-            try:
-                mtype = MemoryType(payload.get("memory_type", "note"))
-            except ValueError:
-                # Fall back to NOTE for invalid memory types
-                mtype = MemoryType.NOTE
+            core_data = payload.get("core", {})
+            entity_data = payload.get("entity", {})
+
+            mtype = core_data.get("memory_type", "note")
 
             mem = Memory(
                 id=r.get("id") or str(uuid4()),
-                user_id=payload.get("user_id", ""),
-                content=payload.get("content", ""),
+                user_id=core_data.get("user_id", ""),
                 memory_type=mtype,
-                summary=payload.get("summary"),
-                title=payload.get("title"),
-                source=payload.get("source", "user"),
-                tags=payload.get("tags", []),
-                confidence=payload.get("confidence", 0.8),
-                vector=None,
-                is_valid=payload.get("is_valid", True),
+                payload=entity_data,  # All entity-specific fields
+                tags=core_data.get("tags", []),
+                confidence=core_data.get("confidence", 0.8),
+                is_valid=core_data.get("is_valid", True),
                 created_at=(
-                    datetime.fromisoformat(payload.get("created_at"))
-                    if payload.get("created_at")
+                    datetime.fromisoformat(core_data.get("created_at"))
+                    if core_data.get("created_at")
                     else datetime.now(UTC)
                 ),
-                expires_at=None,
-                supersedes=None,
-                superseded_by=None,
-                task_status=None,
-                task_priority=None,
-                assignee=None,
-                due_date=None,
+                supersedes=core_data.get("supersedes"),
+                superseded_by=core_data.get("superseded_by"),
             )
             results.append(
                 SearchResult(

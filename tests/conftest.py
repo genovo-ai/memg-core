@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from memg_core.core.interfaces.embedder import Embedder
 from memg_core.core.interfaces.kuzu import KuzuInterface
 from memg_core.core.interfaces.qdrant import QdrantInterface
-from memg_core.core.models import Memory, MemoryType
+from memg_core.core.models import Memory
 
 
 class DummyEmbedder:
@@ -441,23 +441,18 @@ def mem_factory() -> Callable[..., Memory]:
         defaults = {
             "id": str(uuid4()),
             "user_id": "test-user",
-            "content": "Test memory content",
-            "memory_type": MemoryType.NOTE,
-            "title": "Test Title",
-            "summary": None,
-            "source": "user",
+            "memory_type": "note",
+            "payload": {
+                "content": "Test memory content",
+                "title": "Test Title",
+                "source": "user",
+            },
             "tags": ["test"],
             "confidence": 0.8,
-            "vector": None,
             "is_valid": True,
             "created_at": datetime.now(UTC),
-            "expires_at": None,
             "supersedes": None,
             "superseded_by": None,
-            "task_status": None,
-            "task_priority": None,
-            "assignee": None,
-            "due_date": None,
         }
         return Memory(**{**defaults, **kwargs})
 
