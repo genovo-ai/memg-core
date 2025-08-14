@@ -35,10 +35,20 @@ class Memory(BaseModel):
     # Back-compat convenience properties for tests/tools
     @property
     def content(self) -> str | None:
-        # Back-compat shim; prefer payload["details"] or ["content"] if present
-        if isinstance(self.payload, dict):
-            return self.payload.get("content") or self.payload.get("details")
-        return None
+        """
+        Back-compat convenience for tests and old callers.
+        Prefer 'details' (documents), then 'content', then 'statement' (notes/tasks).
+        """
+        entity = self.payload or {}
+        return entity.get("details") or entity.get("content") or entity.get("statement")
+
+    @property
+    def title(self) -> str | None:
+        """
+        Back-compat convenience to expose title at the top level.
+        """
+        entity = self.payload or {}
+        return entity.get("title")
 
     @property
     def summary(self) -> str | None:
