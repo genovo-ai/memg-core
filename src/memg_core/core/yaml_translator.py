@@ -68,6 +68,8 @@ class YamlTranslator:
 
     def _load_schema(self) -> dict[str, Any]:
         """Load schema from the current yaml_path."""
+        if not self.yaml_path:
+            raise YamlTranslatorError("YAML path is None")
         path = Path(self.yaml_path)
         if not path.exists():
             raise YamlTranslatorError(f"YAML schema not found at {path}")
