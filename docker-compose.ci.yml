@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  ci-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+    container_name: memg-ci-runner
+    volumes:
+      # Mount source for live development
+      - ./src:/workspace/src
+      - ./tests:/workspace/tests
+      - ./pyproject.toml:/workspace/pyproject.toml
+      - ./requirements.txt:/workspace/requirements.txt
+      - ./requirements-dev.txt:/workspace/requirements-dev.txt
+      # Mount temp data for persistence
+      - ci-qdrant-data:/workspace/temp_data/qdrant
+      - ci-kuzu-data:/workspace/temp_data/kuzu
+    environment:
+      - PYTHONPATH=/workspace/src
+      - QDRANT_STORAGE_PATH=/workspace/temp_data/qdrant
+      - KUZU_DB_PATH=/workspace/temp_data/kuzu/ci_test.db
+    command: >
+      bash -c "
+        echo '🐳 MEMG Core - Local CI Pipeline' &&
+        echo '=================================' &&
+        echo '' &&
+        echo '📋 Environment Info:' &&
+        echo '  Python: $$(python --version)' &&
+        echo '  Platform: $$(uname -a | cut -d' ' -f1-3)' &&
+        echo '  Working Dir: $$(pwd)' &&
+        echo '' &&
+        echo '🔍 Step 1: Security Scan (Bandit)' &&
+        bandit -r src/ -f json -o bandit-report.json &&
+        echo '✅ Security scan passed' &&
+        echo '' &&
+        echo '🎨 Step 2: Code Formatting Check (Ruff)' &&
+        ruff format --check src/ &&
+        echo '✅ Formatting check passed' &&
+        echo '' &&
+        echo '🔍 Step 3: Code Linting (Ruff)' &&
+        ruff check src/ &&
+        echo '✅ Linting passed' &&
+        echo '' &&
+        echo '🧩 Step 4: Type Checking (MyPy)' &&
+        mypy src/ --ignore-missing-imports &&
+        echo '✅ Type checking passed' &&
+        echo '' &&
+        echo '🧪 Step 5: Running Test Suite' &&
+        python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing &&
+        echo '' &&
+        echo '🎉 LOCAL CI PIPELINE COMPLETED SUCCESSFULLY!' &&
+        echo '   All checks passed - ready for GitHub CI! 🚀'
+      "
+
+  # Interactive development container
+  ci-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+    container_name: memg-ci-dev
+    volumes:
+      - ./:/workspace
+      - ci-qdrant-data:/workspace/temp_data/qdrant
+      - ci-kuzu-data:/workspace/temp_data/kuzu
+    environment:
+      - PYTHONPATH=/workspace/src
+      - QDRANT_STORAGE_PATH=/workspace/temp_data/qdrant
+      - KUZU_DB_PATH=/workspace/temp_data/kuzu/ci_test.db
+    command: bash
+    stdin_open: true
+    tty: true
+
+volumes:
+  ci-qdrant-data:
+  ci-kuzu-data:
