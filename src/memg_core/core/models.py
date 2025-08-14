@@ -66,6 +66,11 @@ class Memory(BaseModel):
         return (self.payload or {}).get("title")
 
     @property
+    def due_date(self) -> str | None:
+        """TEMP back-compat: allow .due_date access for task tests."""
+        return (self.payload or {}).get("due_date")
+
+    @property
     def summary(self) -> str | None:
         if isinstance(self.payload, dict):
             return self.payload.get("summary") or self.payload.get("statement")
@@ -112,7 +117,19 @@ class Memory(BaseModel):
             "user_id": self.user_id,
             "memory_type": self.memory_type,
             "tags": ",".join(self.tags) if isinstance(self.tags, list) else (self.tags or ""),
+            "created_at": self.created_at.isoformat(),
+            "is_valid": self.is_valid,
         }
+
+        # TEMP back-compat: Add fields that tests expect
+        if self.hrid:
+            node["hrid"] = self.hrid
+        if self.supersedes:
+            node["supersedes"] = self.supersedes
+        if self.superseded_by:
+            node["superseded_by"] = self.superseded_by
+
+        # Entity fields
         if entity.get("title"):
             node["title"] = str(entity["title"])[:256]
         if entity.get("task_status"):
