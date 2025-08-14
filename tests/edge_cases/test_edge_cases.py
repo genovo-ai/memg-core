@@ -5,7 +5,7 @@ import pytest
 pytestmark = pytest.mark.edge_case
 from datetime import UTC, datetime, timedelta
 
-from memg_core.core.models import Memory, MemoryType
+from memg_core.core.models import Memory
 from memg_core.core.pipeline.indexer import add_memory_index
 from memg_core.core.pipeline.retrieval import graph_rag_search
 
@@ -19,7 +19,7 @@ def test_unknown_memory_type_falls_back_to_note(mem_factory, embedder, qdrant_fa
         content="This is content",
         summary="This is summary",
         title="This is title",
-        memory_type=MemoryType.NOTE,  # Start with a valid type
+        memory_type="note",  # Start with a valid type
     )
 
     # Manually create a payload with unknown type to test the retrieval fallback
@@ -61,7 +61,7 @@ def test_unknown_memory_type_falls_back_to_note(mem_factory, embedder, qdrant_fa
     # Should retrieve the memory and normalize type to NOTE
     assert len(results) == 1
     assert results[0].memory.id == "memory-1"
-    assert results[0].memory.memory_type == MemoryType.NOTE
+    assert results[0].memory.memory_type == "note"
 
 
 def test_datetime_handling_naive_to_utc_normalization(mem_factory, embedder, qdrant_fake, kuzu_fake):

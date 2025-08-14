@@ -22,6 +22,49 @@ from ..models import Memory, SearchResult
 # ----------------------------- helpers ---------------------------------
 
 
+# NEW: deterministic field projection for payloads
+def _project_payload(
+    memory_type: str,
+    payload: dict[str, Any] | None,
+    *,
+    include_details: str,
+    projection: dict[str, list[str]] | None,
+) -> dict[str, Any]:
+    """
+    Returns a pruned payload based on include_details and optional projection mapping.
+
+    Policy (v1):
+      - include_details="none": anchors only → keep just "statement" if present.
+      - include_details="self": anchors + optional projection for anchors; always keep "statement" if present.
+      - include_details other values are reserved for future; treated like "self".
+      - Neighbors remain anchors-only regardless (we don't hydrate neighbor details in v1).
+    """
+    payload = dict(payload or {})
+    if not payload:
+        return {}
+
+    # Always prefer having "statement" present if it exists
+    has_stmt = "statement" in payload
+
+    if include_details == "none":
+        return {"statement": payload["statement"]} if has_stmt else {}
+
+    # self / default behavior with optional projection
+    allowed: set[str] | None = None
+    if projection:
+        allowed = set(projection.get(memory_type, []))
+        # Always include statement when present
+        if has_stmt:
+            allowed.add("statement")
+
+    if allowed is None:
+        # No projection → return as-is
+        return payload
+
+    # With projection → prune to allowed keys
+    return {k: v for k, v in payload.items() if k in allowed}
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -78,7 +121,7 @@ def _build_graph_query_for_memos(
         params["memo_type"] = memo_type
     cut = _cutoff(modified_within_days)
     if cut is not None:
-        cypher += " AND coalesce(m.updated_at, m.created_at) >= $cutoff"
+        cypher += " AND m.created_at >= $cutoff"
         params["cutoff"] = _iso(cut)
 
     cypher += (
@@ -118,7 +161,7 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
                 supersedes=None,
                 superseded_by=None,
                 vector=None,
-                hrid=hrid,  # NEW
+                hrid=hrid,
             )
         )
     return out
@@ -171,7 +214,8 @@ def _append_neighbors(
     relation_names: list[str] | None,
 ) -> list[SearchResult]:
     expanded: list[SearchResult] = []
-    rels = relation_names or None
+    # NEW: default whitelist used if none provided (anchors-only neighbors)
+    rels = relation_names or ["RELATED_TO", "HAS_DOCUMENT", "REQUIRES"]
 
     for seed in seeds[: min(5, len(seeds))]:
         mem = seed.memory
@@ -239,6 +283,8 @@ def graph_rag_search(
     memo_type: str | None = None,
     modified_within_days: int | None = None,
     mode: str | None = None,  # 'vector' | 'graph' | 'hybrid'
+    include_details: str = "none",  # NEW: "none" | "self" (neighbors remain anchors-only in v1)
+    projection: dict[str, list[str]] | None = None,  # NEW: per-type field allow-list
 ) -> list[SearchResult]:
     """Unified retrieval with automatic mode selection.
 
@@ -270,10 +316,21 @@ def graph_rag_search(
             if has_query and candidates:
                 results = _rerank_with_vectors(query or "", candidates, qdrant, embedder)
             else:
-                results = [
-                    SearchResult(memory=m, score=0.5, distance=None, source="graph", metadata={})
-                    for m in candidates
-                ]
+                # score-less anchors with projection
+                proj = []
+                for m in candidates:
+                    m.payload = _project_payload(
+                        m.memory_type,
+                        m.payload,
+                        include_details=include_details,
+                        projection=projection,
+                    )
+                    proj.append(
+                        SearchResult(
+                            memory=m, score=0.5, distance=None, source="graph", metadata={}
+                        )
+                    )
+                results = proj
         elif eff_mode == "vector":
             qf = _qdrant_filters(user_id, memo_type, modified_within_days, filters)
             qvec = embedder.get_embedding(query or "")
@@ -299,6 +356,10 @@ def graph_rag_search(
                     superseded_by=core.get("superseded_by"),
                     vector=None,
                     hrid=core.get("hrid"),  # NEW
+                )
+                # NEW: project anchor payload according to include_details/projection
+                m.payload = _project_payload(
+                    m.memory_type, m.payload, include_details=include_details, projection=projection
                 )
                 results.append(
                     SearchResult(
@@ -345,6 +406,9 @@ def graph_rag_search(
                     vector=None,
                     hrid=core.get("hrid"),  # NEW
                 )
+                m.payload = _project_payload(
+                    m.memory_type, m.payload, include_details=include_details, projection=projection
+                )
                 vec_mems.append(
                     SearchResult(
                         memory=m,
@@ -357,6 +421,9 @@ def graph_rag_search(
 
             by_id: dict[str, SearchResult] = {r.memory.id: r for r in vec_mems}
             for m in candidates:
+                m.payload = _project_payload(
+                    m.memory_type, m.payload, include_details=include_details, projection=projection
+                )
                 sr = by_id.get(m.id)
                 if sr is None or sr.score < 0.5:
                     by_id[m.id] = SearchResult(
@@ -391,6 +458,10 @@ def graph_rag_search(
                     vector=None,
                     hrid=core.get("hrid"),  # NEW
                 )
+                # NEW: project anchor payload according to include_details/projection
+                m.payload = _project_payload(
+                    m.memory_type, m.payload, include_details=include_details, projection=projection
+                )
                 results.append(
                     SearchResult(
                         memory=m,
@@ -407,5 +478,10 @@ def graph_rag_search(
     results = _append_neighbors(results, kuzu, neighbor_cap, relation_names)
 
     # final order & clamp
+    def _sort_key(r: SearchResult):
+        h = r.memory.hrid
+        h_idx = hrid_to_index(h) if h else 9_999_999_999  # push missing HRIDs last
+        return (-r.score, h_idx, r.memory.id)
+
     results.sort(key=_sort_key)
     return results[:limit]

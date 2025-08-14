@@ -5,7 +5,7 @@ import pytest
 pytestmark = pytest.mark.unit
 
 from memg_core.core.indexing import build_index_text
-from memg_core.core.models import Memory, MemoryType
+from memg_core.core.models import Memory
 
 
 def test_indexing_note_uses_content():
@@ -13,7 +13,7 @@ def test_indexing_note_uses_content():
     memory = Memory(
         user_id="test-user",
         content="This is a test note",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
         summary="This summary should be ignored for notes",
     )
 
@@ -29,7 +29,7 @@ def test_indexing_document_prefers_summary_over_content():
     memory_with_summary = Memory(
         user_id="test-user",
         content="This is a long document content that should be ignored if summary exists",
-        memory_type=MemoryType.DOCUMENT,
+        memory_type="document",
         summary="This is the document summary",
     )
 
@@ -42,7 +42,7 @@ def test_indexing_document_prefers_summary_over_content():
     memory_without_summary = Memory(
         user_id="test-user",
         content="This is document content",
-        memory_type=MemoryType.DOCUMENT,
+        memory_type="document",
         summary=None,
     )
 
@@ -54,7 +54,7 @@ def test_indexing_document_prefers_summary_over_content():
     memory_empty_summary = Memory(
         user_id="test-user",
         content="This is document content",
-        memory_type=MemoryType.DOCUMENT,
+        memory_type="document",
         summary="   ",  # Just whitespace
     )
 
@@ -69,7 +69,7 @@ def test_indexing_task_title_safe_join():
     memory_with_title = Memory(
         user_id="test-user",
         content="Implement feature X",
-        memory_type=MemoryType.TASK,
+        memory_type="task",
         title="MEMG-123",
     )
 
@@ -81,7 +81,7 @@ def test_indexing_task_title_safe_join():
     memory_without_title = Memory(
         user_id="test-user",
         content="Implement feature X",
-        memory_type=MemoryType.TASK,
+        memory_type="task",
         title=None,
     )
 
@@ -93,7 +93,7 @@ def test_indexing_task_title_safe_join():
     memory_empty_title = Memory(
         user_id="test-user",
         content="Implement feature X",
-        memory_type=MemoryType.TASK,
+        memory_type="task",
         title="   ",  # Just whitespace
     )
 

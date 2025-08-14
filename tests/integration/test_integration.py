@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from memg_core.core.interfaces.embedder import Embedder
 from memg_core.core.interfaces.kuzu import KuzuInterface
 from memg_core.core.interfaces.qdrant import QdrantInterface
-from memg_core.core.models import Memory, MemoryType
+from memg_core.core.models import Memory
 from memg_core.core.pipeline.indexer import add_memory_index
 from memg_core.core.pipeline.retrieval import graph_rag_search
 
@@ -35,7 +35,7 @@ def test_index_and_search_with_real_qdrant():
         id="12345678-1234-5678-1234-567812345678",  # Valid UUID format
         user_id="test-user",
         content="This is an integration test memory",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
         title="Integration Test",
         created_at=datetime.now(UTC),
     )

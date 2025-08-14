@@ -61,9 +61,12 @@ class FakeQdrant:
                         "created_at": datetime.now(UTC).isoformat(),
                         "is_valid": True,
                         "tags": ["t"],
+                        "hrid": f"MEMO_AAA10{i}",  # make deterministic and usable in ordering tests
                     },
                     "entity": {
                         "statement": f"vector-hit-{i+1}",
+                        "title": f"title-{i+1}",
+                        "details": f"details-{i+1}",
                     },
                 },
             })
@@ -310,3 +313,145 @@ def test_public_search_validation(monkeypatch, tmp_yaml):
     assert isinstance(res, list)
     if res:
         assert isinstance(res[0], SearchResult)
+
+def test_retrieval_uses_hrid_for_ties(monkeypatch, tmp_yaml):
+    # two vector hits with same score but different HRIDs → order by hrid_to_index
+    class _Q(FakeQdrant):
+        def search_points(self, vector, limit=5, collection=None, user_id=None, filters=None):
+            def make_result(id_, hrid_):
+                return {
+                    "id": id_,
+                    "score": 0.9,
+                    "payload": {
+                        "core": {
+                            "user_id": user_id or "u",
+                            "memory_type": "memo",
+                            "created_at": datetime.now(UTC).isoformat(),
+                            "is_valid": True,
+                            "tags": ["t"],
+                            "hrid": hrid_,
+                        },
+                        "entity": {"statement": "x"}
+                    }
+                }
+
+            a = make_result("pA", "NOTE_AAA100")
+            b = make_result("pB", "TASK_AAA050")
+            return [a, b]
+
+    q = _Q()
+    k = FakeKuzu()
+    e = FakeEmbedder()
+    results = graph_rag_search(
+        query="tie",
+        user_id="u",
+        limit=5,
+        qdrant=q,
+        kuzu=k,
+        embedder=e,
+        mode="vector",
+    )
+    assert [r.memory.hrid for r in results[:2]] == ["NOTE_AAA100", "TASK_AAA050"]
+
+
+def test_neighbors_default_whitelist_applies(monkeypatch, tmp_yaml):
+    # With relation_names=None, we should still get neighbor expansions (default whitelist)
+    q = FakeQdrant()
+    k = FakeKuzu()
+    e = FakeEmbedder()
+
+    res = graph_rag_search(
+        query="find",
+        user_id="u",
+        limit=5,
+        qdrant=q,
+        kuzu=k,
+        embedder=e,
+        relation_names=None,  # intentionally None
+        neighbor_cap=1,
+        mode="vector",
+    )
+    assert isinstance(res, list)
+    # Ensure at least one neighbor source present
+    assert any(r.source == "graph_neighbor" for r in res)
+
+
+def test_projection_prunes_payload_fields(monkeypatch, tmp_yaml):
+    q = FakeQdrant()
+    k = FakeKuzu()
+    e = FakeEmbedder()
+
+    # include_details="none" → only 'statement' stays
+    res_none = graph_rag_search(
+        query="find",
+        user_id="u",
+        limit=1,
+        qdrant=q,
+        kuzu=k,
+        embedder=e,
+        include_details="none",
+        mode="vector",
+    )
+    assert res_none
+    p0 = res_none[0].memory.payload
+    assert set(p0.keys()) <= {"statement"}
+
+    # include_details="self" with projection for type "memo" → keep 'title' (+ statement)
+    res_proj = graph_rag_search(
+        query="find",
+        user_id="u",
+        limit=1,
+        qdrant=q,
+        kuzu=k,
+        embedder=e,
+        include_details="self",
+        projection={"memo": ["title"]},
+        mode="vector",
+    )
+    assert res_proj
+    p1 = res_proj[0].memory.payload
+    # statement must remain; title should be present; details must be pruned
+    assert "statement" in p1
+    assert "title" in p1
+    assert "details" not in p1
+
+
+def test_public_api_projection_integration(monkeypatch, tmp_yaml):
+    # Test that public API search() properly passes through projection controls
+    import memg_core.api.public as pub
+
+    # Patch dependencies
+    monkeypatch.setattr(pub, "Embedder", FakeEmbedder)
+    monkeypatch.setattr(pub, "QdrantInterface", FakeQdrant)
+    monkeypatch.setattr(pub, "KuzuInterface", FakeKuzu)
+
+    # config shim
+    class _Cfg:
+        def __init__(self):
+            self.memg = SimpleNamespace(
+                qdrant_collection_name="memories",
+                kuzu_database_path="/tmp/kuzu",
+            )
+
+    monkeypatch.setattr(pub, "get_config", lambda: _Cfg())
+
+    # Test default behavior (anchors-only)
+    res_default = pub.search(query="test", user_id="u", limit=1)
+    assert res_default
+    p_default = res_default[0].memory.payload
+    assert set(p_default.keys()) <= {"statement"}
+
+    # Test include_details="self" with projection
+    res_projected = pub.search(
+        query="test",
+        user_id="u",
+        limit=1,
+        include_details="self",
+        projection={"memo": ["title"]}
+    )
+    assert res_projected
+    p_projected = res_projected[0].memory.payload
+    # Should have statement (always) + title (from projection), but not details
+    assert "statement" in p_projected
+    assert "title" in p_projected
+    assert "details" not in p_projected

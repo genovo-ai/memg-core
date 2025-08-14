@@ -4,7 +4,7 @@ import pytest
 
 pytestmark = pytest.mark.lifecycle
 
-from memg_core.core.models import Memory, MemoryType
+from memg_core.core.models import Memory
 from memg_core.core.pipeline.indexer import add_memory_index
 
 
@@ -17,14 +17,14 @@ def test_delete_memory_removes_from_qdrant_and_kuzu_no_dangling_edges(
         id="memory-1",
         user_id="test-user",
         content="Memory 1 content",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     memory2 = mem_factory(
         id="memory-2",
         user_id="test-user",
         content="Memory 2 content",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     # Add memories to index
@@ -85,7 +85,7 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
         id="memory-1",
         user_id="test-user",
         content="Initial content",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
         title="Initial Title",
     )
 
@@ -106,7 +106,7 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
         id="memory-1",
         user_id="test-user",
         content="Updated content",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
         title="Updated Title",
     )
 

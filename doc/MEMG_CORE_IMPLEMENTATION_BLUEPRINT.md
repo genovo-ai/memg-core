@@ -85,6 +85,10 @@ Prioritized for v0.1 release: Slim basics first, then GraphRAG. Use Python 3.11+
   ```
 - **Test It**: Add memory, query Qdrant to verify payload.
 
+## Retrieval Pipeline
+
+- Date scoping uses created_at exclusively in v1. If/when update semantics are introduced, updated_at will be re-added as the primary filter.
+
 ## Next: Release & Community
 - After these, tag v0.1: git tag v0.1 && git push --tags.
 - Add CONTRIBUTING.md: "Welcome PRs! I (benevolent dictator) review all."

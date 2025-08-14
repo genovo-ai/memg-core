@@ -157,6 +157,8 @@ def search(
     memo_type: str | None = None,
     modified_within_days: int | None = None,
     mode: str | None = None,  # 'vector' | 'graph' | 'hybrid'
+    include_details: str = "none",  # NEW: "none" | "self" (neighbors remain anchors-only in v1)
+    projection: dict[str, list[str]] | None = None,  # NEW: per-type field allow-list
 ) -> list[SearchResult]:
     """Unified search over memories (Graph+Vector).
 
@@ -203,6 +205,8 @@ def search(
         memo_type=memo_type,
         modified_within_days=modified_within_days,
         mode=mode,
+        include_details=include_details,
+        projection=projection,
     )
 
 

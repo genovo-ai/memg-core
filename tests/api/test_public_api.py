@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 
 from memg_core.api.public import add_note, add_document, add_task, search
 from memg_core.core.exceptions import ValidationError
-from memg_core.core.models import Memory, MemoryType, SearchResult
+from memg_core.core.models import Memory, SearchResult
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def mock_graph_rag_search():
             id="test-memory-id",
             user_id="test-user",
             content="Test content",
-            memory_type=MemoryType.NOTE,
+            memory_type="note",
         )
         result = SearchResult(
             memory=memory,
@@ -56,7 +56,7 @@ def test_add_note_returns_memory_and_persists(mock_index_memory):
     assert memory.id == "test-memory-id"
     assert memory.user_id == "test-user"
     assert memory.content == "This is a test note"
-    assert memory.memory_type == MemoryType.NOTE
+    assert memory.memory_type == "note"
     assert memory.title == "Test Note"
     assert memory.tags == ["test", "note"]
 
@@ -67,7 +67,7 @@ def test_add_note_returns_memory_and_persists(mock_index_memory):
     indexed_memory = mock_index_memory.call_args[0][0]
     assert indexed_memory.user_id == "test-user"
     assert indexed_memory.content == "This is a test note"
-    assert indexed_memory.memory_type == MemoryType.NOTE
+    assert indexed_memory.memory_type == "note"
 
 
 def test_add_document_summary_used_in_index_text(mock_index_memory):
@@ -85,7 +85,7 @@ def test_add_document_summary_used_in_index_text(mock_index_memory):
     assert memory.id == "test-memory-id"
     assert memory.user_id == "test-user"
     assert memory.content == "This is a long document content"
-    assert memory.memory_type == MemoryType.DOCUMENT
+    assert memory.memory_type == "document"
     assert memory.title == "Test Document"
     assert memory.summary == "This is a document summary"
     assert memory.tags == ["test", "document"]
@@ -112,7 +112,7 @@ def test_add_task_due_date_serialized(mock_index_memory):
     assert memory.id == "test-memory-id"
     assert memory.user_id == "test-user"
     assert memory.content == "This is a test task"
-    assert memory.memory_type == MemoryType.TASK
+    assert memory.memory_type == "task"
     assert memory.title == "Test Task"
     assert memory.due_date == due_date
     assert memory.tags == ["test", "task"]
@@ -162,7 +162,7 @@ def test_search_plugin_absent_does_not_crash():
                 id="test-memory-id",
                 user_id="test-user",
                 content="Test content",
-                memory_type=MemoryType.NOTE,
+                memory_type="note",
             )
             result = SearchResult(
                 memory=memory,
@@ -214,7 +214,7 @@ def test_api_reads_neighbor_cap_env_and_passes_to_pipeline(monkeypatch):
             id="test-memory-id",
             user_id="test-user",
             content="Test content",
-            memory_type=MemoryType.NOTE,
+            memory_type="note",
         )
         result = SearchResult(
             memory=memory,

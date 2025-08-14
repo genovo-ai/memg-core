@@ -242,5 +242,5 @@ artifacts/
 temp_data
 src/memg_core/version.py
 
-# temp - remove later
-docs/*
+# Temporarily commented out to allow documentation
+# docs/*

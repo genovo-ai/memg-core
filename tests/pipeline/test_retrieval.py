@@ -5,9 +5,9 @@ import pytest
 pytestmark = pytest.mark.pipeline
 from datetime import UTC, datetime
 
-from memg_core.core.models import Memory, MemoryType, SearchResult
+from memg_core.core.models import Memory, SearchResult
 from memg_core.core.pipeline.retrieval import (
-    _build_graph_query,
+    _build_graph_query_for_memos,
     _rows_to_memories,
     _rerank_with_vectors,
     _append_neighbors,
@@ -15,9 +15,9 @@ from memg_core.core.pipeline.retrieval import (
 )
 
 
-def test_build_graph_query_basic():
+def test_build_graph_query_for_memos_basic():
     """Test building a basic graph query."""
-    query, params = _build_graph_query("test query", user_id="test-user", limit=10)
+    query, params = _build_graph_query_for_memos("test query", user_id="test-user", limit=10)
 
     assert "MATCH (m:Memory)-[r:MENTIONS]->(e:Entity)" in query
     assert "WHERE toLower(e.name) CONTAINS toLower($q)" in query
@@ -28,9 +28,9 @@ def test_build_graph_query_basic():
     assert params["limit"] == 10
 
 
-def test_build_graph_query_with_relation_names():
+def test_build_graph_query_for_memos_with_relation_names():
     """Test building a graph query with custom relation names."""
-    query, params = _build_graph_query(
+    query, params = _build_graph_query_for_memos(
         "test query",
         user_id="test-user",
         limit=10,
@@ -41,9 +41,9 @@ def test_build_graph_query_with_relation_names():
     assert params["q"] == "test query"
 
 
-def test_build_graph_query_with_entity_types():
+def test_build_graph_query_for_memos_with_entity_types():
     """Test building a graph query with entity type filters."""
-    query, params = _build_graph_query(
+    query, params = _build_graph_query_for_memos(
         "test query",
         user_id="test-user",
         limit=10,
@@ -92,12 +92,12 @@ def test_rows_to_memories():
     assert memories[0].user_id == "test-user"
     assert memories[0].content == "Memory 1 content"
     assert memories[0].title == "Memory 1"
-    assert memories[0].memory_type == MemoryType.NOTE
+    assert memories[0].memory_type == "note"
     assert memories[0].created_at.isoformat() == "2023-01-01T00:00:00+00:00"
     assert memories[0].tags == ["tag1", "tag2"]
 
     assert memories[1].id == "memory-2"
-    assert memories[1].memory_type == MemoryType.DOCUMENT
+    assert memories[1].memory_type == "document"
     assert memories[1].summary == "Memory 2 summary"
 
 
@@ -118,7 +118,7 @@ def test_rows_to_memories_handles_invalid_memory_type():
     memories = _rows_to_memories(rows)
 
     assert len(memories) == 1
-    assert memories[0].memory_type == MemoryType.NOTE  # Should default to NOTE
+    assert memories[0].memory_type == "note"  # Should default to NOTE
 
 
 def test_rows_to_memories_handles_invalid_date():
@@ -148,14 +148,14 @@ def test_rerank_with_vectors(embedder, qdrant_fake):
         id="memory-1",
         user_id="test-user",
         content="aaaa aaaa aaaa",  # Very different from query
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
         content="test query similar",  # More similar to query
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     # Add to Qdrant
@@ -187,21 +187,21 @@ def test_append_neighbors(kuzu_fake):
         id="memory-1",
         user_id="test-user",
         content="Memory 1 content",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
         content="Memory 2 content",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     memory3 = Memory(
         id="memory-3",
         user_id="test-user",
         content="Memory 3 content",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     # Add to Kuzu
@@ -260,7 +260,7 @@ def test_neighbor_cap_respected(kuzu_fake):
         id="memory-1",
         user_id="test-user",
         content="Memory 1 content",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     # Create 5 neighbor memories
@@ -270,7 +270,7 @@ def test_neighbor_cap_respected(kuzu_fake):
             id=f"memory-{i}",
             user_id="test-user",
             content=f"Memory {i} content",
-            memory_type=MemoryType.NOTE,
+            memory_type="note",
         )
         neighbor_memories.append(memory)
         kuzu_fake.add_node("Memory", memory.to_kuzu_node())
@@ -317,14 +317,14 @@ def test_search_vector_fallback_no_graph(embedder, qdrant_fake, kuzu_fake):
         id="memory-1",
         user_id="test-user",
         content="Apple banana orange",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
         content="Machine learning algorithm",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     # Add to Qdrant
@@ -356,14 +356,14 @@ def test_search_graph_first_rerank_then_neighbors(embedder, qdrant_fake, kuzu_fa
         id="memory-1",
         user_id="test-user",
         content="Database concepts with special keyword",  # Only this will match entity
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
         content="Related concepts without special word",  # This won't match initially
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
     )
 
     # Add to both Qdrant and Kuzu
@@ -433,7 +433,7 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         id="memory-1",
         user_id="user1",
         content="Content for user1",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
         tags=["tag1", "tag2"],
     )
 
@@ -441,7 +441,7 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         id="memory-2",
         user_id="user2",
         content="Content for user2",
-        memory_type=MemoryType.NOTE,
+        memory_type="note",
         tags=["tag2", "tag3"],
     )
 
