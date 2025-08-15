@@ -110,37 +110,33 @@ jobs:
         with:
           name: dist
           path: dist
-      # Docker build and publish steps commented out for now
-      # - uses: docker/setup-qemu-action@v3
-      # - uses: docker/setup-buildx-action@v3
-      # - uses: docker/login-action@v3
-      #   with:
-      #     registry: ${{ env.REGISTRY }}
-      #     username: ${{ github.actor }}
-      #     password: ${{ secrets.GITHUB_TOKEN }}
-      # - id: meta
-      #   uses: docker/metadata-action@v5
-      #   with:
-      #     images: ghcr.io/${{ github.repository }}-mcp
-      #     tags: |
-      #       type=raw,value={{tag}}
-      #       type=raw,value=latest,enable=${{ startsWith(github.ref,'refs/tags/') }}
-      # - uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     file: mcp/Dockerfile.mcp              # <- fixed path
-      #     platforms: linux/amd64,linux/arm64
-      #     push: true
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     labels: ${{ steps.meta.outputs.labels }}
-      #     cache-from: type=gha
-      #     cache-to: type=gha,mode=max
-      #     provenance: true
-      #     # No build args needed - using local wheel
-
-      # Add a placeholder step so the job doesn't fail
-      - name: Skip Docker build (commented out)
-        run: echo "Docker build and publish steps are commented out"
+      # Docker build and publish steps - now enabled with updated MCP server
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-mcp
+          tags: |
+            type=raw,value={{tag}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref,'refs/tags/') }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: mcp/Dockerfile.mcp              # <- fixed path
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          # No build args needed - using local wheel
 
   summary:
     needs: [mcp-image]
@@ -149,4 +145,4 @@ jobs:
     steps:
       - run: |
           echo "PyPI     : pip install memg-core"
-          echo "MCP image build is currently disabled"
+          echo "MCP image : ghcr.io/genovo-ai/memg-core-mcp:latest"
