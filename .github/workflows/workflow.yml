@@ -118,21 +118,17 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}-mcp
-          tags: |
-            type=raw,value={{tag}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref,'refs/tags/') }}
       - uses: docker/build-push-action@v5
         with:
           context: .
-          file: mcp/Dockerfile.mcp              # <- fixed path
+          file: mcp/Dockerfile.mcp
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ghcr.io/${{ github.repository }}-mcp:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: true
