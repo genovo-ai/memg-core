@@ -1,8 +1,5 @@
 """Tests for the public API contract."""
 
-import os
-from pathlib import Path
-
 import pytest
 
 pytestmark = pytest.mark.api
@@ -12,14 +9,6 @@ from unittest.mock import MagicMock, patch
 from memg_core.api.public import add_memory, search
 from memg_core.core.exceptions import ValidationError
 from memg_core.core.models import Memory, SearchResult
-
-
-@pytest.fixture()
-def tmp_yaml(tmp_path: Path):
-    # USE REAL YAML - no invalid temporary schemas
-    config_path = Path(__file__).parent.parent / "config" / "core.minimal.yaml"
-    os.environ["MEMG_YAML_SCHEMA"] = str(config_path)
-    return config_path
 
 
 @pytest.fixture
@@ -52,7 +41,7 @@ def mock_graph_rag_search():
         yield mock
 
 
-def test_add_memory_note_returns_memory_and_persists(mock_index_memory, tmp_yaml):
+def test_add_memory_note_returns_memory_and_persists(mock_index_memory):
     """Test that add_memory for note type returns a Memory and persists it."""
     # Call add_memory with note type
     memory = add_memory(
@@ -83,7 +72,7 @@ def test_add_memory_note_returns_memory_and_persists(mock_index_memory, tmp_yaml
     assert indexed_memory.memory_type == "note"
 
 
-def test_add_memory_document_summary_used_in_index_text(mock_index_memory, tmp_yaml):
+def test_add_memory_document_summary_used_in_index_text(mock_index_memory):
     """Test that add_memory for document type uses summary in index text."""
     # Call add_memory with document type
     memory = add_memory(
@@ -108,7 +97,7 @@ def test_add_memory_document_summary_used_in_index_text(mock_index_memory, tmp_y
     mock_index_memory.assert_called_once()
 
 
-def test_add_memory_task_due_date_serialized(mock_index_memory, tmp_yaml):
+def test_add_memory_task_due_date_serialized(mock_index_memory):
     """Test that add_memory for task type serializes dates correctly."""
     # Create a due date
     due_date = datetime.now(UTC) + timedelta(days=1)

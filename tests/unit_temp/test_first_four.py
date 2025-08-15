@@ -1,6 +1,4 @@
 from datetime import UTC, datetime
-import os
-from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
@@ -166,19 +164,10 @@ class FakeKuzu:
 # ----------------------------- Fixtures -----------------------------
 
 
-@pytest.fixture()
-def tmp_yaml(tmp_path: Path):
-    # TESTS MUST USE REAL YAML - no invalid temporary schemas
-    # Our bulletproof system correctly rejects incomplete YAML
-    config_path = Path(__file__).parent.parent.parent / "config" / "core.minimal.yaml"
-    os.environ["MEMG_YAML_SCHEMA"] = str(config_path)
-    return config_path
-
-
 # ----------------------------- Tests: YAML translator -----------------------------
 
 
-def test_yaml_translator_anchor_and_validation(tmp_yaml):
+def test_yaml_translator_anchor_and_validation():
     mem = create_memory_from_yaml("document", {"statement": "sum", "details": "body"}, user_id="u")
     assert mem.statement == "sum"
     # build anchor resolves to summary for documents
@@ -189,7 +178,7 @@ def test_yaml_translator_anchor_and_validation(tmp_yaml):
 # ----------------------------- Tests: Indexer -----------------------------
 
 
-def test_indexer_adds_to_both_stores(monkeypatch, tmp_yaml):
+def test_indexer_adds_to_both_stores(monkeypatch):
     # monkeypatch interfaces used by indexer caller
     from memg_core.core.pipeline import indexer as idx
 
@@ -223,7 +212,7 @@ def test_indexer_adds_to_both_stores(monkeypatch, tmp_yaml):
 # ----------------------------- Tests: Retrieval -----------------------------
 
 
-def test_retrieval_vector_first(monkeypatch, tmp_yaml):
+def test_retrieval_vector_first(monkeypatch):
     q = cast("QdrantInterface", FakeQdrant())
     k = cast("KuzuInterface", FakeKuzu())
     e = cast("Embedder", FakeEmbedder())
@@ -251,7 +240,7 @@ def test_retrieval_vector_first(monkeypatch, tmp_yaml):
         assert isinstance(results[0].memory.hrid, (str, type(None)))
 
 
-def test_retrieval_graph_first(monkeypatch, tmp_yaml):
+def test_retrieval_graph_first(monkeypatch):
     q = cast("QdrantInterface", FakeQdrant())
     k = cast("KuzuInterface", FakeKuzu())
     e = cast("Embedder", FakeEmbedder())
@@ -278,7 +267,7 @@ def test_retrieval_graph_first(monkeypatch, tmp_yaml):
 # ----------------------------- Tests: Public API -----------------------------
 
 
-def test_public_add_memory_validates_document_schema(monkeypatch, tmp_yaml):
+def test_public_add_memory_validates_document_schema(monkeypatch):
     # patch public API dependencies
     import memg_core.api.public as pub
 
@@ -308,7 +297,7 @@ def test_public_add_memory_validates_document_schema(monkeypatch, tmp_yaml):
     assert m.memory_type == "document"
 
 
-def test_public_search_validation(monkeypatch, tmp_yaml):
+def test_public_search_validation(monkeypatch):
     import memg_core.api.public as pub
 
     with pytest.raises(ValidationError):
@@ -334,7 +323,7 @@ def test_public_search_validation(monkeypatch, tmp_yaml):
         assert isinstance(res[0], SearchResult)
 
 
-def test_retrieval_uses_hrid_for_ties(monkeypatch, tmp_yaml):
+def test_retrieval_uses_hrid_for_ties(monkeypatch):
     # two vector hits with same score but different HRIDs → order by hrid_to_index
     class _Q(FakeQdrant):
         def search_points(self, vector, limit=5, collection=None, user_id=None, filters=None):
@@ -372,7 +361,7 @@ def test_retrieval_uses_hrid_for_ties(monkeypatch, tmp_yaml):
     assert [r.memory.hrid for r in results[:2]] == ["MEMO_AAA050", "NOTE_AAA100"]
 
 
-def test_neighbors_default_whitelist_applies(monkeypatch, tmp_yaml):
+def test_neighbors_default_whitelist_applies(monkeypatch):
     # With relation_names=None, no neighbors should be added (no hardcoded defaults)
     q = cast("QdrantInterface", FakeQdrant())
     k = cast("KuzuInterface", FakeKuzu())
@@ -394,7 +383,7 @@ def test_neighbors_default_whitelist_applies(monkeypatch, tmp_yaml):
     assert not any(r.source == "graph_neighbor" for r in res)
 
 
-def test_projection_prunes_payload_fields(monkeypatch, tmp_yaml):
+def test_projection_prunes_payload_fields(monkeypatch):
     q = cast("QdrantInterface", FakeQdrant())
     k = cast("KuzuInterface", FakeKuzu())
     e = cast("Embedder", FakeEmbedder())
@@ -434,7 +423,7 @@ def test_projection_prunes_payload_fields(monkeypatch, tmp_yaml):
     assert "details" in p1
 
 
-def test_public_api_projection_integration(monkeypatch, tmp_yaml):
+def test_public_api_projection_integration(monkeypatch):
     # Test that public API search() properly passes through projection controls
     import memg_core.api.public as pub
 
