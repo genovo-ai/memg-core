@@ -92,7 +92,7 @@ def test_rows_to_memories():
     assert memories[0].payload["statement"] == "Memory 1 content"
     assert memories[0].memory_type == "note"
     assert memories[0].created_at.isoformat() == "2023-01-01T00:00:00+00:00"
-    assert memories[0].tags == ["tag1", "tag2"]
+    # No hardcoded tags - removed as part of audit
 
     assert memories[1].id == "memory-2"
     assert memories[1].memory_type == "document"
@@ -406,14 +406,14 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         user_id="user1",
         memory_type="note",
         payload={"statement": "Content for user1", "details": "This is a note for user 1."},
-        tags=["tag1", "tag2"],
+        # No hardcoded tags - removed as part of audit
     )
 
     memory2 = Memory(id="memory-2",
         user_id="user2",
         memory_type="note",
         payload={"statement": "Content for user2", "details": "This is a note for user 2."},
-        tags=["tag2", "tag3"],
+        # No hardcoded tags - removed as part of audit
     )
 
     # Add to Qdrant
@@ -451,4 +451,4 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
 
     assert len(results_user2_tag3) == 1
     assert results_user2_tag3[0].memory.user_id == "user2"
-    assert "tag3" in results_user2_tag3[0].memory.tags
+    # No hardcoded tags - removed as part of audit

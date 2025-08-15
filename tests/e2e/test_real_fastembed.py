@@ -50,7 +50,7 @@ def test_real_fastembed_workflow(temp_storage):
             "details": "This is a note about PostgreSQL.",
         },
         user_id=user_id,
-        tags=["database", "postgresql"]
+        # No hardcoded tags - removed as part of audit
     )
 
     doc = add_memory(
@@ -60,7 +60,7 @@ def test_real_fastembed_workflow(temp_storage):
             "details": "Complete guide to PostgreSQL performance tuning with indexing strategies",
         },
         user_id=user_id,
-        tags=["postgresql", "performance"]
+        # No hardcoded tags - removed as part of audit
     )
 
     task = add_memory(
@@ -70,7 +70,7 @@ def test_real_fastembed_workflow(temp_storage):
             "details": "This is a task to implement caching.",
         },
         user_id=user_id,
-        tags=["cache", "performance"]
+        # No hardcoded tags - removed as part of audit
     )
 
     # Verify memories were created

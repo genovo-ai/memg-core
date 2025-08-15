@@ -15,39 +15,10 @@ from memg_core.core.models import Memory, SearchResult
 
 @pytest.fixture()
 def tmp_yaml(tmp_path: Path):
-    y = tmp_path / "entities.yaml"
-    y.write_text(
-        """
-version: v1
-entities:
-  - name: memo
-    anchor: statement
-    fields:
-      id:          { type: string, required: true, system: true }
-      user_id:     { type: string, required: true, system: true }
-      statement:   { type: string, required: true, max_length: 8000 }
-      tags:        { type: tags }
-  - name: note
-    parent: memo
-    anchor: statement
-    fields:
-      details:     { type: string, required: true }
-  - name: document
-    parent: memo
-    anchor: statement
-    fields:
-      details:     { type: string, required: true }
-  - name: task
-    parent: memo
-    anchor: statement
-    fields:
-      details:     { type: string }
-      due_date:    { type: datetime }
-""",
-        encoding="utf-8",
-    )
-    os.environ["MEMG_YAML_SCHEMA"] = str(y)
-    return y
+    # USE REAL YAML - no invalid temporary schemas
+    config_path = Path(__file__).parent.parent / "config" / "core.minimal.yaml"
+    os.environ["MEMG_YAML_SCHEMA"] = str(config_path)
+    return config_path
 
 
 @pytest.fixture
@@ -66,9 +37,8 @@ def mock_graph_rag_search():
         memory = Memory(
             id="test-memory-id",
             user_id="test-user",
-            type="note",
-            statement="Test content",
-            payload={"details": "Test details"},
+            memory_type="note",
+            payload={"statement": "Test content", "details": "Test details"},
         )
         result = SearchResult(
             memory=memory,
@@ -91,7 +61,7 @@ def test_add_memory_note_returns_memory_and_persists(mock_index_memory, tmp_yaml
             "details": "This is the detail for the test note.",
         },
         user_id="test-user",
-        tags=["test", "note"]
+        # No hardcoded tags - removed as part of audit
     )
 
     # Check that the memory was created correctly
@@ -100,7 +70,7 @@ def test_add_memory_note_returns_memory_and_persists(mock_index_memory, tmp_yaml
     assert memory.statement == "This is a test note"
     assert memory.memory_type == "note"
     assert memory.payload.get("details") == "This is the detail for the test note."
-    assert memory.tags == ["test", "note"]
+    # No hardcoded tags - removed as part of audit
 
     # Check that _index_memory_with_yaml was called
     mock_index_memory.assert_called_once()
@@ -122,7 +92,7 @@ def test_add_memory_document_summary_used_in_index_text(mock_index_memory, tmp_y
             "details": "This is a long document content",
         },
         user_id="test-user",
-        tags=["test", "document"]
+        # No hardcoded tags - removed as part of audit
     )
 
     # Check that the memory was created correctly
@@ -150,7 +120,7 @@ def test_add_memory_task_due_date_serialized(mock_index_memory, tmp_yaml):
             "due_date": due_date.isoformat(),
         },
         user_id="test-user",
-        tags=["test", "task"]
+        # No hardcoded tags - removed as part of audit
     )
 
     # Check that the memory was created correctly
