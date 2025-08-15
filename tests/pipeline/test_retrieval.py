@@ -421,7 +421,7 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         user_id="user2",
         memory_type="note",
         payload={"statement": "Content for user2", "details": "This is a note for user 2."},
-        # No hardcoded tags - removed as part of audit
+        tags=["tag3"],  # Add tag3 to match the filter
     )
 
     # Add to Qdrant
