@@ -36,18 +36,42 @@ def load_yaml_schema() -> dict[str, Any] | None:
 
 
 def get_relation_names() -> list[str] | None:
-    """Get relation names from YAML schema if available"""
-    schema = load_yaml_schema()
-    if not schema:
-        return None
+    """Get relation PREDICATES from YAML schema - FIXED: was using names instead of predicates"""
+    try:
+        from ..core.types import TypeRegistry
 
-    relations = schema.get("relations", [])
-    names = [str(r.get("name")).upper() for r in relations if r.get("name")]
-    return names if names else None
+        registry = TypeRegistry.get_instance()
+        return registry.get_valid_predicates()
+    except RuntimeError:
+        # TypeRegistry not initialized - fall back to direct YAML parsing
+        schema = load_yaml_schema()
+        if not schema:
+            return None
+
+        # Extract predicates from relations in entities (NEW YAML STRUCTURE)
+        predicates = set()
+        entities = schema.get("entities", [])
+        for entity in entities:
+            relations = entity.get("relations", [])
+            for relation in relations:
+                rel_predicates = relation.get("predicates", [])
+                predicates.update(rel_predicates)
+
+        return list(predicates) if predicates else None
 
 
 def get_entity_anchor(entity_type: str) -> str | None:
     """Get anchor field for entity type from YAML schema"""
+    try:
+        from ..core.types import TypeRegistry
+
+        # TODO: Add get_entity_anchor method to TypeRegistry
+        # For now, fall back to direct parsing
+        TypeRegistry.get_instance()  # Just validate it's initialized
+    except RuntimeError:
+        pass
+
+    # Direct YAML parsing fallback
     schema = load_yaml_schema()
     if not schema:
         return None

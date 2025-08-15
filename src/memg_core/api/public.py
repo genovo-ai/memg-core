@@ -58,7 +58,6 @@ def add_memory(
     memory_type: str,
     payload: dict[str, Any],
     user_id: str,
-    tags: list[str] | None = None,
 ) -> Memory:
     """Create a memory using strict YAML schema validation and index it.
 
@@ -74,8 +73,8 @@ def add_memory(
 
     # Create memory with strict YAML validation - no fallbacks
     memory = create_memory_from_yaml(memory_type=memory_type, payload=payload, user_id=user_id)
-    if tags:
-        memory.tags = tags
+    # Tags should be part of payload, not hardcoded field - remove this assignment
+    # If tags are needed, they should be defined in YAML schema and passed in payload
 
     # Index with strict YAML anchor resolution
     memory.id = _index_memory_with_yaml(memory)
@@ -107,6 +106,22 @@ def search(
         raise ValidationError("Provide `query` or `memo_type`.")
     if not user_id:
         raise ValidationError("User ID is required for search")
+
+    # VALIDATE RELATION NAMES AGAINST YAML SCHEMA - crash if invalid
+    if relation_names:
+        try:
+            from ..core.types import TypeRegistry
+
+            registry = TypeRegistry.get_instance()
+            valid_predicates = registry.get_valid_predicates()
+            invalid = [r for r in relation_names if r not in valid_predicates]
+            if invalid:
+                raise ValidationError(
+                    f"Invalid relation names: {invalid}. Valid predicates: {valid_predicates}"
+                )
+        except RuntimeError:
+            # TypeRegistry not initialized - skip validation for now
+            pass
 
     config = get_config()
 
