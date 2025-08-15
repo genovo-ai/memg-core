@@ -139,10 +139,10 @@ class QdrantInterface:
             filter_conditions = []
 
             if user_id or filters:
-                # Add user_id filter
+                # Add user_id filter (user_id is stored under core.user_id in the payload)
                 if user_id:
                     filter_conditions.append(
-                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
+                        FieldCondition(key="core.user_id", match=MatchValue(value=user_id))
                     )
 
                 # Add additional filters

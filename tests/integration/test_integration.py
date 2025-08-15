@@ -65,7 +65,9 @@ def test_index_and_search_with_real_qdrant():
 
         assert len(results) > 0
         assert results[0]["id"] == "12345678-1234-5678-1234-567812345678"
-        assert results[0]["payload"]["content"] == "This is an integration test memory"
+        # Check the payload structure - content is in entity.statement
+        payload = results[0]["payload"]
+        assert payload["entity"]["statement"] == "This is an integration test memory"
 
     finally:
         # Clean up

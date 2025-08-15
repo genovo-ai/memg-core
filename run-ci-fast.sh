@@ -1,4 +1,4 @@
-./run-ci-fast.sh#!/bin/bash
+#!/bin/bash
 
 # run-ci-fast.sh - Run fast CI pipeline using Python base image
 

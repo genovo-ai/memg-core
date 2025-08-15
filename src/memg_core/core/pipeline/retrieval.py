@@ -244,14 +244,19 @@ def _append_neighbors(
         mem = seed.memory
         if not mem.id:
             continue
-        rows = kuzu.neighbors(
-            node_label="Memory",
-            node_id=mem.id,
-            rel_types=rels,
-            direction="any",
-            limit=neighbor_limit,
-            neighbor_label="Memory",
-        )
+        try:
+            rows = kuzu.neighbors(
+                node_label="Memory",
+                node_id=mem.id,
+                rel_types=rels,
+                direction="any",
+                limit=neighbor_limit,
+                neighbor_label="Memory",
+            )
+        except DatabaseError:
+            # If relationship tables don't exist, skip neighbors for this seed
+            # This is common in minimal setups or fresh databases
+            continue
         for row in rows:
             statement = row.get("statement", "")
             neighbor = Memory(

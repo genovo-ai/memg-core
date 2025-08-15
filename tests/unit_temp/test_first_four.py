@@ -435,11 +435,19 @@ def test_public_api_projection_integration(monkeypatch, tmp_yaml):
 
     monkeypatch.setattr(pub, "get_config", lambda: _Cfg())
 
-    # Test default behavior (anchors-only)
+    # Test default behavior (include_details="self" - includes all fields)
     res_default = pub.search(query="test", user_id="u", limit=1)
     assert res_default
     p_default = res_default[0].memory.payload
-    assert set(p_default.keys()) <= {"statement"}
+    # Default now includes all fields from the fake memory
+    expected_keys = {"statement", "title", "details"}
+    assert set(p_default.keys()) == expected_keys
+
+    # Test explicit include_details="none" (anchors-only)
+    res_none = pub.search(query="test", user_id="u", limit=1, include_details="none")
+    assert res_none
+    p_none = res_none[0].memory.payload
+    assert set(p_none.keys()) <= {"statement"}
 
     # Test include_details="self" with projection
     res_projected = pub.search(
