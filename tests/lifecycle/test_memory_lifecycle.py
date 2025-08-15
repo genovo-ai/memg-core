@@ -16,15 +16,15 @@ def test_delete_memory_removes_from_qdrant_and_kuzu_no_dangling_edges(
     memory1 = mem_factory(
         id="memory-1",
         user_id="test-user",
-        content="Memory 1 content",
-        memory_type="note",
+        statement="Memory 1 content",
+        type="note",
     )
 
     memory2 = mem_factory(
         id="memory-2",
         user_id="test-user",
-        content="Memory 2 content",
-        memory_type="note",
+        statement="Memory 2 content",
+        type="note",
     )
 
     # Add memories to index
@@ -84,10 +84,10 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
     memory = mem_factory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
+        type="note",
+        statement="Initial content",
         payload={
-            "content": "Initial content",  # YAML schema: note uses content
-            "title": "Initial Title",
+            "details": "Initial details",
         },
     )
 
@@ -96,22 +96,22 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
 
     # Verify initial state - check current payload structure
     qdrant_point = qdrant_fake.get_point("memory-1")
-    assert qdrant_point["payload"]["entity"]["content"] == "Initial content"
-    assert qdrant_point["payload"]["entity"]["title"] == "Initial Title"
+    assert qdrant_point["payload"]["entity"]["statement"] == "Initial content"
+    assert qdrant_point["payload"]["entity"]["details"] == "Initial details"
 
     kuzu_node = kuzu_fake.nodes["Memory"]["memory-1"]
     # Current core doesn't store content in Kuzu, only title
-    assert "content" not in kuzu_node
-    assert kuzu_node["title"] == "Initial Title"
+    assert "details" not in kuzu_node
+    assert kuzu_node["statement"] == "Initial content"
 
     # Update memory with same ID
     updated_memory = mem_factory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
+        type="note",
+        statement="Updated content",
         payload={
-            "content": "Updated content",  # YAML schema: note uses content
-            "title": "Updated Title",
+            "details": "Updated details",
         },
     )
 
@@ -120,10 +120,10 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
 
     # Verify updated state - check current payload structure
     qdrant_point = qdrant_fake.get_point("memory-1")
-    assert qdrant_point["payload"]["entity"]["content"] == "Updated content"
-    assert qdrant_point["payload"]["entity"]["title"] == "Updated Title"
+    assert qdrant_point["payload"]["entity"]["statement"] == "Updated content"
+    assert qdrant_point["payload"]["entity"]["details"] == "Updated details"
 
     kuzu_node = kuzu_fake.nodes["Memory"]["memory-1"]
     # Current core doesn't store content in Kuzu, only title
-    assert "content" not in kuzu_node
-    assert kuzu_node["title"] == "Updated Title"
+    assert "details" not in kuzu_node
+    assert kuzu_node["statement"] == "Updated content"

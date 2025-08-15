@@ -1,15 +1,16 @@
 # `memg_core/core/indexing.py`
 
 ## Module Description
-This module contains **DEPRECATED** indexing logic. Its functions have been superseded by the YAML translator module, which handles anchor text generation based on YAML-defined entity schemas. This module is retained for backward compatibility but is slated for removal.
+This module contains **DEPRECATED** indexing logic. Its functions have been superseded by the YAML translator module (`memg_core.core.yaml_translator`) and the main indexing pipeline (`memg_core.core.pipeline.indexer`). This module is retained for backward compatibility in tests but is slated for removal. **No new functionality or modifications should be added to this module.**
 
 ## Internal Dependencies
-- `..models`: `Memory` for the memory data model.
+- None (Originally depended on `..models`, but functionality has been moved).
 
 ## Functions
 
-### `build_index_text`
-- **Description**: **DEPRECATED**. This function previously built the index text for a memory. It attempts to extract text from the `content` or `summary` fields within the memory's payload. This functionality has been replaced by `build_anchor_text` in `yaml_translator.py`, which uses a more robust YAML-defined anchor field strategy.
-- **Inputs**:
-  - `memory`: Memory - The Memory object for which to build index text.
-- **Returns**: `str` - The extracted index text, or a fallback string if no relevant fields are found.
+### `build_index_text` (DEPRECATED)
+- **Description**: This function previously built the index text for a memory. It has been replaced by `build_anchor_text` in `memg_core.core.yaml_translator`, which uses a more robust YAML-defined anchor field strategy.
+- **Inputs**: (No longer relevant; function removed/superseded)
+- **Returns**: (No longer relevant; function removed/superseded)
+- **Schema**: (N/A - Deprecated)
+- **Type Mixing**: (N/A - Deprecated)

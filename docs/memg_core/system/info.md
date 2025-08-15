@@ -8,16 +8,25 @@ This module provides utility functions for retrieving core system information ab
 - `..core.interfaces.kuzu`: `KuzuInterface` for checking Kuzu database availability.
 - `..core.interfaces.qdrant`: `QdrantInterface` for retrieving Qdrant collection information.
 
+## External Dependencies
+- `os`: For interacting with environment variables.
+- `pathlib`: `Path` for handling file paths.
+- `typing`: `Any` for flexible type annotations.
+
 ## Functions
 
 ### `get_system_info`
 - **Description**: Gathers and returns a comprehensive dictionary of system information for MEMG. This includes details from the core configuration, the status and statistics of the Qdrant and Kuzu storage interfaces, and the enablement and loading status of the YAML schema plugin.
 - **Inputs**:
-  - `qdrant`: QdrantInterface | None = None - An optional instance of `QdrantInterface`. If not provided, a temporary instance will be created to fetch stats.
-  - `kuzu`: KuzuInterface | None = None - An optional instance of `KuzuInterface`. If not provided, a temporary instance will be created to test availability.
+  - `qdrant`: `memg_core.core.interfaces.qdrant.QdrantInterface | None` = None - An optional instance of `QdrantInterface`. If not provided, a temporary instance will be created to fetch stats.
+  - `kuzu`: `memg_core.core.interfaces.kuzu.KuzuInterface | None` = None - An optional instance of `KuzuInterface`. If not provided, a temporary instance will be created to test availability.
 - **Returns**: `dict[str, Any]` - A dictionary containing various system information:
   - `config`: Core configuration settings.
   - `plugins`: Status of plugins, specifically `yaml_schema` (enabled, path, loaded).
   - `qdrant`: Qdrant collection statistics (collection name, existence, vector/point counts, vector size) or an error message if unavailable.
   - `kuzu`: Kuzu database availability and path, or an error message.
   - `graph`: Graph-specific settings, such as `neighbor_limit`.
+- **Schema**:
+  - Input: `qdrant` (QdrantInterface Object or None), `kuzu` (KuzuInterface Object or None)
+  - Output: `dict[str, Any]` (Dictionary with Any type values)
+  - Type Mixing: Mixed type (output `Any`)

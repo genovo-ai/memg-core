@@ -242,4 +242,4 @@ temp_data
 src/memg_core/version.py
 
 # Temporarily commented out to allow documentation
-# docs/*
+docs/*

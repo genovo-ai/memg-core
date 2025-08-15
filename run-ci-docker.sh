@@ -18,6 +18,9 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# Build and run the CI container. It will execute the CMD from Dockerfile.ci
-docker-compose -f docker-compose.fast.yml build ci-dev-fast
-docker-compose -f docker-compose.fast.yml run --rm ci-dev-fast
+# Build and run the CI pipeline container (non-interactive)
+echo "Building CI environment..."
+docker-compose -f docker-compose.fast.yml build ci-runner-fast
+
+echo "Running CI pipeline..."
+docker-compose -f docker-compose.fast.yml run --rm ci-runner-fast

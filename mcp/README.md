@@ -43,27 +43,24 @@
 ## What's New in Lean Core API
 
 The MCP server now uses the **lean core public API**:
-- ✅ `add_note(text, user_id, title, tags)`
-- ✅ `add_document(text, user_id, title, summary, tags)`
-- ✅ `add_task(text, user_id, title, tags, due_date, assignee)`
-- ✅ `search(query, user_id, limit, mode="vector|graph|hybrid")`
+- ✅ `add_memory(memory_type, payload, user_id, tags)` - Generic memory addition
+- ✅ `search(query, user_id, limit, mode="vector|graph|hybrid")` - Unified search
+
+All memory types and field names are defined in YAML schema - no hardcoded types!
 
 ## Available MCP Tools
 
 ### Memory Management
-- **`mcp_gmem_add_memory`** - Generic memory addition
-- **`mcp_gmem_add_note`** - Add a note
-- **`mcp_gmem_add_document`** - Add a document
-- **`mcp_gmem_add_task`** - Add a task
+- **`mcp_gmem_add_memory`** - Generic memory addition (YAML-defined types)
 - **`mcp_gmem_search_memories`** - Search memories
 - **`mcp_gmem_get_system_info`** - Get system stats
 
 ### Example Usage
 ```bash
-# Add a note
-curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_add_note \
+# Add a memory (type must be defined in YAML schema)
+curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_add_memory \
   -H "Content-Type: application/json" \
-  -d '{"text": "Remember to update docs", "user_id": "test_user", "title": "Documentation Task"}'
+  -d '{"memory_type": "note", "payload": {"content": "Remember to update docs"}, "user_id": "test_user"}'
 
 # Search memories
 curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_search_memories \

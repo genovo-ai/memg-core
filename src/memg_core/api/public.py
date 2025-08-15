@@ -11,8 +11,6 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from pydantic import ValidationError as PydanticValidationError
-
 from memg_core.core.config import get_config
 from memg_core.core.exceptions import ValidationError
 from memg_core.core.interfaces.embedder import Embedder
@@ -21,7 +19,7 @@ from memg_core.core.interfaces.qdrant import QdrantInterface
 from memg_core.core.models import Memory, SearchResult
 from memg_core.core.pipeline.indexer import add_memory_index
 from memg_core.core.pipeline.retrieval import graph_rag_search
-from memg_core.core.yaml_translator import build_anchor_text, get_entity_model
+from memg_core.core.yaml_translator import create_memory_from_yaml
 
 # ----------------------------- indexing helper -----------------------------
 
@@ -44,15 +42,12 @@ def _index_memory_with_yaml(memory: Memory) -> str:
     kuzu = KuzuInterface(db_path=kuzu_path)
     embedder = Embedder()
 
-    # Strict YAML anchor text resolution - no fallbacks
-    index_text_override = build_anchor_text(memory)
-
+    # Anchor text resolution is handled by YAML translator in the indexer pipeline
     return add_memory_index(
         memory,
         qdrant,
         kuzu,
         embedder,
-        index_text_override=index_text_override,
     )
 
 
@@ -70,20 +65,17 @@ def add_memory(
     Validates payload against dynamically generated Pydantic model from YAML schema.
     NO fallbacks, NO backward compatibility.
     """
-    # Get dynamic Pydantic model and validate payload in one step
-    entity_model = get_entity_model(memory_type)
-    try:
-        validated_entity = entity_model(**payload)
-    except PydanticValidationError as e:
-        raise ValidationError(f"Validation failed for '{memory_type}': {e}") from e
+    if not memory_type or not memory_type.strip():
+        raise ValidationError("memory_type is required and cannot be empty")
+    if not user_id or not user_id.strip():
+        raise ValidationError("user_id is required and cannot be empty")
+    if not payload or not isinstance(payload, dict):
+        raise ValidationError("payload is required and must be a dictionary")
 
-    # Create Memory with validated payload
-    memory = Memory(
-        memory_type=memory_type,
-        payload=validated_entity.model_dump(exclude_none=True),
-        user_id=user_id,
-        tags=tags or [],
-    )
+    # Create memory with strict YAML validation - no fallbacks
+    memory = create_memory_from_yaml(memory_type=memory_type, payload=payload, user_id=user_id)
+    if tags:
+        memory.tags = tags
 
     # Index with strict YAML anchor resolution
     memory.id = _index_memory_with_yaml(memory)
@@ -104,6 +96,8 @@ def search(
     mode: str | None = None,  # 'vector' | 'graph' | 'hybrid'
     include_details: str = "self",  # NEW: "none" | "self" (neighbors remain anchors-only in v1)
     projection: dict[str, list[str]] | None = None,  # NEW: per-type field allow-list
+    relation_names: list[str] | None = None,
+    neighbor_cap: int = 5,
 ) -> list[SearchResult]:
     """Unified search over memories (Graph+Vector).
 
@@ -125,17 +119,9 @@ def search(
     kuzu = KuzuInterface(db_path=kuzu_path)
     embedder = Embedder()
 
-    # Optional relation whitelist from YAML registry (if present)
-    relation_names = None
-    if os.getenv("MEMG_ENABLE_YAML_SCHEMA", "false").lower() == "true":
-        try:
-            from ..plugins.yaml_schema import get_relation_names
-
-            relation_names = get_relation_names()
-        except Exception:
-            relation_names = None
-
-    neighbor_cap = int(os.getenv("MEMG_GRAPH_NEIGHBORS_LIMIT", "5"))
+    neighbor_cap_env = os.getenv("MEMG_GRAPH_NEIGHBORS_LIMIT")
+    if neighbor_cap_env is not None:
+        neighbor_cap = int(neighbor_cap_env)
 
     return graph_rag_search(
         query=(query.strip() if query else None),

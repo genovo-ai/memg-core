@@ -36,18 +36,18 @@ def test_add_node_and_query_roundtrip(kuzu_fake):
     query = """
     MATCH (m:Memory)
     WHERE m.id = $id
-    RETURN m.id, m.user_id, m.content, m.title, m.memory_type
+    RETURN m as node  # Updated to return the full node object
     """
     params = {"id": "test-node-1"}
 
     results = kuzu_fake.query(query, params)
 
     assert len(results) == 1
-    assert results[0]["m.id"] == "test-node-1"
-    assert results[0]["m.user_id"] == "test-user"
-    assert results[0]["m.content"] == "Test content"
-    assert results[0]["m.title"] == "Test Title"
-    assert results[0]["m.memory_type"] == "note"
+    assert results[0]["node"]["id"] == "test-node-1"  # Access id from node
+    assert results[0]["node"]["user_id"] == "test-user"  # Access user_id from node
+    assert results[0]["node"]["content"] == "Test content"  # Access content from node
+    assert results[0]["node"]["title"] == "Test Title"  # Access title from node
+    assert results[0]["node"]["memory_type"] == "note"  # Access memory_type from node
 
 
 def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
@@ -129,7 +129,7 @@ def test_query_empty_returns_list(kuzu_fake):
     query = """
     MATCH (m:Memory)
     WHERE m.id = $id
-    RETURN m.id, m.user_id, m.content
+    RETURN m as node  # Updated to return the full node object
     """
     params = {"id": "non-existent"}
 

@@ -73,15 +73,11 @@ def build_index_text_with_yaml(memory: Any) -> str | None:
     if not anchor_field:
         return None
 
-    # Get the value from the anchor field
+    # Get the value from the anchor field (no fallback logic)
     val = getattr(memory, anchor_field, None)
     if isinstance(val, str) and val.strip():
         return val
 
-    # For document type, use summary as defined in YAML schema
-    if anchor_field == "summary" and hasattr(memory, "content"):
-        content_val = getattr(memory, "content", "")
-        if isinstance(content_val, str) and content_val.strip():
-            return content_val
-
+    # No fallback logic - if anchor field is missing/empty, return None
+    # This enforces strict YAML schema compliance
     return None

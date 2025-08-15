@@ -261,7 +261,6 @@ class FakeKuzu(KuzuInterface):
         # Skip parent initialization to avoid database requirements
         self.nodes: Dict[str, Dict[str, Dict[str, Any]]] = {
             "Memory": {},
-            "Entity": {},
         }
         self.relationships: List[Dict[str, Any]] = []
 
@@ -320,26 +319,23 @@ class FakeKuzu(KuzuInterface):
             if user_id and node.get("user_id") != user_id:
                 continue
 
-            rows.append(
-                {
-                    "m.id": node_id,
-                    "m.user_id": node.get("user_id"),
-                    "m.memory_type": node.get("memory_type"),
-                    "m.hrid": node.get("hrid"),
-                    # Anchor-first: statement may be absent on legacy nodes → fallback to title/content
-                    "m.statement": node.get("statement") or node.get("title") or node.get("content") or "",
-                    "m.tags": node.get("tags"),
-                    "m.created_at": node.get("created_at"),
-                    # optional key the query sometimes returns; keep for parity
-                    "m.updated_at": node.get("updated_at"),
-                    # keep legacy fields if tests read them
-                    "m.title": node.get("title"),
-                    "m.summary": node.get("summary"),
-                    "m.content": node.get("content"),  # legacy field for backward compatibility
-                }
-            )
+            # TODO: This should eventually be replaced by the YAML-defined anchor field logic
+            memory_type = node.get("memory_type")
+            if memory_type == "note":
+                anchor_field_value = node.get("content") or node.get("title") or ""
+            elif memory_type == "document":
+                anchor_field_value = node.get("summary") or node.get("title") or node.get("content") or ""
+            else:
+                anchor_field_value = node.get("statement") or node.get("title") or node.get("content") or ""
 
-        rows.sort(key=lambda r: r.get("m.created_at") or "", reverse=True)
+            # Use a placeholder if the anchor is still empty or not found
+            if not anchor_field_value:
+                anchor_field_value = f"missing-anchor-for-{memory_type}-{node.get('hrid')}"
+
+            rows.append({
+                "node": node,  # Return the full node object under 'node' key
+            })
+        rows.sort(key=lambda r: r.get("node", {}).get("created_at") or "", reverse=True) # Sort by created_at in node
         return rows[:limit]
 
     def neighbors(
@@ -372,20 +368,22 @@ class FakeKuzu(KuzuInterface):
             if not neighbor or neighbor_table != "Memory":
                 continue
 
-            out.append(
-                {
-                    "id": neighbor_id,
-                    "user_id": neighbor.get("user_id"),
-                    "memory_type": neighbor.get("memory_type"),
-                    "statement": neighbor.get("statement") or neighbor.get("title") or neighbor.get("content") or "",
-                    "created_at": neighbor.get("created_at"),
-                    "hrid": neighbor.get("hrid"),
-                    # legacy fields for backward compatibility
-                    "content": neighbor.get("content"),
-                    "title": neighbor.get("title"),
-                    "rel_type": rel["rel_type"],  # include relationship type for tests
-                }
-            )
+            # TODO: This should eventually be replaced by the YAML-defined anchor field logic
+            memory_type = neighbor.get("memory_type")
+            if memory_type == "note":
+                anchor_field_value = neighbor.get("content") or neighbor.get("title") or ""
+            elif memory_type == "document":
+                anchor_field_value = neighbor.get("summary") or neighbor.get("title") or neighbor.get("content") or ""
+            else:
+                anchor_field_value = neighbor.get("statement") or neighbor.get("title") or neighbor.get("content") or ""
+
+            if not anchor_field_value:
+                anchor_field_value = f"missing-anchor-for-{memory_type}-{neighbor.get('hrid')}"
+
+            # Return all fields from neighbor, not just selected ones
+            neighbor_data = dict(neighbor)
+            neighbor_data["rel_type"] = rel["rel_type"]  # Add relationship type for tests
+            out.append(neighbor_data)
         return out[:limit]
 
 
@@ -410,24 +408,33 @@ def kuzu_fake() -> FakeKuzu:
 @pytest.fixture
 def mem_factory() -> Callable[..., Memory]:
     """Fixture for creating Memory objects with defaults."""
+
     def _create_memory(**kwargs) -> Memory:
+        memory_type = kwargs.get("type", "memo")
         defaults = {
             "id": str(uuid4()),
             "user_id": "test-user",
-            "memory_type": "note",
-            "payload": {
-                "statement": "Test memory content",  # Current core expects statement for notes
-                "title": "Test Title",
-                "source": "user",
-            },
+            "type": memory_type,
+            "statement": f"This is a test statement for {memory_type}.",
+            "payload": {},
             "tags": ["test"],
             "confidence": 0.8,
             "is_valid": True,
             "created_at": datetime.now(UTC),
-            "supersedes": None,
-            "superseded_by": None,
+            "updated_at": None,
         }
-        return Memory(**{**defaults, **kwargs})
+        if memory_type == "document":
+            defaults["payload"] = {
+                "details": "This is the body of the document.",
+            }
+        elif memory_type == "task":
+            defaults["payload"] = {
+                "details": "This is a test task.",
+                "status": "todo",
+            }
+        # Allow kwargs to override defaults
+        final_attrs = {**defaults, **kwargs}
+        return Memory(**final_attrs)
 
     return _create_memory
 

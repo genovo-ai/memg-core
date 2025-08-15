@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from memg_core.api.public import add_document, add_note, add_task, search
+from memg_core.api.public import add_memory, search
 
 
 @pytest.fixture
@@ -43,25 +43,33 @@ def test_real_fastembed_workflow(temp_storage):
     user_id = "test_user"
 
     # Add memories using the real API (which now uses FastEmbed)
-    note = add_note(
-        text="PostgreSQL database configuration and optimization",
+    note = add_memory(
+        memory_type="note",
+        payload={
+            "statement": "PostgreSQL database configuration and optimization",
+            "details": "This is a note about PostgreSQL.",
+        },
         user_id=user_id,
-        title="Database Setup",
         tags=["database", "postgresql"]
     )
 
-    doc = add_document(
-        text="Complete guide to PostgreSQL performance tuning with indexing strategies",
+    doc = add_memory(
+        memory_type="document",
+        payload={
+            "statement": "Performance optimization for PostgreSQL databases",
+            "details": "Complete guide to PostgreSQL performance tuning with indexing strategies",
+        },
         user_id=user_id,
-        title="PostgreSQL Performance Guide",
-        summary="Performance optimization for PostgreSQL databases",
         tags=["postgresql", "performance"]
     )
 
-    task = add_task(
-        text="Implement caching layer for database queries",
+    task = add_memory(
+        memory_type="task",
+        payload={
+            "statement": "Implement caching layer for database queries",
+            "details": "This is a task to implement caching.",
+        },
         user_id=user_id,
-        title="Cache Implementation",
         tags=["cache", "performance"]
     )
 
@@ -88,7 +96,7 @@ def test_real_fastembed_workflow(temp_storage):
     assert scores == sorted(scores, reverse=True)
 
     # Should find the performance guide first (best match)
-    assert "Performance" in results[0].memory.title
+    assert "Performance" in results[0].memory.statement
 
 
 def test_user_isolation_real_fastembed(temp_storage):
@@ -97,8 +105,22 @@ def test_user_isolation_real_fastembed(temp_storage):
     user2 = "user2"
 
     # Add content for each user
-    add_note(text="User 1 secret content", user_id=user1, title="User 1 Note")
-    add_note(text="User 2 secret content", user_id=user2, title="User 2 Note")
+    add_memory(
+        memory_type="note",
+        payload={
+            "statement": "User 1 secret content",
+            "details": "This is a secret note for user 1.",
+        },
+        user_id=user1,
+    )
+    add_memory(
+        memory_type="note",
+        payload={
+            "statement": "User 2 secret content",
+            "details": "This is a secret note for user 2.",
+        },
+        user_id=user2,
+    )
 
     # Search should be isolated by user
     results_user1 = search("secret content", user_id=user1, limit=10)
@@ -115,7 +137,14 @@ def test_user_isolation_real_fastembed(temp_storage):
 def test_fastembed_model_configuration(temp_storage):
     """Test that EMBEDDER_MODEL environment variable works"""
     # Test with default model (should work)
-    note = add_note(text="Test content", user_id="test", title="Test")
+    note = add_memory(
+        memory_type="note",
+        payload={
+            "statement": "Test content",
+            "details": "This is a test note.",
+        },
+        user_id="test",
+    )
     assert note.id
 
     # This test confirms the model configuration is working

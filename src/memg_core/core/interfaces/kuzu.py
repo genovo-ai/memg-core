@@ -63,13 +63,29 @@ class KuzuInterface:
 
             columns_str = ", ".join(columns)
             create_sql = f"CREATE NODE TABLE IF NOT EXISTS {table}({columns_str}, PRIMARY KEY (id))"
-            # Try to create the table - ignore if already exists with different schema
-            import contextlib
 
-            with contextlib.suppress(Exception):
+            # Execute table creation with explicit error handling
+            try:
                 self.conn.execute(create_sql)
+            except Exception as create_error:
+                # Only ignore "table already exists" errors, not all exceptions
+                error_msg = str(create_error).lower()
+                if "already exists" in error_msg or "duplicate" in error_msg:
+                    # Table exists with potentially different schema - this is acceptable
+                    pass
+                else:
+                    # Real error - re-raise with context
+                    raise DatabaseError(
+                        f"Failed to create table {table}: {create_error}",
+                        operation="_ensure_table_schema",
+                        context={"table": table, "sql": create_sql},
+                        original_error=create_error,
+                    )
+        except DatabaseError:
+            # Re-raise our own errors
+            raise
         except Exception as e:
-            # Re-raise with context instead of silent failure
+            # Wrap unexpected errors
             raise DatabaseError(
                 f"Failed to ensure table schema for {table}",
                 operation="_ensure_table_schema",
@@ -110,12 +126,30 @@ class KuzuInterface:
             try:
                 self.conn.execute(create_table_sql)
             except Exception as schema_error:
-                if "type" in str(schema_error).lower():
-                    # Schema mismatch - drop and recreate
-                    self.conn.execute(f"DROP TABLE {rel_type}")
-                    self.conn.execute(create_table_sql)
+                error_msg = str(schema_error).lower()
+                if "type" in error_msg or "schema" in error_msg:
+                    # Schema mismatch - attempt to drop and recreate
+                    try:
+                        self.conn.execute(f"DROP TABLE {rel_type}")
+                        self.conn.execute(create_table_sql)
+                    except Exception as recreate_error:
+                        raise DatabaseError(
+                            f"Failed to recreate relationship table {rel_type}",
+                            operation="add_relationship",
+                            context={
+                                "original_error": str(schema_error),
+                                "recreate_error": str(recreate_error),
+                            },
+                            original_error=recreate_error,
+                        )
                 else:
-                    raise
+                    # Unknown error - wrap and re-raise
+                    raise DatabaseError(
+                        f"Failed to create relationship table {rel_type}",
+                        operation="add_relationship",
+                        context={"sql": create_table_sql},
+                        original_error=schema_error,
+                    )
 
             # Add the relationship
             prop_str = ", ".join([f"{k}: ${k}" for k in props.keys()]) if props else ""
@@ -194,15 +228,16 @@ class KuzuInterface:
                 pattern = f"(a:{node_label} {{id: $id}})-[r{rel_part}]-(n{neighbor})"
 
             if neighbor_label == "Memory":
-                # Type-agnostic query - only return core fields, no assumptions
+                # Type-agnostic query - return core fields + individual payload fields
+                # Note: properties() function syntax varies by Kuzu version, so we'll get individual fields
                 cypher = f"""
                 MATCH {pattern}
                 RETURN DISTINCT n.id as id,
                                 n.user_id as user_id,
                                 n.memory_type as memory_type,
-                                n.statement as statement,
                                 n.created_at as created_at,
-                                label(r) as rel_type
+                                label(r) as rel_type,
+                                n as node
                 LIMIT $limit
                 """
             else:

@@ -16,10 +16,10 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
     memory = mem_factory(
         id="test-memory-1",
         user_id="test-user",
-        memory_type="note",
+        type="note",
+        statement="This is a test memory",
         payload={
-            "content": "This is a test memory",  # YAML schema: note uses content
-            "title": "Test Memory"
+            "details": "This is the detail for the test memory.",
         }
     )
 
@@ -32,17 +32,16 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
     qdrant_point = qdrant_fake.get_point(point_id)
     assert qdrant_point is not None
     assert qdrant_point["payload"]["core"]["user_id"] == "test-user"
-    assert qdrant_point["payload"]["entity"]["content"] == "This is a test memory"
-    assert qdrant_point["payload"]["core"]["memory_type"] == "note"
-    assert qdrant_point["payload"]["entity"]["title"] == "Test Memory"
+    assert qdrant_point["payload"]["entity"]["statement"] == "This is a test memory"
+    assert qdrant_point["payload"]["core"]["type"] == "note"
+    assert qdrant_point["payload"]["entity"]["details"] == "This is the detail for the test memory."
 
     # Check that it's in Kuzu
     assert "test-memory-1" in kuzu_fake.nodes["Memory"]
     kuzu_node = kuzu_fake.nodes["Memory"]["test-memory-1"]
     assert kuzu_node["user_id"] == "test-user"
-    assert kuzu_node["memory_type"] == "note"
+    assert kuzu_node["type"] == "note"
     assert kuzu_node["statement"] == "This is a test memory"
-    assert kuzu_node["title"] == "Test Memory"
 
 
 def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuzu_fake, mem_factory):
@@ -51,18 +50,16 @@ def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuz
     memory = mem_factory(
         id="test-memory-1",
         user_id="test-user",
-        memory_type="note",
+        type="note",
+        statement="This is a test memory",
         payload={
-            "content": "This is a test memory",  # YAML schema: note uses content
-            "title": "Test Memory"
+            "details": "This is the detail for the test memory.",
         }
     )
 
     # Add to index with override
-    override_text = "This is an override text for indexing"
     point_id = add_memory_index(
-        memory, qdrant_fake, kuzu_fake, embedder,
-        index_text_override=override_text
+        memory, qdrant_fake, kuzu_fake, embedder
     )
 
     # Check that the memory was stored in Qdrant
@@ -72,11 +69,11 @@ def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuz
 
     # The embedding should be based on the override text
     # We can verify this by comparing with a direct embedding
-    override_vector = embedder.get_embedding(override_text)
+    statement_vector = embedder.get_embedding(memory.statement)
     stored_vector = qdrant_point["vector"]
 
     # Vectors should be identical since our DummyEmbedder is deterministic
-    assert stored_vector == override_vector
+    assert stored_vector == statement_vector
 
 
 def test_add_memory_index_qdrant_succeeds_kuzu_fails_logs_and_raises(embedder, qdrant_fake, mem_factory):
@@ -85,7 +82,7 @@ def test_add_memory_index_qdrant_succeeds_kuzu_fails_logs_and_raises(embedder, q
     memory = mem_factory(
         id="test-memory-1",
         user_id="test-user",
-        content="This is a test memory"
+        statement="This is a test memory"
     )
 
     # Create a failing Kuzu mock
@@ -111,7 +108,7 @@ def test_add_memory_index_with_collection_name(embedder, qdrant_fake, kuzu_fake,
     memory = mem_factory(
         id="test-memory-1",
         user_id="test-user",
-        content="This is a test memory"
+        statement="This is a test memory"
     )
 
     # Add to index with custom collection

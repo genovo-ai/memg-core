@@ -27,7 +27,7 @@ def get_dynamic_tool_docstring() -> str:
 
         doc = "Adds a memory to the system based on a dynamic, YAML-defined schema.\n\n"
         doc += "Args:\n"
-        doc += "    memory_type (str): The type of memory to add (e.g., 'note', 'document').\n"
+        doc += "    memory_type (str): The type of memory to add (must be defined in YAML schema).\n"
         doc += "    user_id (str): The user ID to associate with the memory.\n"
         doc += "    payload (dict): A dictionary of fields conforming to the schema for the given memory_type.\n\n"
         doc += "Available Schemas:\n"

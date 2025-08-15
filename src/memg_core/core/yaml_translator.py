@@ -2,7 +2,7 @@
 This module makes the core type-agnostic by reading entity definitions from a YAML registry.
 
 Supported registry shapes (flexible to ease migration):
-- entities as a dict: {"note": {...}, "document": {...}}
+- entities as a dict: {"entity_type_1": {...}, "entity_type_2": {...}}
 - or entities as a list: [{"name"|"type": "...", "anchor": "...", "fields": {...}}, ...]
 
 Each entity spec should define:
@@ -15,7 +15,6 @@ YAML schema is required and must define all entity types with explicit anchor fi
 
 from __future__ import annotations
 
-import contextlib
 from functools import lru_cache
 import os
 from pathlib import Path
@@ -46,8 +45,18 @@ class YamlTranslator:
     """Translates YAML schema definitions to Pydantic models for strict validation."""
 
     def __init__(self, yaml_path: str | None = None) -> None:
-        # Prefer explicit arg, then env
-        self.yaml_path = yaml_path or os.getenv("MEMG_YAML_SCHEMA")
+        # Require explicit YAML path - no silent defaults
+        if yaml_path:
+            self.yaml_path = yaml_path
+        else:
+            env_path = os.getenv("MEMG_YAML_SCHEMA")
+            if not env_path:
+                raise YamlTranslatorError(
+                    "YAML schema path required. Set MEMG_YAML_SCHEMA environment variable "
+                    "or provide yaml_path parameter. No defaults allowed."
+                )
+            self.yaml_path = env_path
+
         self._schema: dict[str, Any] | None = None
         self._model_cache: dict[str, Any] = {}  # Instance cache to avoid memory leaks
 
@@ -56,34 +65,14 @@ class YamlTranslator:
         if self._schema is not None:
             return self._schema
 
-        # If explicit path is present, use it (strict)
-        if self.yaml_path:
-            self._schema = self._load_schema()
-            return self._schema
-
-        # Default fallback to built-in core.minimal.yaml
-        try:
-            from pathlib import Path
-
-            # Look for config/core.minimal.yaml relative to project root
-            default_path = (
-                Path(__file__).parent.parent.parent.parent / "config" / "core.minimal.yaml"
-            )
-            if default_path.exists():
-                self.yaml_path = str(default_path)
-                self._schema = self._load_schema()
-                return self._schema
-        except Exception as e:
-            # Re-raise with context instead of silent failure
+        # Load schema from the required path - no fallbacks
+        if not self.yaml_path:
             raise YamlTranslatorError(
-                f"Failed to load YAML schema from {self.yaml_path}: {e}"
-            ) from e
+                "YAML schema path not set. This should not happen after __init__."
+            )
 
-        # No valid YAML schema found
-        raise YamlTranslatorError(
-            "No YAML schema found. Set MEMG_YAML_SCHEMA environment variable "
-            "or ensure config/core.minimal.yaml exists"
-        )
+        self._schema = self._load_schema()
+        return self._schema
 
     def _load_schema(self) -> dict[str, Any]:
         """Load schema from the current yaml_path."""
@@ -129,54 +118,63 @@ class YamlTranslator:
         spec_raw = emap.get(name_l)
         if not spec_raw:
             raise YamlTranslatorError(f"Entity '{entity_name}' not found in YAML schema")
-        # Normalize
+
+        # Read anchor field from YAML schema - NO hardcoding
         anchor = spec_raw.get("anchor")
         if not anchor:
             raise YamlTranslatorError(
-                f"No anchor field defined for entity type '{entity_name}' in YAML schema"
+                f"Entity '{entity_name}' missing required 'anchor' field in YAML schema"
             )
-        # fields may be in different shapes; pass-through
+
         return EntitySpec(
             name=name_l,
             description=spec_raw.get("description"),
-            anchor=anchor,
+            anchor=str(anchor),
             fields=spec_raw.get("fields"),
         )
 
     def get_anchor_field(self, entity_name: str) -> str:
-        return self.get_entity_spec(entity_name).anchor
+        """Get the anchor field name for the given entity type from YAML schema."""
+        spec = self.get_entity_spec(entity_name)
+        return spec.anchor
 
     def build_anchor_text(self, memory) -> str:
-        # Determine anchor field from YAML schema
-        mem_type = getattr(memory, "memory_type", None) or getattr(memory, "type", None)
-        payload: dict[str, Any] = getattr(memory, "payload", {}) or {}
-        anchor_field = None
-
-        with contextlib.suppress(Exception):
-            anchor_field = self.get_anchor_field(str(mem_type))
-
-        # Use only the YAML-defined anchor field, no fallbacks
-        if not anchor_field:
-            raise YamlTranslatorError(f"No anchor field found for memory type '{mem_type}'")
-
-        anchor_text = payload.get(anchor_field)
-        if not anchor_text:
+        """
+        Builds anchor text for embedding from YAML-defined anchor field.
+        NO hardcoded field names - reads anchor field from YAML schema.
+        """
+        mem_type = getattr(memory, "memory_type", None)
+        if not mem_type:
             raise YamlTranslatorError(
-                f"Missing anchor field '{anchor_field}' for memory type '{mem_type}'"
+                "Memory object missing 'memory_type' field", operation="build_anchor_text"
             )
 
-        if isinstance(anchor_text, str):
-            anchor_text = anchor_text.strip()
-            if anchor_text:
-                return anchor_text
+        # Get anchor field from YAML schema
+        anchor_field = self.get_anchor_field(mem_type)
 
+        # Try to get anchor text from the specified field
+        anchor_text = None
+
+        # First check if it's a core field on the Memory object
+        if hasattr(memory, anchor_field):
+            anchor_text = getattr(memory, anchor_field, None)
+        # Otherwise check in the payload
+        elif hasattr(memory, "payload") and isinstance(memory.payload, dict):
+            anchor_text = memory.payload.get(anchor_field)
+
+        if isinstance(anchor_text, str):
+            stripped_text = anchor_text.strip()
+            if stripped_text:
+                return stripped_text
+
+        # Anchor field missing, empty, or invalid
         raise YamlTranslatorError(
-            f"Anchor field '{anchor_field}' is empty or invalid for memory type '{mem_type}'",
+            f"Anchor field '{anchor_field}' is missing, empty, or invalid for memory type '{mem_type}'",
             operation="build_anchor_text",
             context={
                 "memory_type": mem_type,
                 "anchor_field": anchor_field,
-                "available_keys": list(payload.keys()),
+                "anchor_value": anchor_text,
             },
         )
 
@@ -187,18 +185,12 @@ class YamlTranslator:
             req = [str(x) for x in fields.get("required", [])]
             opt = [str(x) for x in fields.get("optional", [])]
             return req, opt
-        # flat dict case: treat all as optional except anchor
-        anchor = spec.get("anchor")
-        if not anchor:
-            raise YamlTranslatorError("No anchor field defined for entity type in YAML schema")
+
+        # In the flat dict case, all fields defined in YAML are considered optional
+        # because the canonical 'statement' is now a code-owned field on the Memory model.
+        # Required fields from YAML are enforced at the Pydantic model level.
         keys = list(fields.keys())
-        if anchor in keys:
-            req = [anchor]
-            opt = [k for k in keys if k != anchor]
-        else:
-            req = []
-            opt = keys
-        return req, opt
+        return [], keys
 
     def validate_memory_against_yaml(
         self, memory_type: str, payload: dict[str, Any]
@@ -208,11 +200,14 @@ class YamlTranslator:
         if payload is None:
             raise YamlTranslatorError("payload is required")
 
+        # Strict validation - entity type MUST exist in YAML
         emap = self._entities_map()
         spec = emap.get(memory_type.lower())
         if not spec:
-            # pass-through if unknown; caller may still index
-            return dict(payload)
+            raise YamlTranslatorError(
+                f"Unknown entity type '{memory_type}'. All types must be defined in YAML schema.",
+                context={"memory_type": memory_type, "available_types": list(emap.keys())},
+            )
 
         req, _opt = self._fields_contract(spec)
         missing = [k for k in req if not payload.get(k)]
@@ -230,9 +225,25 @@ class YamlTranslator:
     def create_memory_from_yaml(self, memory_type: str, payload: dict[str, Any], user_id: str):
         from .models import Memory  # local import to avoid cycles
 
-        validated = self.validate_memory_against_yaml(memory_type, payload)
-        # Construct Memory; the model is type-agnostic
-        return Memory(memory_type=memory_type, payload=validated, user_id=user_id)
+        # Get anchor field from YAML schema
+        anchor_field = self.get_anchor_field(memory_type)
+
+        # Extract anchor text from payload
+        anchor_text = payload.get(anchor_field)
+        if not anchor_text or not isinstance(anchor_text, str):
+            raise YamlTranslatorError(
+                f"Missing or invalid anchor field '{anchor_field}' in payload for memory type '{memory_type}'"
+            )
+
+        # Validate full payload against YAML schema
+        validated_payload = self.validate_memory_against_yaml(memory_type, payload)
+
+        # Construct Memory with YAML-defined payload only
+        return Memory(
+            memory_type=memory_type,
+            payload=validated_payload,
+            user_id=user_id,
+        )
 
     def _python_type_for_yaml(self, yaml_type: str, field_def: dict[str, Any]):
         """Map YAML 'type' string to a Python type annotation used by Pydantic."""

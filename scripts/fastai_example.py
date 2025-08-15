@@ -1,5 +1,5 @@
 # scripts/fastai_example.py - Development/Testing FastAPI Example
-# Note: The production server is at src/memg_core/api/server.py
+# Note: The FastAPI server is now at scripts/fastapi_server.py
 from __future__ import annotations
 
 from datetime import datetime
@@ -25,7 +25,7 @@ app = FastAPI(
     version="0.1.0",
     description=(
         "Development/testing FastAPI example.\n"
-        "For production, use: src/memg_core/api/server.py"
+        "For testing, use: scripts/fastapi_server.py"
     ),
 )
 

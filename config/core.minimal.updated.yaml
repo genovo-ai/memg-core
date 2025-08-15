@@ -44,12 +44,6 @@ entities:
       assignee:    { type: string }
       due_date:    { type: datetime }
 
-  - name: note
-    parent: memo
-    description: "A simple note."
-    fields:
-      details: { type: string, required: true }
-
 relations:
   - name: memo_related
     description: "Generic relation between memos"

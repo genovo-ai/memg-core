@@ -16,7 +16,7 @@ def start_server():
         return subprocess.Popen(
             [
                 sys.executable, "-m", "uvicorn",
-                "memg_core.api.server:app",
+                "scripts.fastapi_server:app",
                 "--host", "127.0.0.1",
                 "--port", "8000"
             ],
