@@ -1,6 +1,6 @@
 # memg_core/core/pipeline/retrieval.py
 """Unified retrieval pipeline with automatic mode selection and neighbor expansion.
-- YAML-driven: uses YAML-defined anchor fields (content, summary, etc.) for text anchoring.
+- YAML-driven: uses YAML-defined anchor fields for text anchoring.
 - Modes: vector-first (Qdrant), graph-first (Kuzu), hybrid (merge).
 - Filters: user_id, memo_type, modified_within_days, arbitrary filters.
 - Deterministic ordering: score DESC, then hrid index ASC, then id ASC.
@@ -22,7 +22,7 @@ from ..models import Memory, SearchResult
 # ----------------------------- helpers ---------------------------------
 
 
-# NEW: deterministic field projection for payloads
+# Deterministic field projection for payloads - YAML-driven
 def _project_payload(
     memory_type: str,
     payload: dict[str, Any] | None,
@@ -31,37 +31,45 @@ def _project_payload(
     projection: dict[str, list[str]] | None,
 ) -> dict[str, Any]:
     """
-    Returns a pruned payload based on include_details and optional projection mapping.
-
-    Policy (v1):
-      - include_details="none": anchors only → keep just "statement" if present.
-      - include_details="self": anchors + optional projection for anchors; always keep "statement" if present.
-      - include_details other values are reserved for future; treated like "self".
-      - Neighbors remain anchors-only regardless (we don't hydrate neighbor details in v1).
+    Returns a pruned payload. The YAML-defined anchor field is always included.
     """
     payload = dict(payload or {})
     if not payload:
         return {}
 
-    # Always prefer having "statement" present if it exists
-    has_stmt = "statement" in payload
+    # Get anchor field from YAML schema - NO hardcoding
+    from ..yaml_translator import get_yaml_translator
+
+    try:
+        anchor_field = get_yaml_translator().get_anchor_field(memory_type)
+    except Exception as e:
+        # No fallbacks - raise error if YAML lookup fails
+        from ..exceptions import ProcessingError
+
+        raise ProcessingError(
+            f"Failed to get anchor field for memory type '{memory_type}' from YAML schema",
+            operation="_project_payload",
+            context={"memory_type": memory_type, "include_details": include_details},
+            original_error=e,
+        )
 
     if include_details == "none":
-        return {"statement": payload["statement"]} if has_stmt else {}
+        if anchor_field in payload:
+            return {anchor_field: payload[anchor_field]}
+        return {}
 
     # self / default behavior with optional projection
     allowed: set[str] | None = None
     if projection:
         allowed = set(projection.get(memory_type, []))
-        # Always include statement when present
-        if has_stmt:
-            allowed.add("statement")
+
+    # Always include the YAML-defined anchor field
+    if allowed is not None:
+        allowed.add(anchor_field)
 
     if allowed is None:
-        # No projection → return as-is
         return payload
 
-    # With projection → prune to allowed keys
     return {k: v for k, v in payload.items() if k in allowed}
 
 
@@ -128,8 +136,7 @@ def _build_graph_query_for_memos(
         params["cutoff"] = _iso(cut)
 
     cypher += (
-        "\nRETURN DISTINCT "
-        "m.id, m.user_id, m.memory_type, m.hrid, m.statement, m.tags, m.created_at, m.updated_at\n"
+        "\nRETURN DISTINCT m as node\n"  # Changed to return full node object
         "ORDER BY coalesce(m.updated_at, m.created_at) DESC\n"
         "LIMIT $limit"
     )
@@ -139,22 +146,60 @@ def _build_graph_query_for_memos(
 def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
     out: list[Memory] = []
     for row in rows:
-        # Core fields are extracted directly.
+        # Handle both old format (m.field) and new format (node object)
+        if "node" in row and hasattr(row["node"], "__dict__"):
+            # New format: extract from node object
+            node_data = row["node"].__dict__ if hasattr(row["node"], "__dict__") else {}
+        elif "node" in row and isinstance(row["node"], dict):
+            # New format: node is already a dict
+            node_data = row["node"]
+        else:
+            # Old format: fields with m. prefix
+            node_data = row
+
+        # Core fields are extracted directly - NO entity-specific fields
         core_fields = {
-            "id": row.get("m.id") or row.get("id") or str(uuid4()),
-            "user_id": row.get("m.user_id") or row.get("user_id", ""),
-            "memory_type": row.get("m.memory_type") or row.get("memory_type") or "memo",
-            "created_at": _parse_datetime(row.get("m.created_at") or row.get("created_at")),
-            "hrid": row.get("m.hrid") or row.get("hrid"),
-            "tags": row.get("m.tags") or row.get("tags") or [],
+            "id": node_data.get("id") or row.get("m.id") or row.get("id") or str(uuid4()),
+            "user_id": node_data.get("user_id") or row.get("m.user_id") or row.get("user_id", ""),
+            "memory_type": node_data.get("memory_type")
+            or row.get("m.memory_type")
+            or row.get("memory_type")
+            or "memo",
+            "created_at": _parse_datetime(
+                node_data.get("created_at") or row.get("m.created_at") or row.get("created_at")
+            ),
+            "updated_at": _parse_datetime(
+                node_data.get("updated_at") or row.get("m.updated_at") or row.get("updated_at")
+            ),
+            "hrid": node_data.get("hrid") or row.get("m.hrid") or row.get("hrid"),
+            "tags": node_data.get("tags") or row.get("m.tags") or row.get("tags") or [],
         }
 
-        # All other fields from the row are considered part of the payload.
-        payload = {
-            key.replace("m.", ""): value
-            for key, value in row.items()
-            if key.replace("m.", "") not in core_fields
+        # All other fields from the node/row are considered part of the payload
+        # Exclude core field names and heavy data like vectors
+        core_field_names = {
+            "id",
+            "user_id",
+            "memory_type",
+            "created_at",
+            "updated_at",
+            "hrid",
+            "tags",
+            "vector",
         }
+
+        if "node" in row:
+            # New format: all fields from node except core fields
+            payload = {
+                key: value for key, value in node_data.items() if key not in core_field_names
+            }
+        else:
+            # Old format: fields with m. prefix
+            payload = {
+                key.replace("m.", ""): value
+                for key, value in row.items()
+                if key.replace("m.", "") not in core_field_names
+            }
 
         # Normalize tags if they are a string
         if isinstance(core_fields["tags"], str):
@@ -177,7 +222,7 @@ def _qdrant_filters(
     if user_id:
         f["core.user_id"] = user_id
     if memo_type:
-        f["core.memory_type"] = memo_type
+        f["core.memory_type"] = memo_type  # Fixed field name
     cut = _cutoff(modified_within_days)
     if cut is not None:
         f["core.updated_at_from"] = _iso(cut)  # adapter layer should translate to a proper Range
@@ -211,8 +256,12 @@ def _append_neighbors(
     relation_names: list[str] | None,
 ) -> list[SearchResult]:
     expanded: list[SearchResult] = []
-    # NEW: default whitelist used if none provided (anchors-only neighbors)
-    rels = relation_names or ["RELATED_TO", "HAS_DOCUMENT", "REQUIRES"]
+    # Use provided relation names or empty list - no hardcoded defaults
+    rels = relation_names or []
+
+    # If no relation names provided, skip neighbor expansion entirely
+    if not rels:
+        return seeds
 
     for seed in seeds[: min(5, len(seeds))]:
         mem = seed.memory
@@ -232,20 +281,29 @@ def _append_neighbors(
             # This is common in minimal setups or fresh databases
             continue
         for row in rows:
-            statement = row.get("statement", "")
+            # Use generic payload reconstruction without hardcoded field names
+            core_field_names = {
+                "id",
+                "user_id",
+                "memory_type",
+                "tags",
+                "created_at",
+                "updated_at",
+                "hrid",
+            }
+            payload = {k: v for k, v in row.items() if k not in core_field_names}
             neighbor = Memory(
                 id=row.get("id") or str(uuid4()),
                 user_id=row.get("user_id", ""),
                 memory_type=row.get("memory_type", "memo"),
-                payload={"statement": statement},
+                payload=payload,
                 confidence=0.8,
                 is_valid=True,
                 created_at=_parse_datetime(row.get("created_at")),
-                supersedes=None,
-                superseded_by=None,
+                updated_at=_parse_datetime(row.get("updated_at")),
                 vector=None,
                 tags=[],
-                hrid=row.get("hrid"),  # NEW: if present
+                hrid=row.get("hrid"),
             )
             expanded.append(
                 SearchResult(
@@ -288,11 +346,11 @@ def graph_rag_search(
     include_details: str = "none",  # NEW: "none" | "self" (neighbors remain anchors-only in v1)
     projection: dict[str, list[str]] | None = None,  # NEW: per-type field allow-list
 ) -> list[SearchResult]:
-    """Unified retrieval with automatic mode selection.
+    """Unified retrieval with graph-first approach as mandated by policy.
 
-    - If `query` is provided → vector-first.
-    - If no `query` but `memo_type/filters/date` are provided → graph-first.
-    - If both and `mode='hybrid'` → merge by id with stable ordering.
+    - Default mode is graph-first with optional vector rerank.
+    - If `mode='vector'` explicitly → vector-first.
+    - If `mode='hybrid'` → merge by id with stable ordering.
     """
     # ---------------- validation ----------------
     has_query = bool(query and query.strip())
@@ -300,8 +358,8 @@ def graph_rag_search(
     if not has_query and not has_scope:
         return []
 
-    # decide mode
-    eff_mode = mode or ("vector" if has_query else "graph")
+    # decide mode - default to graph-first as per policy
+    eff_mode = mode or "graph"
 
     results: list[SearchResult] = []
 
@@ -344,17 +402,18 @@ def graph_rag_search(
                 core = payload.get("core", {})
                 entity = payload.get("entity", {})
 
-                # Reconstruct the Memory object strictly from its stored parts.
+                # Reconstruct the Memory object strictly from its stored parts
                 # The payload is the `entity` dict. Core fields are in `core`.
                 m = Memory(
                     id=r.get("id") or str(uuid4()),
                     user_id=core.get("user_id", ""),
                     memory_type=core.get("memory_type", "memo"),
-                    payload=entity,
+                    payload=entity,  # All entity fields in payload
                     tags=core.get("tags", []),
                     confidence=core.get("confidence", 0.8),
                     is_valid=core.get("is_valid", True),
                     created_at=_parse_datetime(core.get("created_at")),
+                    updated_at=_parse_datetime(core.get("updated_at")),
                     hrid=core.get("hrid"),
                 )
                 # NEW: project anchor payload according to include_details/projection
@@ -400,8 +459,7 @@ def graph_rag_search(
                     confidence=core.get("confidence", 0.8),
                     is_valid=core.get("is_valid", True),
                     created_at=_parse_datetime(core.get("created_at")),
-                    supersedes=core.get("supersedes"),
-                    superseded_by=core.get("superseded_by"),
+                    updated_at=_parse_datetime(core.get("updated_at")),
                     vector=None,
                     hrid=core.get("hrid"),
                 )
@@ -439,23 +497,19 @@ def graph_rag_search(
                 payload = r.get("payload", {})
                 core = payload.get("core", {})
                 entity = payload.get("entity", {})
-                statement = entity.get("statement") or core.get("statement") or ""
+                # Use all entity fields as payload without hardcoded assumptions
                 m = Memory(
                     id=r.get("id") or str(uuid4()),
                     user_id=core.get("user_id", ""),
                     memory_type=core.get("memory_type", "memo"),
-                    payload={
-                        "statement": statement,
-                        **{k: v for k, v in entity.items() if k != "statement"},
-                    },
+                    payload=dict(entity),  # All entity fields, no filtering
                     tags=core.get("tags", []),
                     confidence=core.get("confidence", 0.8),
                     is_valid=core.get("is_valid", True),
                     created_at=_parse_datetime(core.get("created_at")),
-                    supersedes=core.get("supersedes"),
-                    superseded_by=core.get("superseded_by"),
+                    updated_at=_parse_datetime(core.get("updated_at")),
                     vector=None,
-                    hrid=core.get("hrid"),  # NEW
+                    hrid=core.get("hrid"),
                 )
                 # NEW: project anchor payload according to include_details/projection
                 m.payload = _project_payload(
@@ -477,11 +531,6 @@ def graph_rag_search(
     # The neighbor payload is constructed generically, so this should be fine.
     results = _append_neighbors(results, kuzu, neighbor_cap, relation_names)
 
-    # final order & clamp
-    def _sort_key(r: SearchResult):
-        h = r.memory.hrid
-        h_idx = hrid_to_index(h) if h else 9_999_999_999  # push missing HRIDs last
-        return (-r.score, h_idx, r.memory.id)
-
+    # final order & clamp - use the unified sort function
     results.sort(key=_sort_key)
     return results[:limit]

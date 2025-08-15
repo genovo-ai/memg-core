@@ -15,7 +15,6 @@ class MemGConfig:
     high_similarity_threshold: float = 0.9  # For duplicate detection
 
     # Processing settings
-    max_summary_tokens: int = 750  # Max tokens for document summarization
     enable_ai_type_verification: bool = True  # AI-based type detection
     enable_temporal_reasoning: bool = False  # Enable temporal reasoning
 
@@ -38,8 +37,6 @@ class MemGConfig:
             raise ValueError("score_threshold must be between 0.0 and 1.0")
         if not 0.0 <= self.high_similarity_threshold <= 1.0:
             raise ValueError("high_similarity_threshold must be between 0.0 and 1.0")
-        if self.max_summary_tokens < 100:
-            raise ValueError("max_summary_tokens must be at least 100")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary"""
@@ -47,7 +44,6 @@ class MemGConfig:
             "similarity_threshold": self.similarity_threshold,
             "score_threshold": self.score_threshold,
             "high_similarity_threshold": self.high_similarity_threshold,
-            "max_summary_tokens": self.max_summary_tokens,
             "enable_ai_type_verification": self.enable_ai_type_verification,
             "vector_dimension": self.vector_dimension,
             "batch_processing_size": self.batch_processing_size,
@@ -72,7 +68,6 @@ class MemGConfig:
             similarity_threshold=float(os.getenv("MEMG_SIMILARITY_THRESHOLD", "0.7")),
             score_threshold=float(os.getenv("MEMG_SCORE_THRESHOLD", "0.3")),
             high_similarity_threshold=float(os.getenv("MEMG_HIGH_SIMILARITY_THRESHOLD", "0.9")),
-            max_summary_tokens=int(os.getenv("MEMG_MAX_SUMMARY_TOKENS", "750")),
             enable_ai_type_verification=os.getenv(
                 "MEMG_ENABLE_AI_TYPE_VERIFICATION", "true"
             ).lower()

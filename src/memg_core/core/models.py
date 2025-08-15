@@ -12,19 +12,19 @@ class Memory(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    # Core fields only - NO hardcoded entity-specific fields
     id: str = Field(default_factory=lambda: str(uuid4()))
     user_id: str = ""
-    memory_type: str
-    payload: dict[str, Any] = Field(default_factory=dict)
+    memory_type: str = "memo"  # Restored proper field name
+    payload: dict[str, Any] = Field(default_factory=dict)  # All entity fields live here
     tags: list[str] = Field(default_factory=list)
     confidence: float = 0.8
     vector: list[float] | None = None
     is_valid: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    supersedes: str | None = None
-    superseded_by: str | None = None
+    updated_at: datetime | None = None
 
-    # NEW: human-readable id (e.g., TASK_AAA001)
+    # Human-readable id (e.g., MEMO_AAA001)
     hrid: str | None = None
 
     @field_validator("memory_type")
@@ -34,10 +34,10 @@ class Memory(BaseModel):
             raise ValueError("memory_type cannot be empty")
         return v.strip()
 
-    # Remove hardcoded properties to rely on dynamic __getattr__
     # (properties removed – dynamic __getattr__ handles field access)
 
     def to_qdrant_payload(self) -> dict[str, Any]:
+        """Serializes to a strict {'core': ..., 'entity': ...} structure."""
         core = {
             "id": self.id,
             "user_id": self.user_id,
@@ -46,60 +46,36 @@ class Memory(BaseModel):
             "confidence": self.confidence,
             "is_valid": self.is_valid,
             "created_at": self.created_at.isoformat(),
-            "supersedes": self.supersedes,
-            "superseded_by": self.superseded_by,
         }
+        if self.updated_at:
+            core["updated_at"] = self.updated_at.isoformat()
         if self.hrid:
             core["hrid"] = self.hrid
 
-        # entity fields live under "entity"
+        # Entity payload contains only YAML-defined fields
         entity = dict(self.payload)
 
-        payload = {
-            "core": core,
-            "entity": entity,
-            # Flat mirror: include all entity fields at top-level for vector DB convenience
-            **entity,
-        }
-        return payload
+        return {"core": core, "entity": entity}
 
     def to_kuzu_node(self) -> dict[str, Any]:
         """
-        Core Kuzu node: minimal metadata + YAML-defined entity fields.
-        No hardcoded field names or backward compatibility.
+        Exports a minimal node for Kuzu, containing only core fields.
+        Entity-specific fields are not stored in the graph for performance.
         """
-        entity = self.payload or {}
         node = {
             "id": self.id,
             "user_id": self.user_id,
             "memory_type": self.memory_type,
             "tags": ",".join(self.tags) if isinstance(self.tags, list) else (self.tags or ""),
-            "created_at": self.created_at.isoformat(),
+            "confidence": self.confidence,
             "is_valid": self.is_valid,
+            "created_at": self.created_at.isoformat(),
         }
-
-        # Add core Memory fields if present
+        if self.updated_at:
+            node["updated_at"] = self.updated_at.isoformat()
         if self.hrid:
             node["hrid"] = self.hrid
-        if self.supersedes:
-            node["supersedes"] = self.supersedes
-        if self.superseded_by:
-            node["superseded_by"] = self.superseded_by
 
-        # Include all entity fields from payload (no filtering, no assumptions)
-        for k, v in entity.items():
-            if k in {"vector"}:
-                continue  # skip heavy data
-            if isinstance(v, str):
-                node[k] = v[:256]  # trim long strings for storage efficiency
-            else:
-                node[k] = v
-
-        # Store anchor text as statement - YAML schema required, no fallback
-        from .yaml_translator import build_anchor_text
-
-        anchor_text = build_anchor_text(self)
-        node["statement"] = anchor_text
         return node
 
     def __getattr__(self, item: str):
@@ -115,7 +91,7 @@ class Memory(BaseModel):
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
 
     # ---------------------------------------------------------------------
-    # YAML → Entity projection helpers
+    # YAML → Dynamic entity model projection helpers
     # ---------------------------------------------------------------------
     def to_entity_model(self):
         """Project this Memory into a dynamic Pydantic entity model.
@@ -134,55 +110,12 @@ class Memory(BaseModel):
         return model_cls(**model_fields)
 
 
-class Entity(BaseModel):
-    """Entity extracted from memories"""
-
-    id: str | None = Field(default_factory=lambda: str(uuid4()))
-    user_id: str = Field(..., description="User ID for entity isolation")
-    name: str = Field(..., description="Entity name")
-    type: str = Field(..., description="Entity type")
-    description: str = Field(..., description="Entity description")
-    confidence: float = Field(0.8, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    is_valid: bool = Field(True)
-    source_memory_id: str | None = Field(None, description="Source memory ID")
-
-    def to_kuzu_node(self) -> dict[str, Any]:
-        """Convert to Kuzu node properties"""
-        return {
-            "id": self.id,
-            "user_id": self.user_id,
-            "name": self.name,
-            "type": self.type,
-            "description": self.description,
-            "confidence": self.confidence,
-            "created_at": str(self.created_at.isoformat()),
-            "is_valid": self.is_valid,
-            "source_memory_id": self.source_memory_id or "",
-        }
+# Entity class removed - entities are now YAML-defined Memory objects
+# Use Memory with appropriate memory_type instead of hardcoded Entity class
 
 
-class Relationship(BaseModel):
-    """Relationship between entities or memories"""
-
-    id: str | None = Field(default_factory=lambda: str(uuid4()))
-    user_id: str = Field(..., description="User ID for relationship isolation")
-    source_id: str = Field(..., description="Source node ID")
-    target_id: str = Field(..., description="Target node ID")
-    relationship_type: str = Field(..., description="Type of relationship")
-    confidence: float = Field(0.8, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    is_valid: bool = Field(True)
-
-    def to_kuzu_props(self) -> dict[str, Any]:
-        """Convert to Kuzu relationship properties"""
-        return {
-            "user_id": self.user_id,
-            "relationship_type": self.relationship_type,
-            "confidence": self.confidence,
-            "created_at": str(self.created_at.isoformat()),
-            "is_valid": self.is_valid,
-        }
+# Relationship class removed - relationships should be YAML-defined
+# Use YAML relations schema instead of hardcoded Relationship class
 
 
 class MemoryPoint(BaseModel):
@@ -213,19 +146,14 @@ class SearchResult(BaseModel):
 
 
 class ProcessingResult(BaseModel):
-    """Result from memory processing pipeline"""
+    """Result from memory processing pipeline - type-agnostic"""
 
     success: bool
     memories_created: list[Memory] = Field(default_factory=list)
-    entities_created: list[Entity] = Field(default_factory=list)
-    relationships_created: list[Relationship] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     processing_time_ms: float | None = Field(None)
 
     @property
     def total_created(self) -> int:
-        return (
-            len(self.memories_created)
-            + len(self.entities_created)
-            + len(self.relationships_created)
-        )
+        """Total memories created (all types)"""
+        return len(self.memories_created)
