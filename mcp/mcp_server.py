@@ -32,12 +32,12 @@ class MemgCoreBridge:
         """Add a memory using the appropriate lean core function."""
         try:
             if memory_type.lower() == "document":
-                # For documents, use content as summary and title as title
+                # For documents, use text and summary parameters directly
                 memory = add_document(
                     text=kwargs.get("text", content),
                     user_id=user_id,
                     title=title,
-                    summary=content,
+                    summary=kwargs.get("summary", content),
                     tags=tags or []
                 )
             elif memory_type.lower() == "task":
@@ -46,8 +46,7 @@ class MemgCoreBridge:
                     user_id=user_id,
                     title=title,
                     tags=tags or [],
-                    due_date=kwargs.get("due_date"),
-                    assignee=kwargs.get("assignee")
+                    due_date=kwargs.get("due_date")
                 )
             else:  # Default to note
                 memory = add_note(
