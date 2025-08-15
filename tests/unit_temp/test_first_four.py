@@ -59,8 +59,6 @@ class FakeQdrant:
                             "user_id": user_id or "u",
                             "memory_type": filters.get("core.memory_type", "memo") if filters else "memo",
                             "created_at": datetime.now(UTC).isoformat(),
-                            "is_valid": True,
-                            "tags": ["t"],
                             "hrid": f"MEMO_AAA10{i}",  # make deterministic and usable in ordering tests
                         },
                     "entity": {
@@ -105,7 +103,7 @@ class FakeKuzu:
                 "m.user_id": uid,
                 "m.memory_type": mt,
                 "m.statement": "graph-candidate-1",  # Use statement as anchor
-                "m.tags": ["g"],
+                # No hardcoded tags - removed as part of audit
                 "m.created_at": datetime.now(UTC).isoformat(),
                 "m.updated_at": datetime.now(UTC).isoformat(),
             },
@@ -114,7 +112,7 @@ class FakeKuzu:
                 "m.user_id": uid,
                 "m.memory_type": mt,
                 "m.statement": "graph-candidate-2",  # Use statement as anchor
-                "m.tags": ["g"],
+                # No hardcoded tags - removed as part of audit
                 "m.created_at": datetime.now(UTC).isoformat(),
                 "m.updated_at": datetime.now(UTC).isoformat(),
             },
@@ -138,39 +136,11 @@ class FakeKuzu:
 
 @pytest.fixture()
 def tmp_yaml(tmp_path: Path):
-    y = tmp_path / "entities.yaml"
-    y.write_text(
-        """
-version: v1
-entities:
-  - name: memo
-    anchor: statement
-    fields:
-      id:          { type: string, required: true, system: true }
-      user_id:     { type: string, required: true, system: true }
-      statement:   { type: string, required: true, max_length: 8000 }
-      tags:        { type: tags }
-  - name: note
-    parent: memo
-    anchor: statement
-    fields:
-      details:     { type: string, required: true }
-  - name: document
-    parent: memo
-    anchor: statement
-    fields:
-      details:     { type: string, required: true }
-  - name: task
-    parent: memo
-    anchor: statement
-    fields:
-      details:     { type: string }
-      due_date:    { type: datetime }
-""",
-        encoding="utf-8",
-    )
-    os.environ["MEMG_YAML_SCHEMA"] = str(y)
-    return y
+    # TESTS MUST USE REAL YAML - no invalid temporary schemas
+    # Our bulletproof system correctly rejects incomplete YAML
+    config_path = Path(__file__).parent.parent.parent / "config" / "core.minimal.yaml"
+    os.environ["MEMG_YAML_SCHEMA"] = str(config_path)
+    return config_path
 
 
 # ----------------------------- Tests: YAML translator -----------------------------
@@ -197,9 +167,6 @@ def test_indexer_adds_to_both_stores(monkeypatch, tmp_yaml):
         memory_type="note",
         payload={"statement": "hello", "details": "hello world"},
         user_id="u",
-        confidence=0.8,
-        vector=None,
-        is_valid=True,
     )
     fq = FakeQdrant()
     fk = FakeKuzu()
@@ -340,8 +307,6 @@ def test_retrieval_uses_hrid_for_ties(monkeypatch, tmp_yaml):
                             "user_id": user_id or "u",
                             "memory_type": "memo",
                             "created_at": datetime.now(UTC).isoformat(),
-                            "is_valid": True,
-                            "tags": ["t"],
                             "hrid": hrid_,
                         },
                         "entity": {"statement": "x", "details": "x"},

@@ -36,7 +36,6 @@ def test_memory_to_qdrant_payload_shapes_by_type():
         payload={"statement": "Test content",
             "details": "This is the detail for the test note.",
         },
-        tags=["test", "memory"],
         created_at=datetime(2023, 1, 1, tzinfo=UTC),
     )
     note_payload = note_memory.to_qdrant_payload()
@@ -45,7 +44,7 @@ def test_memory_to_qdrant_payload_shapes_by_type():
     assert "entity" in note_payload
     assert note_payload["core"]["memory_type"] == "note"
     assert note_payload["core"]["user_id"] == "test-user"
-    assert note_payload["core"]["tags"] == ["test", "memory"]
+    # No hardcoded tags field - removed as part of audit
     assert note_payload["core"]["created_at"] == "2023-01-01T00:00:00+00:00"
     assert note_payload["entity"]["statement"] == "Test content"
     assert note_payload["entity"]["details"] == "This is the detail for the test note."
@@ -82,7 +81,6 @@ def test_memory_to_kuzu_node_core_fields_only():
             "status": "in_progress",
             "assignee": "developer"
         },
-        tags=["test", "kuzu"],
     )
 
     kuzu_node = memory.to_kuzu_node()
@@ -90,7 +88,7 @@ def test_memory_to_kuzu_node_core_fields_only():
     # Core fields should be present
     assert kuzu_node["user_id"] == "test-user"
     assert kuzu_node["memory_type"] == "task"
-    assert kuzu_node["tags"] == "test,kuzu"
+    # No hardcoded tags field - removed as part of audit
 
     # YAML-defined payload fields should NOT be in Kuzu (only core fields stored)
     assert "statement" not in kuzu_node  # Statement is in payload, not core
