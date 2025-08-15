@@ -18,23 +18,11 @@ from memg_core.core.models import Memory
 @pytest.fixture(scope="session", autouse=True)
 def setup_yaml_schema():
     """Global YAML schema fixture that uses the real config file."""
-    # Try multiple possible locations for the config file
-    possible_paths = [
-        Path(__file__).parent.parent / "config" / "core.minimal.yaml",  # Normal case
-        Path("/workspace/config/core.minimal.yaml"),  # Docker CI case
-        Path.cwd() / "config" / "core.minimal.yaml",  # Fallback
-    ]
+    # Use the correct relative path from tests/ to config/
+    config_path = Path(__file__).parent.parent / "config" / "core.minimal.yaml"
 
-    config_path = None
-    for path in possible_paths:
-        if path.exists():
-            config_path = path
-            break
-
-    if config_path is None:
-        raise FileNotFoundError(
-            f"Config file not found in any of: {[str(p) for p in possible_paths]}"
-        )
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found at: {config_path}")
 
     os.environ["MEMG_YAML_SCHEMA"] = str(config_path)
     return config_path
