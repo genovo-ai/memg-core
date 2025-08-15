@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import os
-
 from fastembed import TextEmbedding
+
+from memg_core.core.config import get_config
 
 
 class Embedder:
@@ -14,13 +14,16 @@ class Embedder:
         """Initialize the FastEmbed embedder
 
         Args:
-            model_name: Model to use. Defaults to env EMBEDDER_MODEL or snowflake-arctic-embed-xs
+            model_name: Model to use. Defaults to config or snowflake-arctic-embed-xs
         """
 
-        # Use env variable or default to the winner model
-        self.model_name = (
-            model_name or os.getenv("EMBEDDER_MODEL") or "Snowflake/snowflake-arctic-embed-xs"
-        )
+        # Get model name from config system (which reads env) or use provided override
+        if model_name:
+            self.model_name = model_name
+        else:
+            # Use config system which handles env variable EMBEDDER_MODEL
+            config = get_config()
+            self.model_name = config.memg.embedder_model
 
         self.model = TextEmbedding(model_name=self.model_name)
 

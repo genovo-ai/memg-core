@@ -16,6 +16,7 @@ from qdrant_client.models import (
     VectorParams,
 )
 
+from memg_core.core.config import get_config
 from memg_core.core.exceptions import DatabaseError
 
 
@@ -39,6 +40,10 @@ class QdrantInterface:
         self.client = QdrantClient(path=storage_path)
         self.collection_name = collection_name
 
+        # Get vector dimension from config instead of hardcoding
+        config = get_config()
+        self.vector_dimension = config.memg.vector_dimension
+
     def collection_exists(self, collection: str | None = None) -> bool:
         """Check if collection exists"""
         try:
@@ -53,10 +58,13 @@ class QdrantInterface:
                 original_error=e,
             )
 
-    def create_collection(self, collection: str | None = None, vector_size: int = 384) -> bool:
+    def create_collection(
+        self, collection: str | None = None, vector_size: int | None = None
+    ) -> bool:
         """Create a new collection"""
         try:
             collection = collection or self.collection_name
+            vector_size = vector_size or self.vector_dimension
             if self.collection_exists(collection):
                 return True  # Already exists
 
@@ -73,7 +81,9 @@ class QdrantInterface:
                 original_error=e,
             )
 
-    def ensure_collection(self, collection: str | None = None, vector_size: int = 384) -> bool:
+    def ensure_collection(
+        self, collection: str | None = None, vector_size: int | None = None
+    ) -> bool:
         """Ensure collection exists, create if it doesn't"""
         collection = collection or self.collection_name
         if not self.collection_exists(collection):
@@ -132,7 +142,7 @@ class QdrantInterface:
             collection = collection or self.collection_name
 
             if not self.collection_exists(collection):
-                self.ensure_collection(collection, 384)
+                self.ensure_collection(collection)
 
             # Build query filter
             query_filter = None

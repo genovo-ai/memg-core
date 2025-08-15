@@ -21,6 +21,7 @@ class MemGConfig:
     # Performance settings
     vector_dimension: int = 384  # Embedding dimension
     batch_processing_size: int = 50  # Batch size for bulk operations
+    embedder_model: str = "Snowflake/snowflake-arctic-embed-xs"  # FastEmbed model
 
     # Template settings
     template_name: str = "default"  # Active template name
@@ -47,6 +48,7 @@ class MemGConfig:
             "enable_ai_type_verification": self.enable_ai_type_verification,
             "vector_dimension": self.vector_dimension,
             "batch_processing_size": self.batch_processing_size,
+            "embedder_model": self.embedder_model,
             "template_name": self.template_name,
             "qdrant_collection_name": self.qdrant_collection_name,
             "kuzu_database_path": self.kuzu_database_path,
@@ -74,6 +76,7 @@ class MemGConfig:
             == "true",
             vector_dimension=int(os.getenv("EMBEDDING_DIMENSION_LEN", "384")),
             batch_processing_size=int(os.getenv("MEMG_BATCH_SIZE", "50")),
+            embedder_model=os.getenv("EMBEDDER_MODEL", "Snowflake/snowflake-arctic-embed-xs"),
             template_name=os.getenv("MEMG_TEMPLATE", "default"),
             qdrant_collection_name=os.getenv("MEMG_QDRANT_COLLECTION", "memories"),
             kuzu_database_path=os.getenv("MEMG_KUZU_DB_PATH", "kuzu_db"),
