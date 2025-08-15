@@ -121,8 +121,10 @@ def test_graph_neighbors_with_real_kuzu():
 
     try:
         # use unique IDs to avoid PK collisions if DB persists
-        node1["id"] = f"test-node-{uuid4()}"
-        node2["id"] = f"test-node-{uuid4()}"
+        node1_id = f"test-node-{uuid4()}"
+        node2_id = f"test-node-{uuid4()}"
+        node1["id"] = node1_id
+        node2["id"] = node2_id
         kuzu.add_node("Memory", node1)
         kuzu.add_node("Memory", node2)
 
@@ -131,21 +133,21 @@ def test_graph_neighbors_with_real_kuzu():
             from_table="Memory",
             to_table="Memory",
             rel_type="TEST_REL",
-            from_id="test-node-1",
-            to_id="test-node-2",
+            from_id=node1_id,
+            to_id=node2_id,
         )
 
         # Query neighbors
         neighbors = kuzu.neighbors(
             node_label="Memory",
-            node_id="test-node-1",
+            node_id=node1_id,
             direction="out",
             limit=10,
             neighbor_label="Memory",
         )
 
         assert len(neighbors) == 1
-        assert neighbors[0]["id"] == "test-node-2"
+        assert neighbors[0]["id"] == node2_id
         assert neighbors[0]["rel_type"] == "TEST_REL"
 
     finally:
