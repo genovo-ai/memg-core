@@ -37,6 +37,16 @@ def add_memory_index(
       Qdrant point ID (string), which should equal `memory.id`.
     """
     try:
+        # Validate memory_type against TypeRegistry - crash if invalid
+        from ..types import validate_entity_type
+
+        if not validate_entity_type(memory.memory_type):
+            raise ProcessingError(
+                f"Invalid memory_type: {memory.memory_type}",
+                operation="add_memory_index",
+                context={"memory_id": memory.id, "memory_type": memory.memory_type},
+            )
+
         # Get anchor text via YAML translator - NO hardcoded fields
         from ..yaml_translator import build_anchor_text
 

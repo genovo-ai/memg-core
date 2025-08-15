@@ -241,7 +241,7 @@ def _rerank_with_vectors(
 
     results: list[SearchResult] = []
     for mem in candidates:
-        score = score_by_id.get(mem.id, 0.5)
+        score = score_by_id.get(mem.id, 0.0)  # No arbitrary fallback scores
         results.append(
             SearchResult(memory=mem, score=score, distance=None, source="graph_rerank", metadata={})
         )
@@ -294,21 +294,18 @@ def _append_neighbors(
             payload = {k: v for k, v in row.items() if k not in core_field_names}
             neighbor = Memory(
                 id=row.get("id") or str(uuid4()),
-                user_id=row.get("user_id", ""),
-                memory_type=row.get("memory_type", "memo"),
+                user_id=row["user_id"],  # CRASH if missing - no fallback
+                memory_type=row["memory_type"],  # CRASH if missing - no fallback
                 payload=payload,
-                confidence=0.8,
-                is_valid=True,
                 created_at=_parse_datetime(row.get("created_at")),
                 updated_at=_parse_datetime(row.get("updated_at")),
                 vector=None,
-                tags=[],
                 hrid=row.get("hrid"),
             )
             expanded.append(
                 SearchResult(
                     memory=neighbor,
-                    score=max(0.3, seed.score * 0.9),
+                    score=seed.score * 0.9,  # No arbitrary minimum score
                     distance=None,
                     source="graph_neighbor",
                     metadata={"from": mem.id},
@@ -389,7 +386,7 @@ def graph_rag_search(
                     )
                     proj.append(
                         SearchResult(
-                            memory=m, score=0.5, distance=None, source="graph", metadata={}
+                            memory=m, score=0.0, distance=None, source="graph", metadata={}
                         )
                     )
                 results = proj
@@ -407,11 +404,9 @@ def graph_rag_search(
                 m = Memory(
                     id=r.get("id") or str(uuid4()),
                     user_id=core.get("user_id", ""),
-                    memory_type=core.get("memory_type", "memo"),
+                    memory_type=core["memory_type"],  # CRASH if missing - no fallback
                     payload=entity,  # All entity fields in payload
-                    tags=core.get("tags", []),
-                    confidence=core.get("confidence", 0.8),
-                    is_valid=core.get("is_valid", True),
+                    # NO hardcoded field assumptions - payload contains all entity data
                     created_at=_parse_datetime(core.get("created_at")),
                     updated_at=_parse_datetime(core.get("updated_at")),
                     hrid=core.get("hrid"),
@@ -453,11 +448,9 @@ def graph_rag_search(
                 m = Memory(
                     id=r.get("id") or str(uuid4()),
                     user_id=core.get("user_id", ""),
-                    memory_type=core.get("memory_type", "memo"),
+                    memory_type=core["memory_type"],  # CRASH if missing - no fallback
                     payload=dict(entity),  # All entity fields, no filtering
-                    tags=core.get("tags", []),
-                    confidence=core.get("confidence", 0.8),
-                    is_valid=core.get("is_valid", True),
+                    # NO hardcoded field assumptions - payload contains all entity data
                     created_at=_parse_datetime(core.get("created_at")),
                     updated_at=_parse_datetime(core.get("updated_at")),
                     vector=None,
@@ -482,7 +475,7 @@ def graph_rag_search(
                     m.memory_type, m.payload, include_details=include_details, projection=projection
                 )
                 sr = by_id.get(m.id)
-                if sr is None or sr.score < 0.5:
+                if sr is None or sr.score < 0.1:  # Lower threshold, no arbitrary cutoff
                     by_id[m.id] = SearchResult(
                         memory=m, score=0.5, distance=None, source="graph", metadata={}
                     )
@@ -501,11 +494,9 @@ def graph_rag_search(
                 m = Memory(
                     id=r.get("id") or str(uuid4()),
                     user_id=core.get("user_id", ""),
-                    memory_type=core.get("memory_type", "memo"),
+                    memory_type=core["memory_type"],  # CRASH if missing - no fallback
                     payload=dict(entity),  # All entity fields, no filtering
-                    tags=core.get("tags", []),
-                    confidence=core.get("confidence", 0.8),
-                    is_valid=core.get("is_valid", True),
+                    # NO hardcoded field assumptions - payload contains all entity data
                     created_at=_parse_datetime(core.get("created_at")),
                     updated_at=_parse_datetime(core.get("updated_at")),
                     vector=None,
