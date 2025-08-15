@@ -151,9 +151,50 @@ def register_tools(app: FastMCP) -> None:
     """Register MCP tools."""
 
     @app.tool("mcp_gmem_add_memory")
-    def add_memory_tool(memory_type: str, user_id: str, payload: dict, tags: str = None):
+    def add_memory_tool(
+        memory_type: str,
+        user_id: str,
+        statement: str,
+        details: str = None,
+        tags: str = None,
+        status: str = None,
+        priority: str = None,
+        assignee: str = None,
+        due_date: str = None
+    ):
+        """Add a memory using YAML-driven schema.
+
+        Core required fields:
+        - memory_type: Type of memory (must be defined in YAML schema)
+        - user_id: User ID
+        - statement: The anchor text (required for all memory types)
+
+        Optional fields (based on YAML schema):
+        - details: Additional details
+        - tags: Comma-separated tags
+        - status: Task status (for task type)
+        - priority: Task priority (for task type)
+        - assignee: Task assignee (for task type)
+        - due_date: Task due date (for task type)
+        """
         if not bridge:
             return {"result": "❌ Bridge not initialized"}
+
+        # Build payload from YAML-driven fields - NO HARDCODING
+        payload = {"statement": statement}
+
+        # Add optional fields to payload if provided
+        optional_fields = {
+            "details": details,
+            "status": status,
+            "priority": priority,
+            "assignee": assignee,
+            "due_date": due_date
+        }
+
+        for key, value in optional_fields.items():
+            if value is not None:
+                payload[key] = value
 
         parsed_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
 

@@ -15,7 +15,8 @@ COPY src/ /app/src/
 # Install local memg-core from source (includes core deps from pyproject)
 RUN pip install --no-cache-dir -e .
 
-# Copy only the minimal MCP server file
+# Copy the YAML schema and MCP server file
+COPY config/core.minimal.yaml /app/config/
 COPY mcp/mcp_server.py /app/
 
 # Install MCP server dependencies
@@ -24,11 +25,11 @@ RUN pip install --no-cache-dir \
     uvicorn>=0.30.0 \
     pydantic>=2.0.0
 
-# Create directories for persistent storage
-RUN mkdir -p /qdrant /kuzu
+# Create directories for persistent storage and config
+RUN mkdir -p /qdrant /kuzu /app/config
 
-# Expose the default port
-# Set default host for Docker container (override via env var)
+# Set environment variables for YAML schema
+ENV MEMG_YAML_SCHEMA=/app/config/core.minimal.yaml
 ENV MEMORY_SYSTEM_MCP_HOST=0.0.0.0
 
 EXPOSE 8787
