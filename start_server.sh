@@ -63,7 +63,7 @@ fi
 if [[ ! -f ".env" && -f "env.example" ]]; then
     echo "📋 Creating .env from env.example..."
     cp env.example .env
-    echo "⚠️  Please edit .env and set your GOOGLE_API_KEY"
+    echo "⚠️  Please edit .env and set MEMORY_SYSTEM_MCP_PORT"
 fi
 
 # Docker compose operations

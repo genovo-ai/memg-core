@@ -38,6 +38,9 @@ COPY config/core.minimal.yaml /app/schema/
 # Copy the MCP server (changes often, so do last)
 COPY mcp/mcp_server.py /app/
 
+# Set default host for Docker container (override via env var)
+ENV MEMORY_SYSTEM_MCP_HOST=0.0.0.0
+
 # Expose the port (will be overridden by docker-compose port mapping)
 EXPOSE 8787
 

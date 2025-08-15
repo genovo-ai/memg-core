@@ -237,7 +237,17 @@ def create_app() -> FastMCP:
 app = create_app()
 
 if __name__ == "__main__":
-    port = int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8787"))
-    print(f"🚀 Starting MEMG Core MCP Server on port {port}")
+    port_env = os.getenv("MEMORY_SYSTEM_MCP_PORT")
+    if not port_env:
+        raise ValueError(
+            "MEMORY_SYSTEM_MCP_PORT environment variable is required for multi-instance support. "
+            "Set it explicitly (e.g., 8787, 8788, 8789) to avoid port conflicts."
+        )
+    port = int(port_env)
+
+    # Host should be configured via deployment (Docker, docker-compose, etc.)
+    host = os.getenv("MEMORY_SYSTEM_MCP_HOST", "127.0.0.1")  # Secure default: localhost only
+
+    print(f"🚀 Starting MEMG Core MCP Server on {host}:{port}")
     print(f"📦 Using memg-core v{__version__} with a generic, YAML-driven API")
-    app.run(transport="sse", host="0.0.0.0", port=port)  # nosec
+    app.run(transport="sse", host=host, port=port)

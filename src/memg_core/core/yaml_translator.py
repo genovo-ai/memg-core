@@ -73,8 +73,11 @@ class YamlTranslator:
                 self.yaml_path = str(default_path)
                 self._schema = self._load_schema()
                 return self._schema
-        except Exception:
-            pass
+        except Exception as e:
+            # Re-raise with context instead of silent failure
+            raise YamlTranslatorError(
+                f"Failed to load YAML schema from {self.yaml_path}: {e}"
+            ) from e
 
         # No valid YAML schema found
         raise YamlTranslatorError(

@@ -63,7 +63,11 @@ class MemGConfig:
 
     @classmethod
     def from_env(cls) -> "MemGConfig":
-        """Create configuration from environment variables"""
+        """Create configuration from environment variables
+
+        Each instance should use explicit environment variables for isolation.
+        The core memory system doesn't know or care about server ports.
+        """
         return cls(
             similarity_threshold=float(os.getenv("MEMG_SIMILARITY_THRESHOLD", "0.7")),
             score_threshold=float(os.getenv("MEMG_SCORE_THRESHOLD", "0.3")),
@@ -83,34 +87,26 @@ class MemGConfig:
 
 @dataclass
 class MemorySystemConfig:
-    """System-wide configuration"""
+    """Core memory system configuration - NO SERVER CONCERNS"""
 
     memg: MemGConfig = field(default_factory=MemGConfig)
 
-    # System settings (minimal)
+    # Core system settings only
     debug_mode: bool = False
     log_level: str = "INFO"
 
-    # MCP server settings
-    mcp_port: int = 8787
-    mcp_host: str = "0.0.0.0"  # nosec B104
-
     def __post_init__(self):
-        """Validate system configuration"""
-        if self.mcp_port < 1024 or self.mcp_port > 65535:
-            raise ValueError("mcp_port must be between 1024 and 65535")
+        """Validate core system configuration"""
         if self.log_level not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
             raise ValueError("log_level must be a valid logging level")
 
     @classmethod
     def from_env(cls) -> "MemorySystemConfig":
-        """Create system configuration from environment variables"""
+        """Create core memory system configuration from environment variables"""
         return cls(
             memg=MemGConfig.from_env(),
             debug_mode=os.getenv("MEMORY_SYSTEM_DEBUG", "false").lower() == "true",
             log_level=os.getenv("MEMORY_SYSTEM_LOG_LEVEL", "INFO").upper(),
-            mcp_port=int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8787")),
-            mcp_host=os.getenv("MEMORY_SYSTEM_MCP_HOST", "0.0.0.0"),  # nosec B104
         )
 
 

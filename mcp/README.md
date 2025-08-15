@@ -20,7 +20,7 @@
 1. **Setup environment:**
    ```bash
    cp ../env.example ../.env
-   # Edit .env if needed (GOOGLE_API_KEY not required for basic testing)
+   # Edit .env if needed (No API keys required - uses FastEmbed locally!)
    ```
 
 2. **Start MEMG Core MCP Server:**
@@ -31,8 +31,8 @@
 
 3. **Test it's working:**
    ```bash
-   curl http://localhost:8787/health
-   curl http://localhost:8787/
+   curl http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health
+   curl http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/
    ```
 
 4. **Stop when done:**
@@ -61,12 +61,12 @@ The MCP server now uses the **lean core public API**:
 ### Example Usage
 ```bash
 # Add a note
-curl -X POST http://localhost:8787/tools/mcp_gmem_add_note \
+curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_add_note \
   -H "Content-Type: application/json" \
   -d '{"text": "Remember to update docs", "user_id": "test_user", "title": "Documentation Task"}'
 
 # Search memories
-curl -X POST http://localhost:8787/tools/mcp_gmem_search_memories \
+curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_search_memories \
   -H "Content-Type: application/json" \
   -d '{"query": "documentation", "user_id": "test_user", "limit": 5}'
 ```
@@ -80,7 +80,7 @@ QDRANT_STORAGE_PATH=/path/to/qdrant
 KUZU_DB_PATH=/path/to/kuzu/db
 
 # Server settings
-MEMORY_SYSTEM_MCP_PORT=8787
+MEMORY_SYSTEM_MCP_PORT=8787  # Change for multiple instances
 
 # Note: Current lean core uses fixed schema (core.minimal.yaml)
 # Future: MEMG_TEMPLATE for domain-specific templates

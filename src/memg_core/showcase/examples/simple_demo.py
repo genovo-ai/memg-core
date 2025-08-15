@@ -5,10 +5,10 @@ import os
 
 from memg_core import add_memory, search
 
-# Set required environment variables
+# Set required environment variables (using FastEmbed - no API keys needed!)
 os.environ["QDRANT_STORAGE_PATH"] = "$HOME/.memg/qdrant"
 os.environ["KUZU_DB_PATH"] = "$HOME/.memg/kuzu/db"
-os.environ["GOOGLE_API_KEY"] = "your-api-key-here"  # Replace with actual key
+os.environ["MEMG_YAML_SCHEMA"] = "config/core.minimal.yaml"
 
 
 def main():

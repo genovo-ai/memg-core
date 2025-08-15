@@ -19,12 +19,12 @@ cp env.example .env
 
 # 2. Run MEMG MCP Server (359MB)
 docker run -d \
-  -p 8787:8787 \
+  -p ${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787} \
   --env-file .env \
   ghcr.io/genovo-ai/memg-core-mcp:latest
 
 # 3. Test it's working
-curl http://localhost:8787/health
+curl http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health
 ```
 
 ### Option 2: Python Package (Core Library)
@@ -138,7 +138,7 @@ Configure via `.env` file (copy from `env.example`):
 
 ```bash
 # Core settings
-MEMORY_SYSTEM_MCP_PORT=8787
+MEMORY_SYSTEM_MCP_PORT=8787  # Change for multiple instances
 MEMG_TEMPLATE=software_development
 
 # Embeddings (optional)

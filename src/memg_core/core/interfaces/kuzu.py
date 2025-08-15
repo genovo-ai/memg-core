@@ -68,9 +68,14 @@ class KuzuInterface:
 
             with contextlib.suppress(Exception):
                 self.conn.execute(create_sql)
-        except Exception:
-            # Don't fail the whole operation for schema issues
-            pass
+        except Exception as e:
+            # Re-raise with context instead of silent failure
+            raise DatabaseError(
+                f"Failed to ensure table schema for {table}",
+                operation="_ensure_table_schema",
+                context={"table": table, "properties": properties},
+                original_error=e,
+            )
 
     def add_relationship(
         self,

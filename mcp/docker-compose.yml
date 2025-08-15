@@ -17,6 +17,7 @@ services:
       QDRANT_STORAGE_PATH: /qdrant
       KUZU_DB_PATH: /kuzu/memory_db
       MEMORY_SYSTEM_MCP_PORT: ${MEMORY_SYSTEM_MCP_PORT:-8787}
+      MEMORY_SYSTEM_MCP_HOST: "0.0.0.0"  # Docker container binding
       MEMG_YAML_SCHEMA: ${MEMG_YAML_SCHEMA:-/app/schema/core.minimal.yaml}
       # Note: Current lean core uses fixed schema (core.minimal.yaml)
       # Future: MEMG_TEMPLATE for domain-specific templates

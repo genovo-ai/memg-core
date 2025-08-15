@@ -19,7 +19,7 @@ echo "🧪 Step 2: Testing MCP server..."
 echo "Starting container..."
 docker run -d \
     --name memg-mcp-test \
-    -p 8787:8787 \
+    -p ${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787} \
     -e QDRANT_STORAGE_PATH=/qdrant \
     -e KUZU_DB_PATH=/kuzu/memory_db \
     -e MEMG_YAML_SCHEMA=/app/schema/core.minimal.yaml \
@@ -31,7 +31,7 @@ sleep 10
 
 # Test health endpoint
 echo "Testing health endpoint..."
-if curl -f http://localhost:8787/health > /dev/null 2>&1; then
+if curl -f http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health > /dev/null 2>&1; then
     echo "✅ Health check passed"
 else
     echo "❌ Health check failed"
@@ -43,12 +43,12 @@ fi
 
 # Test root endpoint
 echo "Testing root endpoint..."
-curl -s http://localhost:8787/ | python -m json.tool
+curl -s http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/ | python -m json.tool
 
 echo ""
 echo "🎉 MCP Server test completed successfully!"
 echo ""
-echo "Server is running at: http://localhost:8787"
+echo "Server is running at: http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}"
 echo "To stop: docker stop memg-mcp-test && docker rm memg-mcp-test"
 echo ""
 echo "Available tools:"

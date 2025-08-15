@@ -47,11 +47,11 @@ This module defines the core configuration settings for the MEMG memory system. 
   - `memg`: MemGConfig - An instance of `MemGConfig` for memory-specific settings.
   - `debug_mode`: bool = False - Flag for enabling debug mode.
   - `log_level`: str = "INFO" - Logging level for the system.
-  - `mcp_port`: int = 8787 - Port number for the MCP server.
-  - `mcp_host`: str = "0.0.0.0" - Host address for the MCP server.
+  - `mcp_port`: Removed - MCP server handles its own port configuration via MEMORY_SYSTEM_MCP_PORT env var.
+  - `mcp_host`: Removed - MCP server handles its own host configuration.
 - **Methods**:
   - `__post_init__`:
-    - **Description**: Validates the `mcp_port` and `log_level` parameters after initialization.
+    - **Description**: Validates the `log_level` parameter after initialization.
     - **Inputs**: None
     - **Returns**: None
   - `from_env` (classmethod):
