@@ -1,75 +1,105 @@
-# MEMG Core - Docker Quickstart
+# MEMG Core MCP Server - Lean Core API
 
-🚀 **Simple Docker deployment for MEMG Core memory system**
+🚀 **Updated MCP server using the latest lean core API**
 
-## Quick Start (Public Image)
+## Quick Test with Latest Code
 
-**Fastest way to get started:**
+**Test the MCP server with your latest wheel:**
 ```bash
-# 1. Setup configuration
-cp ../env.example ../.env
-# Edit .env and set your GOOGLE_API_KEY
+# Build and test with latest code
+./test-mcp-server.sh
 
-# 2. Run MEMG MCP Server directly
-docker run -d \
-  -p 8787:8787 \
-  --env-file ../.env \
-  ghcr.io/genovo-ai/memg-core-mcp:latest
-
-# 3. Test it's working
-curl http://localhost:8787/health
+# This will:
+# 1. Build a fresh wheel from your code
+# 2. Build Docker image with the wheel
+# 3. Start MCP server and test it
 ```
 
-## Alternative: Docker Compose
+## Quick Start (Docker Compose)
 
 1. **Setup environment:**
    ```bash
    cp ../env.example ../.env
-   # Edit .env and set your GOOGLE_API_KEY
+   # Edit .env if needed (GOOGLE_API_KEY not required for basic testing)
    ```
 
-2. **Start MEMG Core:**
+2. **Start MEMG Core MCP Server:**
    ```bash
-   cd dockerfiles/
+   cd mcp/
    docker-compose up -d
    ```
 
-3. **Stop when done:**
+3. **Test it's working:**
+   ```bash
+   curl http://localhost:8787/health
+   curl http://localhost:8787/
+   ```
+
+4. **Stop when done:**
    ```bash
    docker-compose down
    ```
 
-## What You Get
+## What's New in Lean Core API
 
-- **MEMG Core MCP Server** on port 8787
-- **Persistent Storage** in `~/.local/share/memory_system_8787/`
-- **Health Monitoring** with automatic restarts
-- **20+ Memory Tools** for AI integration
+The MCP server now uses the **lean core public API**:
+- ✅ `add_note(text, user_id, title, tags)`
+- ✅ `add_document(text, user_id, title, summary, tags)`
+- ✅ `add_task(text, user_id, title, tags, due_date, assignee)`
+- ✅ `search(query, user_id, limit, mode="vector|graph|hybrid")`
+
+## Available MCP Tools
+
+### Memory Management
+- **`mcp_gmem_add_memory`** - Generic memory addition
+- **`mcp_gmem_add_note`** - Add a note
+- **`mcp_gmem_add_document`** - Add a document
+- **`mcp_gmem_add_task`** - Add a task
+- **`mcp_gmem_search_memories`** - Search memories
+- **`mcp_gmem_get_system_info`** - Get system stats
+
+### Example Usage
+```bash
+# Add a note
+curl -X POST http://localhost:8787/tools/mcp_gmem_add_note \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Remember to update docs", "user_id": "test_user", "title": "Documentation Task"}'
+
+# Search memories
+curl -X POST http://localhost:8787/tools/mcp_gmem_search_memories \
+  -H "Content-Type: application/json" \
+  -d '{"query": "documentation", "user_id": "test_user", "limit": 5}'
+```
 
 ## Configuration
 
 Key settings in `.env` file:
 ```bash
-# Required
-GOOGLE_API_KEY=your_google_api_key_here
+# Storage paths (will be created automatically)
+QDRANT_STORAGE_PATH=/path/to/qdrant
+KUZU_DB_PATH=/path/to/kuzu/db
 
-# Core settings
-GEMINI_MODEL=gemini-2.0-flash
+# Server settings
 MEMORY_SYSTEM_MCP_PORT=8787
-MEMG_TEMPLATE=software_development
 
-# Storage & Performance
-BASE_MEMORY_PATH=$HOME/.local/share/memory_system
-QDRANT_COLLECTION=memories
-EMBEDDING_DIMENSION_LEN=384
-MEMORY_SYSTEM_DEBUG=false
+# Optional: YAML template for entity definitions
+MEMG_TEMPLATE=software_development
 ```
 
-## Usage
+## Architecture
 
-Once running, connect your AI client to:
-- **MCP Server**: `http://localhost:8787`
-- **Available Tools**: `mcp_gmem_add_memory`, `mcp_gmem_search_memories`, etc.
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   MCP Client    │───▶│   MCP Server     │───▶│   Lean Core     │
+│   (AI Agent)    │    │  (FastMCP)       │    │   Public API    │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                                         │
+                                               ┌─────────▼─────────┐
+                                               │  Storage Backends │
+                                               │  • Qdrant (vector)│
+                                               │  • Kuzu (graph)   │
+                                               └───────────────────┘
+```
 
 ## Logs & Debugging
 
@@ -80,8 +110,24 @@ docker-compose logs -f memg-mcp-server
 # Check container status
 docker-compose ps
 
+# Interactive shell in container
+docker-compose exec memg-mcp-server bash
+
 # Reset everything
 docker-compose down && docker-compose up -d
+```
+
+## Development
+
+```bash
+# Test with latest code changes
+./test-mcp-server.sh
+
+# Build wheel manually
+python -m build
+
+# Build Docker image manually
+docker build -f mcp/Dockerfile.mcp -t memg-core-mcp:latest .
 ```
 
 That's it! 🎉

@@ -1,271 +1,314 @@
 #!/usr/bin/env python3
 """
-Minimal MEMG MCP Server - Clean bridge over the published memg-core library.
+MEMG Core MCP Server - Updated for lean core API.
 
-This is a thin MCP integration that uses only the memg-core library APIs.
-No custom wrappers or sync_wrapper dependencies.
+This MCP server uses the latest memg-core public API with the lean core architecture.
 """
 
-import asyncio
 import os
 from typing import Any, Optional
 
 from fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
-import memg_core
-from memg_core.config import get_config
-from memg_core.kuzu_graph.interface import KuzuInterface
-from memg_core.logging_config import get_logger, log_error
-from memg_core.models.api import MemoryResultItem, SearchMemoriesResponse
-from memg_core.models.core import MemoryType
-from memg_core.processing.memory_retriever import MemoryRetriever
-from memg_core.qdrant.interface import QdrantInterface
-from memg_core.utils.embeddings import GenAIEmbedder
-
-logger = get_logger("mcp_server")
+# Import the new lean core public API
+from memg_core.api.public import add_note, add_document, add_task, search
+from memg_core.core.models import SearchResult
+from memg_core import __version__
 
 
-class MinimalMemoryBridge:
-    """Minimal bridge that uses memg-core library directly."""
+class MemgCoreBridge:
+    """Bridge that uses the new lean core public API."""
 
-    def __init__(self) -> None:
-        self.system_config = get_config()
-        self.memg_config = self.system_config.memg
-
-        self.qdrant_interface = QdrantInterface()
-        self.kuzu_interface = KuzuInterface()
-        self.retriever = MemoryRetriever(
-            qdrant_interface=self.qdrant_interface,
-            kuzu_interface=self.kuzu_interface,
-        )
-        self.embedder = GenAIEmbedder()
-
-    def add(
+    def add_memory(
         self,
         content: str,
         user_id: str,
-        memory_type: Optional[MemoryType] = None,
+        memory_type: str = "note",
         title: Optional[str] = None,
-        source: str = "mcp_api",
         tags: Optional[list[str]] = None,
-        project_id: Optional[str] = None,
-        project_name: Optional[str] = None,
+        **kwargs
     ) -> dict[str, Any]:
-        final_type = memory_type or MemoryType.NOTE
+        """Add a memory using the appropriate lean core function."""
+        try:
+            if memory_type.lower() == "document":
+                # For documents, use content as summary and title as title
+                memory = add_document(
+                    text=kwargs.get("text", content),
+                    user_id=user_id,
+                    title=title,
+                    summary=content,
+                    tags=tags or []
+                )
+            elif memory_type.lower() == "task":
+                memory = add_task(
+                    text=content,
+                    user_id=user_id,
+                    title=title,
+                    tags=tags or [],
+                    due_date=kwargs.get("due_date"),
+                    assignee=kwargs.get("assignee")
+                )
+            else:  # Default to note
+                memory = add_note(
+                    text=content,
+                    user_id=user_id,
+                    title=title,
+                    tags=tags or []
+                )
 
-        # Determine embedding text
-        if final_type == MemoryType.DOCUMENT:
-            index_text = f"{title}. {content}" if title else content
-        elif final_type == MemoryType.TASK:
-            index_text = f"{title}. {content}" if title else content
-        else:
-            index_text = content
-
-        vector = self.embedder.get_embedding(index_text)
-
-        # Ensure collection exists
-        self.qdrant_interface.ensure_collection(
-            self.memg_config.qdrant_collection_name, len(vector)
-        )
-
-        payload = {
-            "user_id": user_id,
-            "content": content,
-            "memory_type": final_type.value,
-            "title": title,
-            "source": source,
-            "tags": tags or [],
-            "project_id": project_id,
-            "project_name": project_name,
-            "is_valid": True,
-            "index_text": index_text,
-            "created_at": __import__("datetime")
-            .datetime.now(__import__("datetime").timezone.utc)
-            .isoformat(),
-        }
-
-        success, point_id = self.qdrant_interface.add_point(
-            vector=vector,
-            payload=payload,
-            point_id=None,
-            collection=self.memg_config.qdrant_collection_name,
-        )
-
-        # Add to Kuzu
-        self.kuzu_interface.add_node(
-            "Memory",
-            {
-                "id": point_id,
-                "user_id": user_id,
-                "project_id": project_id or "",
-                "project_name": project_name or "",
-                "content": content,
-                "memory_type": final_type.value,
-                "summary": "",
-                "title": title or "",
-                "source": source or "",
-                "tags": ",".join(tags or []),
-                "confidence": 0.8,
-                "is_valid": True,
-                "created_at": payload["created_at"],
-                "expires_at": "",
-                "supersedes": "",
-                "superseded_by": "",
-            },
-        )
-
-        return {
-            "success": bool(success),
-            "memory_id": point_id,
-            "final_type": final_type.value,
-            "word_count": len(content.split()),
-        }
-
-    async def search_async(
-        self, query: str, user_id: Optional[str], limit: int
-    ) -> list[dict[str, Any]]:
-        results = await self.retriever.search_memories(
-            query=query,
-            user_id=user_id,
-            limit=limit,
-            score_threshold=self.memg_config.score_threshold,
-        )
-        return [
-            {
-                "content": r.memory.content,
-                "type": r.memory.memory_type.value,
-                "summary": r.memory.summary,
-                "score": r.score,
-                "source": r.memory.source or "unknown",
-                "memory_id": r.memory.id,
-                "title": r.memory.title,
-                "tags": r.memory.tags,
-                "word_count": r.memory.word_count(),
-                "created_at": r.memory.created_at.isoformat(),
+            return {
+                "success": True,
+                "memory_id": memory.id,
+                "memory_type": memory.memory_type,
+                "hrid": memory.hrid,
+                "word_count": len(content.split()) if content else 0,
             }
-            for r in results
-        ]
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "memory_id": None,
+            }
 
-    def search(
-        self, query: str, user_id: Optional[str], limit: int = 5
+    def search_memories(
+        self,
+        query: str,
+        user_id: Optional[str] = None,
+        limit: int = 5,
+        **kwargs
     ) -> list[dict[str, Any]]:
-        return asyncio.run(self.search_async(query, user_id, limit))
+        """Search memories using the lean core search function."""
+        try:
+            results: list[SearchResult] = search(
+                query=query,
+                user_id=user_id,
+                limit=limit,
+                memo_type=kwargs.get("memory_type"),
+                mode=kwargs.get("mode", "vector"),  # vector, graph, or hybrid
+                include_details=kwargs.get("include_details", "self")
+            )
+
+            return [
+                {
+                    "memory_id": result.memory.id,
+                    "content": result.memory.content or "",
+                    "title": result.memory.title,
+                    "memory_type": result.memory.memory_type,
+                    "tags": result.memory.tags,
+                    "score": result.score,
+                    "source": result.source,
+                    "hrid": result.memory.hrid,
+                    "created_at": result.memory.created_at.isoformat() if result.memory.created_at else None,
+                    "word_count": len((result.memory.content or "").split()),
+                }
+                for result in results
+            ]
+        except Exception as e:
+            return [{"error": str(e)}]
 
     def get_stats(self) -> dict[str, Any]:
+        """Get system statistics."""
         return {
-            "retriever_initialized": self.retriever is not None,
-            "qdrant_available": self.qdrant_interface is not None,
-            "kuzu_available": self.kuzu_interface is not None,
-            "system_type": "memg_core_mcp_bridge",
-            "memg_config": self.memg_config.to_dict(),
+            "system_type": "memg_core_lean_mcp",
+            "version": __version__,
+            "api_type": "lean_core_public_api",
+            "available_functions": ["add_note", "add_document", "add_task", "search"],
+            "storage_paths": {
+                "qdrant": os.getenv("QDRANT_STORAGE_PATH", "not_set"),
+                "kuzu": os.getenv("KUZU_DB_PATH", "not_set"),
+            }
         }
 
 
-# ------------------------- App + Memory Init -------------------------
-memory: Optional[MinimalMemoryBridge] = None
+# Global bridge instance
+bridge: Optional[MemgCoreBridge] = None
 
 
-def initialize_memory_system() -> Optional[MinimalMemoryBridge]:
-    global memory
-    memory = MinimalMemoryBridge()
-    return memory
+def initialize_bridge() -> MemgCoreBridge:
+    """Initialize the MEMG Core bridge."""
+    global bridge
+    bridge = MemgCoreBridge()
+    return bridge
 
 
 def setup_health_endpoints(app: FastMCP) -> None:
+    """Setup health check endpoints."""
     @app.custom_route("/", methods=["GET"])
     async def root(_req):
-        return JSONResponse(
-            {"status": "healthy", "service": f"MEMG MCP v{memg_core.__version__}"}
-        )
+        return JSONResponse({
+            "status": "healthy",
+            "service": f"MEMG Core MCP v{__version__}",
+            "api": "lean_core"
+        })
 
     @app.custom_route("/health", methods=["GET"])
     async def health(_req):
         status = {
-            "service": "MEMG MCP",
-            "version": memg_core.__version__,
-            "memory_system_initialized": memory is not None,
-            "status": "healthy" if memory is not None else "unhealthy",
+            "service": "MEMG Core MCP",
+            "version": __version__,
+            "bridge_initialized": bridge is not None,
+            "status": "healthy" if bridge is not None else "unhealthy",
         }
-        return JSONResponse(status, status_code=200 if memory else 503)
+        return JSONResponse(status, status_code=200 if bridge else 503)
 
 
 def register_tools(app: FastMCP) -> None:
+    """Register MCP tools."""
+
     @app.tool("mcp_gmem_add_memory")
-    def add_memory(
+    def add_memory_tool(
         content: str,
         user_id: str,
-        memory_type: str = None,
+        memory_type: str = "note",
         title: str = None,
-        source: str = "mcp_api",
         tags: str = None,
+        text: str = None,  # For documents
+        due_date: str = None,  # For tasks
+        assignee: str = None,  # For tasks
     ):
-        if not memory:
-            return {"result": "❌ Memory system not initialized"}
-        parsed_type = None
-        if memory_type:
-            name = memory_type.strip().upper()
-            if name in MemoryType.__members__:
-                parsed_type = MemoryType[name]
-            else:
-                return {"result": f"❌ Invalid memory_type: {memory_type}"}
+        """Add a memory (note, document, or task)."""
+        if not bridge:
+            return {"result": "❌ Bridge not initialized"}
 
+        # Parse tags
         parsed_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
-        resp = memory.add(
+
+        # Prepare kwargs
+        kwargs = {}
+        if text:
+            kwargs["text"] = text
+        if due_date:
+            kwargs["due_date"] = due_date
+        if assignee:
+            kwargs["assignee"] = assignee
+
+        result = bridge.add_memory(
             content=content,
             user_id=user_id,
-            memory_type=parsed_type,
+            memory_type=memory_type,
             title=title,
-            source=source,
             tags=parsed_tags,
+            **kwargs
         )
-        return {
-            "result": (
-                "✅ Memory added" if resp["success"] else "❌ Failed to add memory"
-            ),
-            "memory_id": resp["memory_id"],
-            "final_type": resp["final_type"],
-            "word_count": resp["word_count"],
-        }
+
+        if result["success"]:
+            return {
+                "result": f"✅ {memory_type.title()} added successfully",
+                "memory_id": result["memory_id"],
+                "memory_type": result["memory_type"],
+                "hrid": result["hrid"],
+                "word_count": result["word_count"],
+            }
+        else:
+            return {
+                "result": f"❌ Failed to add {memory_type}",
+                "error": result.get("error", "Unknown error")
+            }
 
     @app.tool("mcp_gmem_search_memories")
-    def search_memories(query: str, user_id: str = None, limit: int = 5):
-        if not memory:
-            return {"result": "❌ Memory system not initialized"}
-        results = memory.search(query=query, user_id=user_id, limit=limit)
-        return {"result": results}
+    def search_memories_tool(
+        query: str,
+        user_id: str = None,
+        limit: int = 5,
+        memory_type: str = None,
+        mode: str = "vector"
+    ):
+        """Search memories with the lean core search function."""
+        if not bridge:
+            return {"result": "❌ Bridge not initialized"}
+
+        results = bridge.search_memories(
+            query=query,
+            user_id=user_id,
+            limit=limit,
+            memory_type=memory_type,
+            mode=mode
+        )
+
+        if results and "error" in results[0]:
+            return {"result": f"❌ Search failed: {results[0]['error']}"}
+
+        return {
+            "result": f"✅ Found {len(results)} memories",
+            "memories": results,
+            "query": query,
+            "mode": mode
+        }
+
+    @app.tool("mcp_gmem_add_note")
+    def add_note_tool(text: str, user_id: str, title: str = None, tags: str = None):
+        """Add a note memory."""
+        return add_memory_tool(
+            content=text,
+            user_id=user_id,
+            memory_type="note",
+            title=title,
+            tags=tags
+        )
+
+    @app.tool("mcp_gmem_add_document")
+    def add_document_tool(
+        text: str,
+        user_id: str,
+        title: str = None,
+        summary: str = None,
+        tags: str = None
+    ):
+        """Add a document memory."""
+        return add_memory_tool(
+            content=summary or text[:200] + "..." if len(text) > 200 else text,
+            user_id=user_id,
+            memory_type="document",
+            title=title,
+            tags=tags,
+            text=text
+        )
+
+    @app.tool("mcp_gmem_add_task")
+    def add_task_tool(
+        text: str,
+        user_id: str,
+        title: str = None,
+        tags: str = None,
+        due_date: str = None,
+        assignee: str = None
+    ):
+        """Add a task memory."""
+        return add_memory_tool(
+            content=text,
+            user_id=user_id,
+            memory_type="task",
+            title=title,
+            tags=tags,
+            due_date=due_date,
+            assignee=assignee
+        )
 
     @app.tool("mcp_gmem_get_system_info")
-    def get_system_info():
-        if not memory:
-            return {
-                "result": {"components_initialized": False, "status": "Not initialized"}
-            }
-        stats = memory.get_stats()
-        # Optionally enrich using core system info when available
-        try:
-            from memg_core.utils.system_info import get_system_info as core_info
+    def get_system_info_tool():
+        """Get system information and statistics."""
+        if not bridge:
+            return {"result": {"status": "Bridge not initialized"}}
 
-            enriched = core_info(qdrant=memory.qdrant_interface)
-            stats.update({"core": enriched})
-        except Exception:
-            pass
-        port = int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8787"))
-        stats.update({"transport": "SSE", "port": port})
+        stats = bridge.get_stats()
         return {"result": stats}
 
 
 def create_app() -> FastMCP:
+    """Create and configure the FastMCP app."""
     app = FastMCP()
-    initialize_memory_system()
+    initialize_bridge()
     setup_health_endpoints(app)
     register_tools(app)
     return app
 
 
+# Create the app instance
 app = create_app()
 
 if __name__ == "__main__":
     port = int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8787"))
-
+    print(f"🚀 Starting MEMG Core MCP Server on port {port}")
+    print(f"📦 Using memg-core v{__version__} with lean core API")
     app.run(transport="sse", host="0.0.0.0", port=port)  # nosec

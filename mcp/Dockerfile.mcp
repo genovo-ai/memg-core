@@ -1,29 +1,46 @@
 FROM python:3.11-slim
+
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
-# Copy the *directory* (works even if empty, as long as it exists in context)
+# Copy the dist directory (contains wheel files)
 COPY dist/ /tmp/dist/
 
-# Prefer local wheel if present; else PyPI
+# Install memg-core from local wheel if available, otherwise from PyPI
 RUN set -e; \
     if find /tmp/dist -maxdepth 1 -name '*.whl' -print -quit | grep -q .; then \
+        echo "📦 Installing from local wheel..."; \
         LATEST_WHEEL=$(find /tmp/dist -name '*.whl' | sort -V | tail -1); \
+        echo "Using wheel: $LATEST_WHEEL"; \
         pip install --no-cache-dir "$LATEST_WHEEL"; \
     else \
+        echo "📦 Installing from PyPI..."; \
         pip install --no-cache-dir memg-core; \
     fi
 
-RUN pip install --no-cache-dir "fastmcp>=2.10.6" "starlette>=0.37"
+# Install MCP server dependencies
+RUN pip install --no-cache-dir "fastmcp>=0.2.0" "starlette>=0.37"
+
+# Copy the updated MCP server
 COPY mcp/mcp_server.py /app/
 
+# Create storage directories
 RUN mkdir -p /qdrant /kuzu
-ENV QDRANT_STORAGE_PATH=/qdrant KUZU_DB_PATH=/kuzu/memory_db MEMORY_SYSTEM_MCP_PORT=8787
 
+# Set environment variables
+ENV QDRANT_STORAGE_PATH=/qdrant
+ENV KUZU_DB_PATH=/kuzu/memory_db
+ENV MEMORY_SYSTEM_MCP_PORT=8787
+
+# Expose the port
 EXPOSE 8787
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f "http://localhost:${MEMORY_SYSTEM_MCP_PORT}/health" || exit 1
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f "http://localhost:${MEMORY_SYSTEM_MCP_PORT}/health" || exit 1
+
+# Run the MCP server
 CMD ["python", "mcp_server.py"]
