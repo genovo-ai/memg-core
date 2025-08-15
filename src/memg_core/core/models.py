@@ -25,9 +25,6 @@ class Memory(BaseModel):
     # Human-readable id (e.g., MEMO_AAA001)
     hrid: str | None = None
 
-    # Tags for categorization and filtering
-    tags: list[str] | None = None
-
     @field_validator("memory_type")
     @classmethod
     def memory_type_not_empty(cls, v: str) -> str:
@@ -49,8 +46,6 @@ class Memory(BaseModel):
             core["updated_at"] = self.updated_at.isoformat()
         if self.hrid:
             core["hrid"] = self.hrid
-        if self.tags:
-            core["tags"] = self.tags
 
         # Entity payload contains only YAML-defined fields
         entity = dict(self.payload)
@@ -72,8 +67,6 @@ class Memory(BaseModel):
             node["updated_at"] = self.updated_at.isoformat()
         if self.hrid:
             node["hrid"] = self.hrid
-        if self.tags:
-            node["tags"] = self.tags
 
         return node
 

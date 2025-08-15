@@ -420,8 +420,11 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         id="memory-2",
         user_id="user2",
         memory_type="note",
-        payload={"statement": "Content for user2", "details": "This is a note for user 2."},
-        tags=["tag3"],  # Add tag3 to match the filter
+        payload={
+            "statement": "Content for user2",
+            "details": "This is a note for user 2.",
+            "tags": ["tag3"],  # Add tag3 to entity payload (YAML-defined)
+        },
     )
 
     # Add to Qdrant
@@ -453,7 +456,7 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         qdrant=qdrant_fake,
         kuzu=kuzu_fake,
         embedder=embedder,
-        filters={"core.tags": ["tag3"]},
+        filters={"entity.tags": ["tag3"]},
         mode="vector",
     )
 
