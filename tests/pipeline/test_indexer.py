@@ -16,7 +16,7 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
     memory = mem_factory(
         id="test-memory-1",
         user_id="test-user",
-        type="note",
+        memory_type="note",
         statement="This is a test memory",
         payload={
             "details": "This is the detail for the test memory.",
@@ -33,15 +33,15 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
     assert qdrant_point is not None
     assert qdrant_point["payload"]["core"]["user_id"] == "test-user"
     assert qdrant_point["payload"]["entity"]["statement"] == "This is a test memory"
-    assert qdrant_point["payload"]["core"]["type"] == "note"
+    assert qdrant_point["payload"]["core"]["memory_type"] == "note"
     assert qdrant_point["payload"]["entity"]["details"] == "This is the detail for the test memory."
 
     # Check that it's in Kuzu
     assert "test-memory-1" in kuzu_fake.nodes["Memory"]
     kuzu_node = kuzu_fake.nodes["Memory"]["test-memory-1"]
     assert kuzu_node["user_id"] == "test-user"
-    assert kuzu_node["type"] == "note"
-    assert kuzu_node["statement"] == "This is a test memory"
+    assert kuzu_node["memory_type"] == "note"
+    # Kuzu only stores core fields, not payload fields like statement
 
 
 def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuzu_fake, mem_factory):
@@ -50,7 +50,7 @@ def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuz
     memory = mem_factory(
         id="test-memory-1",
         user_id="test-user",
-        type="note",
+        memory_type="note",
         statement="This is a test memory",
         payload={
             "details": "This is the detail for the test memory.",

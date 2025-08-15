@@ -453,8 +453,19 @@ def mem_factory() -> Callable[..., Memory]:
 
         # Allow kwargs to override defaults, but merge payload properly
         final_attrs = {**defaults, **kwargs}
+
+        # Handle explicit statement parameter by putting it in payload
+        if "statement" in kwargs:
+            # Remove statement from top-level attrs since it belongs in payload
+            explicit_statement = final_attrs.pop("statement", None)
+            if "payload" in final_attrs:
+                final_attrs["payload"] = {**final_attrs["payload"], "statement": explicit_statement}
+            else:
+                final_attrs["payload"] = {"statement": explicit_statement}
+
+        # Merge explicit payload last to ensure it takes precedence
         if "payload" in kwargs:
-            final_attrs["payload"] = {**payload, **kwargs["payload"]}
+            final_attrs["payload"] = {**final_attrs["payload"], **kwargs["payload"]}
 
         return Memory(**final_attrs)
 

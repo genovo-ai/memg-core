@@ -64,7 +64,7 @@ def test_rows_to_memories():
                 "id": "memory-1",
                 "user_id": "test-user",
                 "statement": "Memory 1 content",
-                "type": "note",
+                                    "memory_type": "note",
                 "created_at": "2023-01-01T00:00:00+00:00",
                 "tags": "tag1,tag2",
                 "confidence": 0.8,
@@ -75,7 +75,7 @@ def test_rows_to_memories():
                 "id": "memory-2",
                 "user_id": "test-user",
                 "statement": "Memory 2 summary",
-                "type": "document",
+                                    "memory_type": "document",
                 "created_at": "2023-01-02T00:00:00+00:00",
                 "tags": "tag2,tag3",
                 "confidence": 0.9,
@@ -89,14 +89,14 @@ def test_rows_to_memories():
     assert len(memories) == 2
     assert memories[0].id == "memory-1"
     assert memories[0].user_id == "test-user"
-    assert memories[0].statement == "Memory 1 content"
-    assert memories[0].type == "note"
+    assert memories[0].payload["statement"] == "Memory 1 content"
+    assert memories[0].memory_type == "note"
     assert memories[0].created_at.isoformat() == "2023-01-01T00:00:00+00:00"
     assert memories[0].tags == ["tag1", "tag2"]
 
     assert memories[1].id == "memory-2"
-    assert memories[1].type == "document"
-    assert memories[1].statement == "Memory 2 summary"
+    assert memories[1].memory_type == "document"
+    assert memories[1].payload["statement"] == "Memory 2 summary"
 
 
 def test_rows_to_memories_handles_invalid_memory_type():
@@ -130,7 +130,7 @@ def test_rows_to_memories_handles_invalid_date():
                 "id": "memory-1",
                 "user_id": "test-user",
                 "statement": "Memory 1 content",
-                "type": "note",
+                                    "memory_type": "note",
                 "created_at": "not-a-date",
             }
         }
@@ -146,20 +146,16 @@ def test_rows_to_memories_handles_invalid_date():
 def test_rerank_with_vectors(embedder, qdrant_fake):
     """Test reranking graph results with vector similarity."""
     # Create test memories with very different content
-    memory1 = Memory(
-        id="memory-1",
+    memory1 = Memory(id="memory-1",
         user_id="test-user",
-        type="note",
-        statement="aaaa aaaa aaaa",
-        payload={"details": "This is a note with unrelated content."},
+        memory_type="note",
+        payload={"statement": "aaaa aaaa aaaa", "details": "This is a note with unrelated content."},
     )
 
-    memory2 = Memory(
-        id="memory-2",
+    memory2 = Memory(id="memory-2",
         user_id="test-user",
-        type="note",
-        statement="test query similar",
-        payload={"details": "This is a note with similar content."},
+        memory_type="note",
+        payload={"statement": "test query similar", "details": "This is a note with similar content."},
     )
 
     # Add to Qdrant
@@ -187,28 +183,22 @@ def test_rerank_with_vectors(embedder, qdrant_fake):
 def test_append_neighbors(kuzu_fake):
     """Test appending graph neighbors to results."""
     # Create test memories
-    memory1 = Memory(
-        id="memory-1",
+    memory1 = Memory(id="memory-1",
         user_id="test-user",
-        type="note",
-        statement="Memory 1 content",
-        payload={"details": "This is the detail for memory 1."},
+        memory_type="note",
+        payload={"statement": "Memory 1 content", "details": "This is the detail for memory 1."},
     )
 
-    memory2 = Memory(
-        id="memory-2",
+    memory2 = Memory(id="memory-2",
         user_id="test-user",
-        type="note",
-        statement="Memory 2 content",
-        payload={"details": "This is the detail for memory 2."},
+        memory_type="note",
+        payload={"statement": "Memory 2 content", "details": "This is the detail for memory 2."},
     )
 
-    memory3 = Memory(
-        id="memory-3",
+    memory3 = Memory(id="memory-3",
         user_id="test-user",
-        type="note",
-        statement="Memory 3 content",
-        payload={"details": "This is the detail for memory 3."},
+        memory_type="note",
+        payload={"statement": "Memory 3 content", "details": "This is the detail for memory 3."},
     )
 
     # Add to Kuzu
@@ -263,12 +253,10 @@ def test_append_neighbors(kuzu_fake):
 def test_neighbor_cap_respected(kuzu_fake):
     """Test that neighbor_cap is respected."""
     # Create test memories
-    memory1 = Memory(
-        id="memory-1",
+    memory1 = Memory(id="memory-1",
         user_id="test-user",
-        type="note",
-        statement="Memory 1 content",
-        payload={"details": "This is the detail for memory 1."},
+        memory_type="note",
+        payload={"statement": "Memory 1 content", "details": "This is the detail for memory 1."},
     )
 
     # Create 5 neighbor memories
@@ -277,7 +265,7 @@ def test_neighbor_cap_respected(kuzu_fake):
         memory = Memory(
             id=f"memory-{i}",
             user_id="test-user",
-            type="note",
+            memory_type="note",
             statement=f"Memory {i} content",
             payload={"details": f"This is the detail for memory {i}."},
         )
@@ -325,17 +313,15 @@ def test_search_vector_fallback_no_graph(embedder, qdrant_fake, kuzu_fake):
     memory1 = Memory(
         id="memory-1",
         user_id="test-user",
-        type="note",
-        statement="Apple banana orange",
-        payload={"details": "This is a note about fruits."},
+        memory_type="note",
+        payload={"statement": "Apple banana orange", "details": "This is a note about fruits."},
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
-        type="note",
-        statement="Machine learning algorithm",
-        payload={"details": "This is a note about AI."},
+        memory_type="note",
+        payload={"statement": "Machine learning algorithm", "details": "This is a note about AI."},
     )
 
     # Add to Qdrant
@@ -353,6 +339,7 @@ def test_search_vector_fallback_no_graph(embedder, qdrant_fake, kuzu_fake):
         qdrant=qdrant_fake,
         kuzu=kuzu_fake,
         embedder=embedder,
+        mode="vector",
     )
 
     assert len(results) > 0
@@ -363,20 +350,16 @@ def test_search_vector_fallback_no_graph(embedder, qdrant_fake, kuzu_fake):
 def test_search_graph_first_rerank_then_neighbors(embedder, qdrant_fake, kuzu_fake):
     """Test search with graph-first, rerank, and neighbors (lean core: Memory-only graph)."""
     # Create test memories
-    memory1 = Memory(
-        id="memory-1",
+    memory1 = Memory(id="memory-1",
         user_id="test-user",
-        type="note",
-        statement="Database concepts with special keyword",
-        payload={"details": "This is a note about databases."},
+        memory_type="note",
+        payload={"statement": "Database concepts with special keyword", "details": "This is a note about databases."},
     )
 
-    memory2 = Memory(
-        id="memory-2",
+    memory2 = Memory(id="memory-2",
         user_id="test-user",
-        type="note",
-        statement="Related concepts without special word",
-        payload={"details": "This is a related note."},
+        memory_type="note",
+        payload={"statement": "Related concepts without special word", "details": "This is a related note."},
     )
 
     # Add to both Qdrant and Kuzu
@@ -419,27 +402,23 @@ def test_search_graph_first_rerank_then_neighbors(embedder, qdrant_fake, kuzu_fa
 def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuzu_fake):
     """Test that filters and user_id propagate to Qdrant search."""
     # Create memories for different users with different tags
-    memory1 = Memory(
-        id="memory-1",
+    memory1 = Memory(id="memory-1",
         user_id="user1",
-        type="note",
-        statement="Content for user1",
-        payload={"details": "This is a note for user 1."},
+        memory_type="note",
+        payload={"statement": "Content for user1", "details": "This is a note for user 1."},
         tags=["tag1", "tag2"],
     )
 
-    memory2 = Memory(
-        id="memory-2",
+    memory2 = Memory(id="memory-2",
         user_id="user2",
-        type="note",
-        statement="Content for user2",
-        payload={"details": "This is a note for user 2."},
+        memory_type="note",
+        payload={"statement": "Content for user2", "details": "This is a note for user 2."},
         tags=["tag2", "tag3"],
     )
 
     # Add to Qdrant
-    vector1 = embedder.get_embedding(memory1.statement)
-    vector2 = embedder.get_embedding(memory2.statement)
+    vector1 = embedder.get_embedding(memory1.payload["statement"])
+    vector2 = embedder.get_embedding(memory2.payload["statement"])
 
     qdrant_fake.add_point(vector=vector1, payload=memory1.to_qdrant_payload(), point_id="memory-1")
     qdrant_fake.add_point(vector=vector2, payload=memory2.to_qdrant_payload(), point_id="memory-2")
@@ -452,6 +431,7 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         qdrant=qdrant_fake,
         kuzu=kuzu_fake,
         embedder=embedder,
+        mode="vector",
     )
 
     assert len(results_user1) == 1
@@ -466,6 +446,7 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         kuzu=kuzu_fake,
         embedder=embedder,
         filters={"core.tags": ["tag3"]},
+        mode="vector",
     )
 
     assert len(results_user2_tag3) == 1
