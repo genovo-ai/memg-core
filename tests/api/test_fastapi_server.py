@@ -130,7 +130,7 @@ def test_add_memory_endpoint_validation(client):
     """Test generic add memory endpoint validates required fields."""
     # Missing memory_type should fail
     response = client.post("/v1/memories", json={
-        "payload": {"statement": "test"},
+        "payload": {"content": "test"},  # YAML schema: note uses content
         "user_id": "test_user"
     })
     assert response.status_code == 422  # Pydantic validation error
@@ -148,7 +148,7 @@ def test_add_memory_endpoint_with_valid_params(client):
     response = client.post("/v1/memories", json={
         "memory_type": "note",
         "payload": {
-            "statement": "Generic memory test",
+            "content": "Generic memory test",  # YAML schema: note uses content
             "source": "api_test"
         },
         "user_id": "test_user",
@@ -166,7 +166,7 @@ def test_search_endpoint_projection_param(client):
         "include_details": "self",
         "projection": {
             "document": ["title", "summary"],
-            "note": ["statement"]
+            "note": ["content"]  # YAML schema: note anchor field
         }
     })
     # May return 200 (empty results) or 400 (if no storage setup), both acceptable for integration test

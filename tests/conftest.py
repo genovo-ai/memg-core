@@ -10,20 +10,11 @@ from uuid import uuid4
 import pytest
 from pydantic import BaseModel
 
+from memg_core.api.public import add_memory, search
 from memg_core.core.interfaces.embedder import Embedder
 from memg_core.core.interfaces.kuzu import KuzuInterface
 from memg_core.core.interfaces.qdrant import QdrantInterface
 from memg_core.core.models import Memory
-
-
-def _dig(d: Dict[str, Any], dotted: str) -> Any:
-    """Fetch nested value using dotted keys, e.g. 'core.user_id'."""
-    cur = d
-    for part in dotted.split("."):
-        if not isinstance(cur, dict) or part not in cur:
-            return None
-        cur = cur[part]
-    return cur
 
 
 class DummyEmbedder:
@@ -132,6 +123,17 @@ class FakeQdrant(QdrantInterface):
         collection = collection or self.collection_name
         if collection not in self.points:
             return []
+
+        def _dig(data: dict, path: str):
+            """Helper to access nested dict values using dot notation"""
+            keys = path.split(".")
+            current = data
+            for key in keys:
+                if isinstance(current, dict) and key in current:
+                    current = current[key]
+                else:
+                    return None
+            return current
 
         def _passes_filters(payload: Dict[str, Any]) -> bool:
             # support both nested payload {"core": {...}, "entity": {...}}

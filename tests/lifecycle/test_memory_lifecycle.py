@@ -86,7 +86,7 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
         user_id="test-user",
         memory_type="note",
         payload={
-            "statement": "Initial content",  # Current core uses payload.statement
+            "content": "Initial content",  # YAML schema: note uses content
             "title": "Initial Title",
         },
     )
@@ -96,7 +96,7 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
 
     # Verify initial state - check current payload structure
     qdrant_point = qdrant_fake.get_point("memory-1")
-    assert qdrant_point["payload"]["entity"]["statement"] == "Initial content"
+    assert qdrant_point["payload"]["entity"]["content"] == "Initial content"
     assert qdrant_point["payload"]["entity"]["title"] == "Initial Title"
 
     kuzu_node = kuzu_fake.nodes["Memory"]["memory-1"]
@@ -110,7 +110,7 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
         user_id="test-user",
         memory_type="note",
         payload={
-            "statement": "Updated content",  # Current core uses payload.statement
+            "content": "Updated content",  # YAML schema: note uses content
             "title": "Updated Title",
         },
     )
@@ -120,7 +120,7 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
 
     # Verify updated state - check current payload structure
     qdrant_point = qdrant_fake.get_point("memory-1")
-    assert qdrant_point["payload"]["entity"]["statement"] == "Updated content"
+    assert qdrant_point["payload"]["entity"]["content"] == "Updated content"
     assert qdrant_point["payload"]["entity"]["title"] == "Updated Title"
 
     kuzu_node = kuzu_fake.nodes["Memory"]["memory-1"]

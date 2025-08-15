@@ -47,6 +47,8 @@ RUN python -m pip install --upgrade pip && \
 ENV PYTHONPATH=/workspace/src
 ENV QDRANT_STORAGE_PATH=/workspace/temp_data/qdrant
 ENV KUZU_DB_PATH=/workspace/temp_data/kuzu/ci_test.db
+ENV MEMG_YAML_SCHEMA=/workspace/config/core.minimal.yaml
+ENV EMBEDDING_DIMENSION_LEN=384
 
 # Create temp directories
 RUN mkdir -p /workspace/temp_data/qdrant /workspace/temp_data/kuzu

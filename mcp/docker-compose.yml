@@ -2,6 +2,7 @@ services:
   # MEMG Core MCP Server with Lean Core API
   memg-mcp-server:
     image: ghcr.io/genovo-ai/memg-core-mcp:latest
+    platform: linux/amd64  # Force AMD64 platform for ARM64 compatibility via Colima
     container_name: memg-mcp-server-${MEMORY_SYSTEM_MCP_PORT:-8787}
     ports:
       - "${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787}"
@@ -10,7 +11,7 @@ services:
       - ${BASE_MEMORY_PATH:-$HOME/.local/share/memory_system}_${MEMORY_SYSTEM_MCP_PORT:-8787}/qdrant:/qdrant
       - ${BASE_MEMORY_PATH:-$HOME/.local/share/memory_system}_${MEMORY_SYSTEM_MCP_PORT:-8787}/kuzu:/kuzu
     env_file:
-      - ../.env
+      - .env
     environment:
       # Container-specific paths
       QDRANT_STORAGE_PATH: /qdrant

@@ -1,6 +1,6 @@
 # memg_core/core/pipeline/retrieval.py
 """Unified retrieval pipeline with automatic mode selection and neighbor expansion.
-- Anchor-first: uses `statement` as the only textual anchor.
+- YAML-driven: uses YAML-defined anchor fields (content, summary, etc.) for text anchoring.
 - Modes: vector-first (Qdrant), graph-first (Kuzu), hybrid (merge).
 - Filters: user_id, memo_type, modified_within_days, arbitrary filters.
 - Deterministic ordering: score DESC, then hrid index ASC, then id ASC.
@@ -139,54 +139,28 @@ def _build_graph_query_for_memos(
 def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
     out: list[Memory] = []
     for row in rows:
-        mtype = row.get("m.memory_type") or row.get("memory_type") or "memo"
-        statement = row.get("m.statement") or row.get("statement") or ""
-        created_at_raw = row.get("m.created_at") or row.get("created_at")
-        # updated_at_raw = row.get("m.updated_at") or row.get("updated_at")
-        tags_raw = row.get("m.tags") or row.get("tags") or []
-        hrid = row.get("m.hrid") or row.get("hrid")  # NEW
+        # Core fields are extracted directly.
+        core_fields = {
+            "id": row.get("m.id") or row.get("id") or str(uuid4()),
+            "user_id": row.get("m.user_id") or row.get("user_id", ""),
+            "memory_type": row.get("m.memory_type") or row.get("memory_type") or "memo",
+            "created_at": _parse_datetime(row.get("m.created_at") or row.get("created_at")),
+            "hrid": row.get("m.hrid") or row.get("hrid"),
+            "tags": row.get("m.tags") or row.get("tags") or [],
+        }
 
-        if isinstance(tags_raw, str):
-            tags = [t for t in tags_raw.split(",") if t]
-        else:
-            tags = list(tags_raw)
+        # All other fields from the row are considered part of the payload.
+        payload = {
+            key.replace("m.", ""): value
+            for key, value in row.items()
+            if key.replace("m.", "") not in core_fields
+        }
 
-        # Build payload from available row fields
-        payload = {"statement": statement}
+        # Normalize tags if they are a string
+        if isinstance(core_fields["tags"], str):
+            core_fields["tags"] = [t.strip() for t in core_fields["tags"].split(",") if t.strip()]
 
-        # Include other available fields in payload
-        title = row.get("m.title") or row.get("title")
-        if title:
-            payload["title"] = title
-
-        summary = row.get("m.summary") or row.get("summary")
-        if summary:
-            payload["summary"] = summary
-
-        task_status = row.get("m.task_status") or row.get("task_status")
-        if task_status:
-            payload["task_status"] = task_status
-
-        assignee = row.get("m.assignee") or row.get("assignee")
-        if assignee:
-            payload["assignee"] = assignee
-
-        out.append(
-            Memory(
-                id=row.get("m.id") or row.get("id") or str(uuid4()),
-                user_id=row.get("m.user_id") or row.get("user_id", ""),
-                memory_type=mtype,
-                payload=payload,
-                tags=tags,
-                confidence=0.8,
-                is_valid=True,
-                created_at=_parse_datetime(created_at_raw),
-                supersedes=None,
-                superseded_by=None,
-                vector=None,
-                hrid=hrid,
-            )
-        )
+        out.append(Memory(payload=payload, **core_fields))
     return out
 
 
@@ -369,23 +343,19 @@ def graph_rag_search(
                 payload = r.get("payload", {})
                 core = payload.get("core", {})
                 entity = payload.get("entity", {})
-                statement = entity.get("statement") or core.get("statement") or ""
+
+                # Reconstruct the Memory object strictly from its stored parts.
+                # The payload is the `entity` dict. Core fields are in `core`.
                 m = Memory(
                     id=r.get("id") or str(uuid4()),
                     user_id=core.get("user_id", ""),
                     memory_type=core.get("memory_type", "memo"),
-                    payload={
-                        "statement": statement,
-                        **{k: v for k, v in entity.items() if k != "statement"},
-                    },
+                    payload=entity,
                     tags=core.get("tags", []),
                     confidence=core.get("confidence", 0.8),
                     is_valid=core.get("is_valid", True),
                     created_at=_parse_datetime(core.get("created_at")),
-                    supersedes=core.get("supersedes"),
-                    superseded_by=core.get("superseded_by"),
-                    vector=None,
-                    hrid=core.get("hrid"),  # NEW
+                    hrid=core.get("hrid"),
                 )
                 # NEW: project anchor payload according to include_details/projection
                 m.payload = _project_payload(
@@ -420,15 +390,12 @@ def graph_rag_search(
                 payload = r.get("payload", {})
                 core = payload.get("core", {})
                 entity = payload.get("entity", {})
-                statement = entity.get("statement") or core.get("statement") or ""
+                # Type-agnostic: use all entity fields as payload, no hardcoded assumptions
                 m = Memory(
                     id=r.get("id") or str(uuid4()),
                     user_id=core.get("user_id", ""),
                     memory_type=core.get("memory_type", "memo"),
-                    payload={
-                        "statement": statement,
-                        **{k: v for k, v in entity.items() if k != "statement"},
-                    },
+                    payload=dict(entity),  # All entity fields, no filtering
                     tags=core.get("tags", []),
                     confidence=core.get("confidence", 0.8),
                     is_valid=core.get("is_valid", True),
@@ -436,7 +403,7 @@ def graph_rag_search(
                     supersedes=core.get("supersedes"),
                     superseded_by=core.get("superseded_by"),
                     vector=None,
-                    hrid=core.get("hrid"),  # NEW
+                    hrid=core.get("hrid"),
                 )
                 m.payload = _project_payload(
                     m.memory_type, m.payload, include_details=include_details, projection=projection
@@ -507,6 +474,7 @@ def graph_rag_search(
             results = []
 
     # neighbors (anchors only)
+    # The neighbor payload is constructed generically, so this should be fine.
     results = _append_neighbors(results, kuzu, neighbor_cap, relation_names)
 
     # final order & clamp

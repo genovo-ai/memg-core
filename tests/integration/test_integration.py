@@ -37,7 +37,7 @@ def test_index_and_search_with_real_qdrant():
         user_id="test-user",
         memory_type="note",
         payload={
-            "statement": "This is an integration test memory",  # Current core uses payload.statement
+            "content": "This is an integration test memory",  # YAML schema: note uses content
             "title": "Integration Test",
         },
         created_at=datetime.now(UTC),
@@ -65,9 +65,9 @@ def test_index_and_search_with_real_qdrant():
 
         assert len(results) > 0
         assert results[0]["id"] == "12345678-1234-5678-1234-567812345678"
-        # Check the payload structure - content is in entity.statement
+        # Check the payload structure - content is in entity.content for notes
         payload = results[0]["payload"]
-        assert payload["entity"]["statement"] == "This is an integration test memory"
+        assert payload["entity"]["content"] == "This is an integration test memory"
 
     finally:
         # Clean up

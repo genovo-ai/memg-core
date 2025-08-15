@@ -1,17 +1,17 @@
 """
-Minimal public API exposing generic add_memory and unified search.
-- Uses YAML translator to validate payloads and resolve anchor → statement.
-- add_note/add_document/add_task are thin shims that build normalized payloads
-  with `statement` as the anchor and optional `details`.
-- search() supports vector-first, graph-first, or hybrid via `mode`, and
-  accepts date scoping via `modified_within_days`.
+Strict YAML-enforced public API exposing only generic add_memory and unified search.
+- Uses YAML translator to validate ALL payloads against dynamically generated Pydantic models
+- NO hardcoded helper functions - clients MUST use YAML schema directly
+- All validation is strict - no fallbacks, no backward compatibility
+- search() supports vector-first, graph-first, or hybrid via `mode`
 """
 
 from __future__ import annotations
 
-from datetime import datetime
 import os
 from typing import Any
+
+from pydantic import ValidationError as PydanticValidationError
 
 from memg_core.core.config import get_config
 from memg_core.core.exceptions import ValidationError
@@ -21,17 +21,17 @@ from memg_core.core.interfaces.qdrant import QdrantInterface
 from memg_core.core.models import Memory, SearchResult
 from memg_core.core.pipeline.indexer import add_memory_index
 from memg_core.core.pipeline.retrieval import graph_rag_search
-from memg_core.core.yaml_translator import build_anchor_text, create_memory_from_yaml
+from memg_core.core.yaml_translator import build_anchor_text, get_entity_model
 
 # ----------------------------- indexing helper -----------------------------
 
 
-def _index_memory_with_optional_yaml(memory: Memory) -> str:
-    """Helper to index a memory with YAML-driven anchor if available.
+def _index_memory_with_yaml(memory: Memory) -> str:
+    """Index a memory with strict YAML-driven anchor text resolution.
 
-    - Initializes interfaces using config/env.
-    - Resolves anchor text via YAML translator (fallback suppressed).
-    - Upserts into Qdrant and mirrors to Kuzu.
+    - Initializes interfaces using config/env
+    - Resolves anchor text via YAML translator (REQUIRED - no fallbacks)
+    - Upserts into Qdrant and mirrors to Kuzu
     """
     config = get_config()
 
@@ -44,12 +44,8 @@ def _index_memory_with_optional_yaml(memory: Memory) -> str:
     kuzu = KuzuInterface(db_path=kuzu_path)
     embedder = Embedder()
 
-    index_text_override = None
-    try:
-        index_text_override = build_anchor_text(memory)
-    except Exception:
-        # If YAML not configured or anchor missing, allow indexer to fail if truly empty
-        index_text_override = None
+    # Strict YAML anchor text resolution - no fallbacks
+    index_text_override = build_anchor_text(memory)
 
     return add_memory_index(
         memory,
@@ -63,86 +59,35 @@ def _index_memory_with_optional_yaml(memory: Memory) -> str:
 # ----------------------------- public adders -----------------------------
 
 
-def add_note(
-    text: str,
+def add_memory(
+    memory_type: str,
+    payload: dict[str, Any],
     user_id: str,
-    title: str | None = None,
     tags: list[str] | None = None,
 ) -> Memory:
-    """Add a note-type memory (anchor = `content`)."""
-    if not text or not text.strip():
-        raise ValidationError("Note content cannot be empty")
-    if not user_id:
-        raise ValidationError("User ID is required")
+    """Create a memory using strict YAML schema validation and index it.
 
-    payload: dict[str, Any] = {
-        "content": text.strip(),
-        "source": "user",
-    }
-    if title:
-        payload["title"] = title
-
-    return add_memory("note", payload, user_id, tags)
-
-
-def add_document(
-    text: str,
-    user_id: str,
-    title: str | None = None,
-    summary: str | None = None,
-    tags: list[str] | None = None,
-) -> Memory:
-    """Add a document-type memory.
-
-    Normalization:
-    - `summary` = provided summary or truncated text
-    - `body`   = full text body
+    Validates payload against dynamically generated Pydantic model from YAML schema.
+    NO fallbacks, NO backward compatibility.
     """
-    if not text or not text.strip():
-        raise ValidationError("Document content cannot be empty")
-    if not user_id:
-        raise ValidationError("User ID is required")
+    # Get dynamic Pydantic model and validate payload in one step
+    entity_model = get_entity_model(memory_type)
+    try:
+        validated_entity = entity_model(**payload)
+    except PydanticValidationError as e:
+        raise ValidationError(f"Validation failed for '{memory_type}': {e}") from e
 
-    text_clean = text.strip()
-    payload: dict[str, Any] = {
-        "summary": (
-            summary.strip()
-            if summary and summary.strip()
-            else (text_clean[:200] + "..." if len(text_clean) > 200 else text_clean)
-        ),
-        "body": text_clean,
-        "source": "user",
-    }
-    if title:
-        payload["title"] = title
+    # Create Memory with validated payload
+    memory = Memory(
+        memory_type=memory_type,
+        payload=validated_entity.model_dump(exclude_none=True),
+        user_id=user_id,
+        tags=tags or [],
+    )
 
-    return add_memory("document", payload, user_id, tags)
-
-
-def add_task(
-    text: str,
-    user_id: str,
-    title: str | None = None,
-    due_date: datetime | None = None,
-    tags: list[str] | None = None,
-) -> Memory:
-    """Add a task-type memory (anchor = `summary`, with lifecycle fields)."""
-    if not text or not text.strip():
-        raise ValidationError("Task content cannot be empty")
-    if not user_id:
-        raise ValidationError("User ID is required")
-
-    payload: dict[str, Any] = {
-        "summary": text.strip(),
-        "source": "user",
-        "status": "OPEN",
-    }
-    if title:
-        payload["title"] = title
-    if due_date:
-        payload["due_date"] = due_date
-
-    return add_memory("task", payload, user_id, tags)
+    # Index with strict YAML anchor resolution
+    memory.id = _index_memory_with_yaml(memory)
+    return memory
 
 
 # ----------------------------- public search -----------------------------
@@ -208,43 +153,3 @@ def search(
         include_details=include_details,
         projection=projection,
     )
-
-
-# ----------------------------- generic add -----------------------------
-
-
-def add_memory(
-    memory_type: str,
-    payload: dict[str, Any],
-    user_id: str,
-    tags: list[str] | None = None,
-) -> Memory:
-    """Create a memory using YAML-defined type + payload and index it.
-
-    Normalizes tags, validates against YAML, builds anchor via translator,
-    and indexes into both stores. Returns the populated Memory.
-    """
-    if not memory_type or not memory_type.strip():
-        raise ValidationError("Memory type cannot be empty")
-    if not user_id:
-        raise ValidationError("User ID is required")
-    if not payload:
-        raise ValidationError("Payload cannot be empty")
-
-    # Normalize tags early to a list[str]
-    norm_tags: list[str] = [t for t in (tags or []) if isinstance(t, str) and t.strip()]
-    if norm_tags:
-        # keep a copy in payload for callers/tests that look there
-        payload = dict(payload)  # shallow copy to avoid mutating caller dict
-        payload.setdefault("tags", norm_tags)
-
-    # Build the Memory via YAML translator (validates payload)
-    memory = create_memory_from_yaml(memory_type.strip(), payload, user_id)
-
-    # TEMP back-compat: ensure top-level Memory.tags reflects API input
-    if norm_tags:
-        memory.tags = norm_tags
-
-    # Index and attach id
-    memory.id = _index_memory_with_optional_yaml(memory)
-    return memory

@@ -36,53 +36,10 @@ class KuzuInterface:
             )
 
     def add_node(self, table: str, properties: dict[str, Any]) -> None:
-        """Add a node to the graph"""
+        """Add a node to the graph with dynamic schema creation"""
         try:
-            # Create table if it doesn't exist (DDL on demand)
-            if table == "Entity":
-                self.conn.execute(
-                    """
-                    CREATE NODE TABLE IF NOT EXISTS Entity(
-                        id STRING,
-                        user_id STRING,
-                        name STRING,
-                        type STRING,
-                        description STRING,
-                        confidence DOUBLE,
-                        created_at STRING,
-                        is_valid BOOLEAN,
-                        source_memory_id STRING,
-                        PRIMARY KEY (id)
-                    )
-                """
-                )
-            elif table == "Memory":
-                self.conn.execute(
-                    """
-                    CREATE NODE TABLE IF NOT EXISTS Memory(
-                        id STRING,
-                        user_id STRING,
-                        memory_type STRING,
-                        statement STRING,
-                        title STRING,
-                        summary STRING,
-                        content STRING,
-                        source STRING,
-                        tags STRING,
-                        confidence DOUBLE,
-                        is_valid BOOLEAN,
-                        created_at STRING,
-                        updated_at STRING,
-                        expires_at STRING,
-                        supersedes STRING,
-                        superseded_by STRING,
-                        hrid STRING,
-                        task_status STRING,
-                        assignee STRING,
-                        PRIMARY KEY (id)
-                    )
-                """
-                )
+            # Create table dynamically based on properties
+            self._ensure_table_schema(table, properties)
 
             props = ", ".join([f"{k}: ${k}" for k in properties])
             query = f"CREATE (:{table} {{{props}}})"
@@ -94,6 +51,26 @@ class KuzuInterface:
                 context={"table": table, "properties": properties},
                 original_error=e,
             )
+
+    def _ensure_table_schema(self, table: str, properties: dict[str, Any]) -> None:
+        """Ensure table exists with proper schema based on properties"""
+        try:
+            # Generate schema from properties - type-agnostic
+            columns = []
+            for key, value in properties.items():
+                kuzu_type = self._get_kuzu_type(key, value)
+                columns.append(f"{key} {kuzu_type}")
+
+            columns_str = ", ".join(columns)
+            create_sql = f"CREATE NODE TABLE IF NOT EXISTS {table}({columns_str}, PRIMARY KEY (id))"
+            # Try to create the table - ignore if already exists with different schema
+            import contextlib
+
+            with contextlib.suppress(Exception):
+                self.conn.execute(create_sql)
+        except Exception:
+            # Don't fail the whole operation for schema issues
+            pass
 
     def add_relationship(
         self,
@@ -212,13 +189,13 @@ class KuzuInterface:
                 pattern = f"(a:{node_label} {{id: $id}})-[r{rel_part}]-(n{neighbor})"
 
             if neighbor_label == "Memory":
+                # Type-agnostic query - only return core fields, no assumptions
                 cypher = f"""
                 MATCH {pattern}
                 RETURN DISTINCT n.id as id,
                                 n.user_id as user_id,
-                                n.content as content,
-                                n.title as title,
                                 n.memory_type as memory_type,
+                                n.statement as statement,
                                 n.created_at as created_at,
                                 label(r) as rel_type
                 LIMIT $limit

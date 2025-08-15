@@ -3,7 +3,7 @@
 
 import os
 
-from memg_core import add_document, add_note, add_task, search
+from memg_core import add_memory, search
 
 # Set required environment variables
 os.environ["QDRANT_STORAGE_PATH"] = "$HOME/.memg/qdrant"
@@ -15,28 +15,37 @@ def main():
     user_id = "demo_user"
 
     # Add a note
-    note = add_note(
-        text="GraphRAG combines graph databases with vector search for better retrieval",
+    note = add_memory(
+        memory_type="note",
+        payload={
+            "content": "GraphRAG combines graph databases with vector search for better retrieval"
+        },
         user_id=user_id,
         tags=["graphrag", "retrieval"],
     )
     print(f"Added note: {note.id}")
 
     # Add a document
-    doc = add_document(
-        text="The complete GraphRAG implementation guide covers entity extraction, relationship mapping, and hybrid search strategies.",
+    doc = add_memory(
+        memory_type="document",
+        payload={
+            "summary": "Comprehensive guide to implementing GraphRAG systems",
+            "body": "The complete GraphRAG implementation guide covers entity extraction, relationship mapping, and hybrid search strategies.",
+            "title": "GraphRAG Implementation Guide",
+        },
         user_id=user_id,
-        title="GraphRAG Implementation Guide",
-        summary="Comprehensive guide to implementing GraphRAG systems",
         tags=["documentation", "graphrag"],
     )
     print(f"Added document: {doc.id}")
 
     # Add a task
-    task = add_task(
-        text="Implement graph neighbor expansion for search results",
+    task = add_memory(
+        memory_type="task",
+        payload={
+            "summary": "Implement graph neighbor expansion for search results",
+            "title": "Add neighbor expansion",
+        },
         user_id=user_id,
-        title="Add neighbor expansion",
         tags=["enhancement", "search"],
     )
     print(f"Added task: {task.id}")

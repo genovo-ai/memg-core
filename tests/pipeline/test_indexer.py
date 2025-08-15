@@ -18,7 +18,7 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
         user_id="test-user",
         memory_type="note",
         payload={
-            "statement": "This is a test memory",
+            "content": "This is a test memory",  # YAML schema: note uses content
             "title": "Test Memory"
         }
     )
@@ -32,7 +32,7 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
     qdrant_point = qdrant_fake.get_point(point_id)
     assert qdrant_point is not None
     assert qdrant_point["payload"]["core"]["user_id"] == "test-user"
-    assert qdrant_point["payload"]["entity"]["statement"] == "This is a test memory"
+    assert qdrant_point["payload"]["entity"]["content"] == "This is a test memory"
     assert qdrant_point["payload"]["core"]["memory_type"] == "note"
     assert qdrant_point["payload"]["entity"]["title"] == "Test Memory"
 
@@ -53,7 +53,7 @@ def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuz
         user_id="test-user",
         memory_type="note",
         payload={
-            "statement": "This is a test memory",
+            "content": "This is a test memory",  # YAML schema: note uses content
             "title": "Test Memory"
         }
     )

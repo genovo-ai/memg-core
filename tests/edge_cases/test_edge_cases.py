@@ -54,10 +54,10 @@ def test_empty_search_returns_empty_list_not_exception(embedder, qdrant_fake, ku
 
 
 def test_large_content_truncation_in_kuzu_node_does_not_break_payload(mem_factory, embedder, qdrant_fake, kuzu_fake):
-    """Full content stays in Qdrant payload under entity.statement (anchor)."""
+    """Full content stays in Qdrant payload under entity.content (anchor for notes)."""
     large = "x" * 2000
-    memory = Memory(id="memory-1", user_id="test-user", memory_type="note", payload={"statement": large})
+    memory = Memory(id="memory-1", user_id="test-user", memory_type="note", payload={"content": large})
     add_memory_index(memory, qdrant_fake, kuzu_fake, embedder)
 
     pt = qdrant_fake.get_point("memory-1")
-    assert len(pt["payload"]["entity"]["statement"]) == 2000  # full text stays in vector store
+    assert len(pt["payload"]["entity"]["content"]) == 2000  # full text stays in vector store

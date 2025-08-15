@@ -62,7 +62,7 @@ def test_rows_to_memories():
         {
             "m.id": "memory-1",
             "m.user_id": "test-user",
-            "m.statement": "Memory 1 content",  # Current core uses statement field
+            "m.statement": "Memory 1 content",  # Retrieval still expects statement field
             "m.title": "Memory 1",
             "m.memory_type": "note",
             "m.created_at": "2023-01-01T00:00:00+00:00",
@@ -72,7 +72,7 @@ def test_rows_to_memories():
         {
             "m.id": "memory-2",
             "m.user_id": "test-user",
-            "m.statement": "Memory 2 content",  # Current core uses statement field
+            "m.statement": "Memory 2 content",  # Retrieval still expects statement field
             "m.title": "Memory 2",
             "m.summary": "Memory 2 summary",  # Add summary field that test expects
             "m.memory_type": "document",
@@ -106,7 +106,7 @@ def test_rows_to_memories_handles_invalid_memory_type():
         {
             "m.id": "memory-1",
             "m.user_id": "test-user",
-            "m.statement": "Memory 1 content",  # Current core uses statement field
+            "m.statement": "Memory 1 content",  # Retrieval still expects statement field
             "m.memory_type": "invalid_type",
             "m.created_at": "2023-01-01T00:00:00+00:00",
         }
@@ -126,7 +126,7 @@ def test_rows_to_memories_handles_invalid_date():
         {
             "m.id": "memory-1",
             "m.user_id": "test-user",
-            "m.statement": "Memory 1 content",  # Current core uses statement field
+            "m.statement": "Memory 1 content",  # Retrieval still expects statement field
             "m.memory_type": "note",
             "m.created_at": "not-a-date",
         }
@@ -146,14 +146,14 @@ def test_rerank_with_vectors(embedder, qdrant_fake):
         id="memory-1",
         user_id="test-user",
         memory_type="note",
-        payload={"statement": "aaaa aaaa aaaa"},  # Very different from query
+        payload={"content": "aaaa aaaa aaaa"},  # YAML schema: note uses content
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
         memory_type="note",
-        payload={"statement": "test query similar"},  # More similar to query
+        payload={"content": "test query similar"},  # YAML schema: note uses content
     )
 
     # Add to Qdrant
@@ -185,21 +185,21 @@ def test_append_neighbors(kuzu_fake):
         id="memory-1",
         user_id="test-user",
         memory_type="note",
-        payload={"statement": "Memory 1 content"},
+        payload={"content": "Memory 1 content"},  # YAML schema: note uses content
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
         memory_type="note",
-        payload={"statement": "Memory 2 content"},
+        payload={"content": "Memory 2 content"},  # YAML schema: note uses content
     )
 
     memory3 = Memory(
         id="memory-3",
         user_id="test-user",
         memory_type="note",
-        payload={"statement": "Memory 3 content"},
+        payload={"content": "Memory 3 content"},  # YAML schema: note uses content
     )
 
     # Add to Kuzu
@@ -258,7 +258,7 @@ def test_neighbor_cap_respected(kuzu_fake):
         id="memory-1",
         user_id="test-user",
         memory_type="note",
-        payload={"statement": "Memory 1 content"},
+        payload={"content": "Memory 1 content"},  # YAML schema: note uses content
     )
 
     # Create 5 neighbor memories
@@ -268,7 +268,7 @@ def test_neighbor_cap_respected(kuzu_fake):
             id=f"memory-{i}",
             user_id="test-user",
             memory_type="note",
-            payload={"statement": f"Memory {i} content"},
+            payload={"content": f"Memory {i} content"},  # YAML schema: note uses content
         )
         neighbor_memories.append(memory)
         kuzu_fake.add_node("Memory", memory.to_kuzu_node())
@@ -315,14 +315,14 @@ def test_search_vector_fallback_no_graph(embedder, qdrant_fake, kuzu_fake):
         id="memory-1",
         user_id="test-user",
         memory_type="note",
-        payload={"statement": "Apple banana orange"},
+        payload={"content": "Apple banana orange"},  # YAML schema: note uses content
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
         memory_type="note",
-        payload={"statement": "Machine learning algorithm"},
+        payload={"content": "Machine learning algorithm"},  # YAML schema: note uses content
     )
 
     # Add to Qdrant
@@ -354,14 +354,14 @@ def test_search_graph_first_rerank_then_neighbors(embedder, qdrant_fake, kuzu_fa
         id="memory-1",
         user_id="test-user",
         memory_type="note",
-        payload={"statement": "Database concepts with special keyword"},
+        payload={"content": "Database concepts with special keyword"},  # YAML schema: note uses content
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
         memory_type="note",
-        payload={"statement": "Related concepts without special word"},
+        payload={"content": "Related concepts without special word"},  # YAML schema: note uses content
     )
 
     # Add to both Qdrant and Kuzu
@@ -408,7 +408,7 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         id="memory-1",
         user_id="user1",
         memory_type="note",
-        payload={"statement": "Content for user1"},
+        payload={"content": "Content for user1"},  # YAML schema: note uses content
         tags=["tag1", "tag2"],
     )
 
@@ -416,7 +416,7 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         id="memory-2",
         user_id="user2",
         memory_type="note",
-        payload={"statement": "Content for user2"},
+        payload={"content": "Content for user2"},  # YAML schema: note uses content
         tags=["tag2", "tag3"],
     )
 

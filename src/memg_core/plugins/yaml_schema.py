@@ -78,7 +78,7 @@ def build_index_text_with_yaml(memory: Any) -> str | None:
     if isinstance(val, str) and val.strip():
         return val
 
-    # For document type, fallback to content if summary is empty
+    # For document type, use summary as defined in YAML schema
     if anchor_field == "summary" and hasattr(memory, "content"):
         content_val = getattr(memory, "content", "")
         if isinstance(content_val, str) and content_val.strip():

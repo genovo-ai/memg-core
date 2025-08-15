@@ -12,63 +12,64 @@ from fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
 # Import the new lean core public API
-from memg_core.api.public import add_note, add_document, add_task, search
+from memg_core.api.public import add_memory, search
 from memg_core.core.models import SearchResult
 from memg_core import __version__
+from memg_core.core.yaml_translator import get_yaml_translator
+from memg_core.core.exceptions import ValidationError
+
+
+def get_dynamic_tool_docstring() -> str:
+    """Generates a dynamic docstring for the add_memory tool from the YAML schema."""
+    try:
+        translator = get_yaml_translator()
+        spec_map = translator._entities_map()
+
+        doc = "Adds a memory to the system based on a dynamic, YAML-defined schema.\n\n"
+        doc += "Args:\n"
+        doc += "    memory_type (str): The type of memory to add (e.g., 'note', 'document').\n"
+        doc += "    user_id (str): The user ID to associate with the memory.\n"
+        doc += "    payload (dict): A dictionary of fields conforming to the schema for the given memory_type.\n\n"
+        doc += "Available Schemas:\n"
+
+        for name, spec_data in spec_map.items():
+            spec = translator.get_entity_spec(name)
+            doc += f"  - memory_type: '{spec.name}'\n"
+            doc += f"    Anchor Field: '{spec.anchor}'\n"
+            doc += f"    Fields:\n"
+            if spec.fields:
+                for field_name, props in spec.fields.items():
+                    if props.get('system'):
+                        continue
+                    req_str = " (required)" if props.get('required') else ""
+                    type_str = props.get('type', 'any')
+                    doc += f"      - {field_name}: {type_str}{req_str}\n"
+        return doc
+    except Exception as e:
+        return f"Could not generate dynamic docstring. Error: {e}"
 
 
 class MemgCoreBridge:
-    """Bridge that uses the new lean core public API."""
+    """A lean bridge to the memg-core public API."""
 
-    def add_memory(
-        self,
-        content: str,
-        user_id: str,
-        memory_type: str = "note",
-        title: Optional[str] = None,
-        tags: Optional[list[str]] = None,
-        **kwargs
-    ) -> dict[str, Any]:
-        """Add a memory using the appropriate lean core function."""
+    def add_memory(self, memory_type: str, user_id: str, payload: dict, tags: Optional[list[str]] = None) -> dict[str, Any]:
+        """Directly calls the generic add_memory function."""
         try:
-            if memory_type.lower() == "document":
-                # For documents, use text and summary parameters directly
-                memory = add_document(
-                    text=kwargs.get("text", content),
-                    user_id=user_id,
-                    title=title,
-                    summary=kwargs.get("summary", content),
-                    tags=tags or []
-                )
-            elif memory_type.lower() == "task":
-                memory = add_task(
-                    text=content,
-                    user_id=user_id,
-                    title=title,
-                    tags=tags or [],
-                    due_date=kwargs.get("due_date")
-                )
-            else:  # Default to note
-                memory = add_note(
-                    text=content,
-                    user_id=user_id,
-                    title=title,
-                    tags=tags or []
-                )
-
+            memory = add_memory(
+                memory_type=memory_type,
+                user_id=user_id,
+                payload=payload,
+                tags=tags or []
+            )
             return {
                 "success": True,
                 "memory_id": memory.id,
-                "memory_type": memory.memory_type,
                 "hrid": memory.hrid,
-                "word_count": len(content.split()) if content else 0,
             }
+        except ValidationError as e:
+            return {"success": False, "error": f"Validation Error: {e}"}
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "memory_id": None,
-            }
+            return {"success": False, "error": str(e)}
 
     def search_memories(
         self,
@@ -84,24 +85,22 @@ class MemgCoreBridge:
                 user_id=user_id,
                 limit=limit,
                 memo_type=kwargs.get("memory_type"),
-                mode=kwargs.get("mode", "vector"),  # vector, graph, or hybrid
+                mode=kwargs.get("mode", "vector"),
                 include_details=kwargs.get("include_details", "self")
             )
 
+            # The `__getattr__` on Memory model allows generic access to payload.
             return [
                 {
-                    "memory_id": result.memory.id,
-                    "content": result.memory.content or "",
-                    "title": result.memory.title,
-                    "memory_type": result.memory.memory_type,
-                    "tags": result.memory.tags,
-                    "score": result.score,
-                    "source": result.source,
-                    "hrid": result.memory.hrid,
-                    "created_at": result.memory.created_at.isoformat() if result.memory.created_at else None,
-                    "word_count": len((result.memory.content or "").split()),
+                    "memory_id": r.memory.id,
+                    "hrid": r.memory.hrid,
+                    "memory_type": r.memory.memory_type,
+                    "payload": r.memory.payload,
+                    "tags": r.memory.tags,
+                    "score": r.score,
+                    "source": r.source,
                 }
-                for result in results
+                for r in results
             ]
         except Exception as e:
             return [{"error": str(e)}]
@@ -111,67 +110,13 @@ class MemgCoreBridge:
         return {
             "system_type": "memg_core_lean_mcp",
             "version": __version__,
-            "api_type": "lean_core_public_api",
-            "available_functions": ["add_note", "add_document", "add_task", "search"],
-            "storage_paths": {
-                "qdrant": os.getenv("QDRANT_STORAGE_PATH", "not_set"),
-                "kuzu": os.getenv("KUZU_DB_PATH", "not_set"),
-            }
+            "api_type": "generic_yaml_driven",
+            "available_functions": ["add_memory", "search_memories"],
         }
 
 
 # Global bridge instance
 bridge: Optional[MemgCoreBridge] = None
-
-
-def add_memory_tool(
-    content: str,
-    user_id: str,
-    memory_type: str = "note",
-    title: str = None,
-    tags: str = None,
-    text: str = None,  # For documents
-    due_date: str = None,  # For tasks
-    assignee: str = None,  # For tasks
-):
-    """Add a memory (note, document, or task)."""
-    if not bridge:
-        return {"result": "❌ Bridge not initialized"}
-
-    # Parse tags
-    parsed_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
-
-    # Prepare kwargs
-    kwargs = {}
-    if text:
-        kwargs["text"] = text
-    if due_date:
-        kwargs["due_date"] = due_date
-    if assignee:
-        kwargs["assignee"] = assignee
-
-    result = bridge.add_memory(
-        content=content,
-        user_id=user_id,
-        memory_type=memory_type,
-        title=title,
-        tags=parsed_tags,
-        **kwargs
-    )
-
-    if result["success"]:
-        return {
-            "result": f"✅ {memory_type.title()} added successfully",
-            "memory_id": result["memory_id"],
-            "memory_type": result["memory_type"],
-            "hrid": result["hrid"],
-            "word_count": result["word_count"],
-        }
-    else:
-        return {
-            "result": f"❌ Failed to add {memory_type}",
-            "error": result.get("error", "Unknown error")
-        }
 
 
 def initialize_bridge() -> MemgCoreBridge:
@@ -188,7 +133,7 @@ def setup_health_endpoints(app: FastMCP) -> None:
         return JSONResponse({
             "status": "healthy",
             "service": f"MEMG Core MCP v{__version__}",
-            "api": "lean_core"
+            "api": "generic_yaml_driven"
         })
 
     @app.custom_route("/health", methods=["GET"])
@@ -206,27 +151,34 @@ def register_tools(app: FastMCP) -> None:
     """Register MCP tools."""
 
     @app.tool("mcp_gmem_add_memory")
-    def add_memory_tool_wrapper(
-        content: str,
-        user_id: str,
-        memory_type: str = "note",
-        title: str = None,
-        tags: str = None,
-        text: str = None,  # For documents
-        due_date: str = None,  # For tasks
-        assignee: str = None,  # For tasks
-    ):
-        """Add a memory (note, document, or task)."""
-        return add_memory_tool(
-            content=content,
-            user_id=user_id,
+    def add_memory_tool(memory_type: str, user_id: str, payload: dict, tags: str = None):
+        if not bridge:
+            return {"result": "❌ Bridge not initialized"}
+
+        parsed_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+
+        result = bridge.add_memory(
             memory_type=memory_type,
-            title=title,
-            tags=tags,
-            text=text,
-            due_date=due_date,
-            assignee=assignee
+            user_id=user_id,
+            payload=payload,
+            tags=parsed_tags
         )
+
+        if result["success"]:
+            return {
+                "result": f"✅ {memory_type.title()} added successfully",
+                "memory_id": result["memory_id"],
+                "hrid": result.get("hrid"),
+            }
+        else:
+            return {
+                "result": f"❌ Failed to add {memory_type}",
+                "error": result.get("error", "Unknown error")
+            }
+
+    # Dynamically set the docstring from the YAML schema
+    add_memory_tool.__doc__ = get_dynamic_tool_docstring()
+
 
     @app.tool("mcp_gmem_search_memories")
     def search_memories_tool(
@@ -254,66 +206,21 @@ def register_tools(app: FastMCP) -> None:
         return {
             "result": f"✅ Found {len(results)} memories",
             "memories": results,
-            "query": query,
-            "mode": mode
         }
-
-    @app.tool("mcp_gmem_add_note")
-    def add_note_tool(text: str, user_id: str, title: str = None, tags: str = None):
-        """Add a note memory."""
-        return add_memory_tool(
-            content=text,
-            user_id=user_id,
-            memory_type="note",
-            title=title,
-            tags=tags
-        )
-
-    @app.tool("mcp_gmem_add_document")
-    def add_document_tool(
-        text: str,
-        user_id: str,
-        title: str = None,
-        summary: str = None,
-        tags: str = None
-    ):
-        """Add a document memory."""
-        return add_memory_tool(
-            content=summary or text[:200] + "..." if len(text) > 200 else text,
-            user_id=user_id,
-            memory_type="document",
-            title=title,
-            tags=tags,
-            text=text
-        )
-
-    @app.tool("mcp_gmem_add_task")
-    def add_task_tool(
-        text: str,
-        user_id: str,
-        title: str = None,
-        tags: str = None,
-        due_date: str = None,
-        assignee: str = None
-    ):
-        """Add a task memory."""
-        return add_memory_tool(
-            content=text,
-            user_id=user_id,
-            memory_type="task",
-            title=title,
-            tags=tags,
-            due_date=due_date,
-            assignee=assignee
-        )
 
     @app.tool("mcp_gmem_get_system_info")
     def get_system_info_tool():
-        """Get system information and statistics."""
+        """Get system information and available memory schemas."""
         if not bridge:
             return {"result": {"status": "Bridge not initialized"}}
 
         stats = bridge.get_stats()
+        try:
+            translator = get_yaml_translator()
+            stats["yaml_schemas"] = translator._entities_map()
+        except Exception as e:
+            stats["yaml_schemas"] = {"error": f"Could not load schemas: {e}"}
+
         return {"result": stats}
 
 
@@ -332,5 +239,5 @@ app = create_app()
 if __name__ == "__main__":
     port = int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8787"))
     print(f"🚀 Starting MEMG Core MCP Server on port {port}")
-    print(f"📦 Using memg-core v{__version__} with lean core API")
+    print(f"📦 Using memg-core v{__version__} with a generic, YAML-driven API")
     app.run(transport="sse", host="0.0.0.0", port=port)  # nosec

@@ -4,10 +4,12 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Memory(BaseModel):
+    """Core memory model with YAML-driven payload validation."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: str = Field(default_factory=lambda: str(uuid4()))
@@ -32,49 +34,8 @@ class Memory(BaseModel):
             raise ValueError("memory_type cannot be empty")
         return v.strip()
 
-    @model_validator(mode="before")
-    @classmethod
-    def _merge_top_level_into_payload(cls, data: dict[str, Any]) -> dict[str, Any]:
-        """
-        TEMP back-compat: Some tests construct Memory() with top-level fields
-        like content/title/assignee. Mirror them into payload for now.
-        Remove once all callers are updated to use payload directly.
-        """
-        if not isinstance(data, dict):
-            return data
-
-        payload = data.get("payload") or {}
-        if not isinstance(payload, dict):
-            payload = {}
-
-        for key in ("content", "statement", "title", "task_status", "assignee"):
-            if key in data and data[key] is not None and key not in payload:
-                payload[key] = data[key]
-
-        data["payload"] = payload
-        return data
-
-    @property
-    def content(self) -> str | None:
-        """TEMP back-compat: allow .content even if only in payload."""
-        entity = self.payload or {}
-        return entity.get("details") or entity.get("content") or entity.get("statement")
-
-    @property
-    def title(self) -> str | None:
-        """TEMP back-compat: allow .title even if only in payload."""
-        return (self.payload or {}).get("title")
-
-    @property
-    def due_date(self) -> str | None:
-        """TEMP back-compat: allow .due_date access for task tests."""
-        return (self.payload or {}).get("due_date")
-
-    @property
-    def summary(self) -> str | None:
-        if isinstance(self.payload, dict):
-            return self.payload.get("summary") or self.payload.get("statement")
-        return None
+    # Remove hardcoded properties to rely on dynamic __getattr__
+    # (properties removed – dynamic __getattr__ handles field access)
 
     def to_qdrant_payload(self) -> dict[str, Any]:
         core = {
@@ -97,19 +58,15 @@ class Memory(BaseModel):
         payload = {
             "core": core,
             "entity": entity,
-            # --- Back-compat flat mirrors (only for common keys) ---
-            # Tests reference payload["content"], payload["title"]
-            **({"content": entity.get("content")} if "content" in entity else {}),
-            **({"title": entity.get("title")} if "title" in entity else {}),
-            **({"statement": entity.get("statement")} if "statement" in entity else {}),
-            **({"summary": entity.get("summary")} if "summary" in entity else {}),
+            # Flat mirror: include all entity fields at top-level for vector DB convenience
+            **entity,
         }
         return payload
 
     def to_kuzu_node(self) -> dict[str, Any]:
         """
-        Core Kuzu node: minimal metadata.
-        TEMP back-compat: also include assignee & tags as comma string for tests.
+        Core Kuzu node: minimal metadata + YAML-defined entity fields.
+        No hardcoded field names or backward compatibility.
         """
         entity = self.payload or {}
         node = {
@@ -121,7 +78,7 @@ class Memory(BaseModel):
             "is_valid": self.is_valid,
         }
 
-        # TEMP back-compat: Add fields that tests expect
+        # Add core Memory fields if present
         if self.hrid:
             node["hrid"] = self.hrid
         if self.supersedes:
@@ -129,16 +86,52 @@ class Memory(BaseModel):
         if self.superseded_by:
             node["superseded_by"] = self.superseded_by
 
-        # Entity fields
-        if entity.get("title"):
-            node["title"] = str(entity["title"])[:256]
-        if entity.get("task_status"):
-            node["task_status"] = entity["task_status"]
-        if entity.get("assignee"):
-            node["assignee"] = entity["assignee"]
-        if entity.get("statement"):
-            node["statement"] = entity["statement"]
+        # Include all entity fields from payload (no filtering, no assumptions)
+        for k, v in entity.items():
+            if k in {"vector"}:
+                continue  # skip heavy data
+            if isinstance(v, str):
+                node[k] = v[:256]  # trim long strings for storage efficiency
+            else:
+                node[k] = v
+
+        # Store anchor text as statement - YAML schema required, no fallback
+        from .yaml_translator import build_anchor_text
+
+        anchor_text = build_anchor_text(self)
+        node["statement"] = anchor_text
         return node
+
+    def __getattr__(self, item: str):
+        """Dynamic attribute access for YAML-defined payload fields ONLY.
+
+        No fallback logic, no backward compatibility. If the field is not
+        in the payload dictionary, raises AttributeError immediately.
+        This enforces strict YAML schema compliance.
+        """
+        payload = self.__dict__.get("payload")
+        if isinstance(payload, dict) and item in payload:
+            return payload[item]
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
+
+    # ---------------------------------------------------------------------
+    # YAML → Entity projection helpers
+    # ---------------------------------------------------------------------
+    def to_entity_model(self):
+        """Project this Memory into a dynamic Pydantic entity model.
+
+        Returns an instance of the auto-generated model class that matches
+        the entity type defined in the YAML schema. Only non-system fields
+        are included.
+        """
+        from .yaml_translator import get_entity_model  # local import to avoid cycles
+
+        model_cls = get_entity_model(self.memory_type)
+        # Pass only fields that the model expects
+        model_fields = {
+            k: v for k, v in (self.payload or {}).items() if k in model_cls.model_fields
+        }
+        return model_cls(**model_fields)
 
 
 class Entity(BaseModel):
