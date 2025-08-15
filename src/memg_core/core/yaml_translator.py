@@ -1,16 +1,10 @@
-"""YAML Translator: validates payloads and resolves anchor text for embeddings.
-This module makes the core type-agnostic by reading entity definitions from a YAML registry.
+"""YAML Translator: validates payloads using TypeRegistry and resolves anchor text.
 
-Supported registry shapes (flexible to ease migration):
-- entities as a dict: {"entity_type_1": {...}, "entity_type_2": {...}}
-- or entities as a list: [{"name"|"type": "...", "anchor": "...", "fields": {...}}, ...]
+STRICT YAML-FIRST: This module enforces the single-YAML-orchestrates-everything principle.
+NO flexibility, NO migration support, NO fallbacks.
 
-Each entity spec should define:
-- name/type: the entity type string used by Memory.memory_type
-- anchor: the payload field considered the anchor (mapped to embedding text)
-- fields: a dict with "required"/"optional" or a flat dict of field specs
-
-YAML schema is required and must define all entity types with explicit anchor fields.
+Uses TypeRegistry as SINGLE SOURCE OF TRUTH for all entity definitions.
+All type building and validation delegated to TypeRegistry - zero redundancy.
 """
 
 from __future__ import annotations
@@ -20,10 +14,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel
 import yaml
 
 from .exceptions import MemorySystemError
+from .types import initialize_types_from_yaml
 
 
 class YamlTranslatorError(MemorySystemError):
@@ -32,13 +26,8 @@ class YamlTranslatorError(MemorySystemError):
     pass
 
 
-class EntitySpec(BaseModel):
-    """Specification for a YAML-defined entity type."""
-
-    name: str
-    description: str | None = None
-    anchor: str  # NO DEFAULT - must be explicitly defined in YAML
-    fields: dict[str, Any] | None = None  # flexible; may contain required/optional/etc.
+# EntitySpec REMOVED - TypeRegistry handles all entity specifications
+# NO REDUNDANCY - all type definitions centralized in TypeRegistry
 
 
 class YamlTranslator:
@@ -58,7 +47,13 @@ class YamlTranslator:
             self.yaml_path = env_path
 
         self._schema: dict[str, Any] | None = None
-        self._model_cache: dict[str, Any] = {}  # Instance cache to avoid memory leaks
+        # NO model cache - TypeRegistry handles all caching
+
+        # Initialize TypeRegistry from YAML - crash early if invalid
+        try:
+            initialize_types_from_yaml(self.yaml_path)
+        except Exception as e:
+            raise YamlTranslatorError(f"Failed to initialize TypeRegistry from YAML: {e}") from e
 
     @property
     def schema(self) -> dict[str, Any]:
@@ -110,7 +105,8 @@ class YamlTranslator:
                 out[key] = item
         return out
 
-    def get_entity_spec(self, entity_name: str) -> EntitySpec:
+    def get_anchor_field(self, entity_name: str) -> str:
+        """Get the anchor field name for the given entity type from YAML schema."""
         if not entity_name:
             raise YamlTranslatorError("Empty entity name")
         name_l = entity_name.lower()
@@ -125,18 +121,7 @@ class YamlTranslator:
             raise YamlTranslatorError(
                 f"Entity '{entity_name}' missing required 'anchor' field in YAML schema"
             )
-
-        return EntitySpec(
-            name=name_l,
-            description=spec_raw.get("description"),
-            anchor=str(anchor),
-            fields=spec_raw.get("fields"),
-        )
-
-    def get_anchor_field(self, entity_name: str) -> str:
-        """Get the anchor field name for the given entity type from YAML schema."""
-        spec = self.get_entity_spec(entity_name)
-        return spec.anchor
+        return str(anchor)
 
     def build_anchor_text(self, memory) -> str:
         """
@@ -245,87 +230,11 @@ class YamlTranslator:
             user_id=user_id,
         )
 
-    def _python_type_for_yaml(self, yaml_type: str, field_def: dict[str, Any]):
-        """Map YAML 'type' string to a Python type annotation used by Pydantic."""
-        from datetime import datetime
-        from typing import Literal
-
-        yaml_type = str(yaml_type).lower()
-
-        # Handle enum types
-        if yaml_type == "enum":
-            choices = field_def.get("choices", [])
-            if choices:
-                return Literal[tuple(choices)]
-            return str
-
-        # Standard type mapping
-        mapping = {
-            "string": str,
-            "float": float,
-            "bool": bool,
-            "datetime": datetime,
-            "tags": list[str],
-            "vector": list[float],
-        }
-        return mapping.get(yaml_type, str)
-
     def get_entity_model(self, entity_name: str):
-        """Return (and cache) a dynamic Pydantic model for the given entity type."""
-        # Check cache first to avoid memory leaks
-        if entity_name in self._model_cache:
-            return self._model_cache[entity_name]
+        """Get Pydantic model from TypeRegistry - NO REDUNDANCY."""
+        from .types import get_entity_model
 
-        from typing import Union
-
-        from pydantic import Field, create_model  # local import to avoid global dependency
-
-        spec = self.get_entity_spec(entity_name)
-        if not spec.fields:
-            # No field definitions – return minimal model
-            return create_model(f"{spec.name.capitalize()}Entity")
-
-        # Use Any for model_fields to avoid complex type annotations
-        model_fields: dict[str, Any] = {}
-        for field_name, field_def in spec.fields.items():
-            # Skip system-reserved fields – these live on the core Memory object
-            if field_def.get("system"):
-                continue
-
-            yaml_type = field_def.get("type", "string")
-            required = bool(field_def.get("required", False))
-            default = field_def.get("default")
-            max_length = field_def.get("max_length")
-
-            py_type = self._python_type_for_yaml(yaml_type, field_def)
-            if not required:
-                py_type = Union[py_type, type(None)]
-
-            field_kwargs: dict[str, Any] = {}
-            if max_length:
-                field_kwargs["max_length"] = max_length
-
-            # Handle required vs optional fields properly
-            if required and default is None:
-                # Required field with no default
-                field_info = Field(..., **field_kwargs)
-            elif default is not None:
-                # Field with default value (optional)
-                field_kwargs["default"] = default
-                field_info = Field(**field_kwargs)
-            else:
-                # Optional field with no default (None)
-                field_kwargs["default"] = None
-                field_info = Field(**field_kwargs)
-
-            model_fields[field_name] = (py_type, field_info)
-
-        model_name = f"{spec.name.capitalize()}Entity"
-        model = create_model(model_name, **model_fields)
-
-        # Cache the model to avoid recreating it
-        self._model_cache[entity_name] = model
-        return model
+        return get_entity_model(entity_name)
 
 
 @lru_cache(maxsize=1)

@@ -13,15 +13,13 @@ class Memory(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Core fields only - NO hardcoded entity-specific fields
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    user_id: str = ""
-    memory_type: str = "memo"  # Restored proper field name
-    payload: dict[str, Any] = Field(default_factory=dict)  # All entity fields live here
-    tags: list[str] = Field(default_factory=list)
-    confidence: float = 0.8
-    vector: list[float] | None = None
-    is_valid: bool = True
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    # NO DEFAULTS - crash early if required fields missing
+    id: str = Field(default_factory=lambda: str(uuid4()))  # System-generated ID only
+    user_id: str  # REQUIRED - no default
+    memory_type: str  # REQUIRED - no default, must come from YAML
+    payload: dict[str, Any] = Field(default_factory=dict)  # Entity fields container
+    vector: list[float] | None = None  # System-generated vector
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))  # System timestamp
     updated_at: datetime | None = None
 
     # Human-readable id (e.g., MEMO_AAA001)
@@ -42,9 +40,6 @@ class Memory(BaseModel):
             "id": self.id,
             "user_id": self.user_id,
             "memory_type": self.memory_type,
-            "tags": self.tags,
-            "confidence": self.confidence,
-            "is_valid": self.is_valid,
             "created_at": self.created_at.isoformat(),
         }
         if self.updated_at:
@@ -60,15 +55,12 @@ class Memory(BaseModel):
     def to_kuzu_node(self) -> dict[str, Any]:
         """
         Exports a minimal node for Kuzu, containing only core fields.
-        Entity-specific fields are not stored in the graph for performance.
+        NO hardcoded fields - only system fields stored in graph.
         """
         node = {
             "id": self.id,
             "user_id": self.user_id,
             "memory_type": self.memory_type,
-            "tags": ",".join(self.tags) if isinstance(self.tags, list) else (self.tags or ""),
-            "confidence": self.confidence,
-            "is_valid": self.is_valid,
             "created_at": self.created_at.isoformat(),
         }
         if self.updated_at:
@@ -100,7 +92,7 @@ class Memory(BaseModel):
         the entity type defined in the YAML schema. Only non-system fields
         are included.
         """
-        from .yaml_translator import get_entity_model  # local import to avoid cycles
+        from .types import get_entity_model  # Use TypeRegistry directly
 
         model_cls = get_entity_model(self.memory_type)
         # Pass only fields that the model expects
