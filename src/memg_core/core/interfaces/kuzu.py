@@ -106,9 +106,20 @@ class KuzuInterface:
         try:
             props = props or {}
 
-            # Sanitize relationship type name for SQL compatibility
-            rel_type = rel_type.replace(" ", "_").replace("-", "_").upper()
-            rel_type = "".join(c for c in rel_type if c.isalnum() or c == "_")
+            # VALIDATE RELATIONSHIP AGAINST YAML SCHEMA - crash if invalid
+            try:
+                from ..types import validate_relation_predicate
+
+                if not validate_relation_predicate(rel_type):
+                    raise ValueError(
+                        f"Invalid relationship predicate: {rel_type}. Must be defined in YAML schema."
+                    )
+            except RuntimeError:
+                # TypeRegistry not initialized - skip validation for now
+                pass
+
+            # Use relationship type as-is (predicates from YAML) - no sanitization
+            # rel_type should already be a valid predicate (e.g., "REFERENCED_BY", "ANNOTATES")
 
             # Create relationship table if it doesn't exist
             prop_columns = (
@@ -262,11 +273,7 @@ class KuzuInterface:
             )
 
     def _get_kuzu_type(self, key: str, value: Any) -> str:
-        """Map Python types to Kuzu types"""
-        if key in ["confidence"]:
-            return "DOUBLE"
-        if key in ["is_valid"]:
-            return "BOOLEAN"
+        """Map Python types to Kuzu types - NO field-specific logic"""
         if isinstance(value, (int, float)):
             return "DOUBLE"
         if isinstance(value, bool):
