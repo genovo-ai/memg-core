@@ -125,6 +125,56 @@ class MemgCoreBridge:
 bridge: Optional[MemgCoreBridge] = None
 
 
+def add_memory_tool(
+    content: str,
+    user_id: str,
+    memory_type: str = "note",
+    title: str = None,
+    tags: str = None,
+    text: str = None,  # For documents
+    due_date: str = None,  # For tasks
+    assignee: str = None,  # For tasks
+):
+    """Add a memory (note, document, or task)."""
+    if not bridge:
+        return {"result": "❌ Bridge not initialized"}
+
+    # Parse tags
+    parsed_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+
+    # Prepare kwargs
+    kwargs = {}
+    if text:
+        kwargs["text"] = text
+    if due_date:
+        kwargs["due_date"] = due_date
+    if assignee:
+        kwargs["assignee"] = assignee
+
+    result = bridge.add_memory(
+        content=content,
+        user_id=user_id,
+        memory_type=memory_type,
+        title=title,
+        tags=parsed_tags,
+        **kwargs
+    )
+
+    if result["success"]:
+        return {
+            "result": f"✅ {memory_type.title()} added successfully",
+            "memory_id": result["memory_id"],
+            "memory_type": result["memory_type"],
+            "hrid": result["hrid"],
+            "word_count": result["word_count"],
+        }
+    else:
+        return {
+            "result": f"❌ Failed to add {memory_type}",
+            "error": result.get("error", "Unknown error")
+        }
+
+
 def initialize_bridge() -> MemgCoreBridge:
     """Initialize the MEMG Core bridge."""
     global bridge
@@ -157,7 +207,7 @@ def register_tools(app: FastMCP) -> None:
     """Register MCP tools."""
 
     @app.tool("mcp_gmem_add_memory")
-    def add_memory_tool(
+    def add_memory_tool_wrapper(
         content: str,
         user_id: str,
         memory_type: str = "note",
@@ -168,43 +218,16 @@ def register_tools(app: FastMCP) -> None:
         assignee: str = None,  # For tasks
     ):
         """Add a memory (note, document, or task)."""
-        if not bridge:
-            return {"result": "❌ Bridge not initialized"}
-
-        # Parse tags
-        parsed_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
-
-        # Prepare kwargs
-        kwargs = {}
-        if text:
-            kwargs["text"] = text
-        if due_date:
-            kwargs["due_date"] = due_date
-        if assignee:
-            kwargs["assignee"] = assignee
-
-        result = bridge.add_memory(
+        return add_memory_tool(
             content=content,
             user_id=user_id,
             memory_type=memory_type,
             title=title,
-            tags=parsed_tags,
-            **kwargs
+            tags=tags,
+            text=text,
+            due_date=due_date,
+            assignee=assignee
         )
-
-        if result["success"]:
-            return {
-                "result": f"✅ {memory_type.title()} added successfully",
-                "memory_id": result["memory_id"],
-                "memory_type": result["memory_type"],
-                "hrid": result["hrid"],
-                "word_count": result["word_count"],
-            }
-        else:
-            return {
-                "result": f"❌ Failed to add {memory_type}",
-                "error": result.get("error", "Unknown error")
-            }
 
     @app.tool("mcp_gmem_search_memories")
     def search_memories_tool(
