@@ -8,7 +8,6 @@ defaults:
   vector:
     metric: cosine
     normalize: true
-    dim: 384
   timestamps:
     auto_create: true
     auto_update: true
@@ -21,42 +20,65 @@ entities:
       id:          { type: string, required: true, system: true }
       user_id:     { type: string, required: true, system: true }
       statement:   { type: string, required: true, max_length: 8000 }
-      tags:        { type: tags }
-      confidence:  { type: float, default: 0.8, system: true }
-      is_valid:    { type: bool, default: true, system: true }
       created_at:  { type: datetime, required: true, system: true }
       updated_at:  { type: datetime, system: true }
-      vector:      { type: vector, dim: 384, derived_from: statement, system: true }
+      vector:      { type: vector, derived_from: statement, system: true }
+    relations:
+      - name: memo_related
+        description: "Generic relation between memos"
+        directed: true
+        predicates: [RELATED_TO]
+        source: memo
+        target: memo
 
   - name: document
     parent: memo
-    description: "Document-like memo with long body"
+    description: "Document-like memo with extended 'details' text"
     anchor: statement
     fields:
-      details:     { type: string, required: true }   # long text body
+      details: { type: string, required: true }
+    relations:
+      - name: document_note
+        description: "Document referenced by a note"
+        directed: true
+        predicates: [REFERENCED_BY]
+        source: document
+        target: note
+      - name: task_document
+        description: "Document providing details or requirements for a task"
+        directed: true
+        predicates: [SUPPORTS]
+        source: document
+        target: task
 
   - name: task
     parent: memo
     description: "Task-like memo"
     anchor: statement
     fields:
-      details:     { type: string }                    # optional extra context
-      status:      { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled], default: todo }
-      priority:    { type: enum, choices: [low, medium, high, critical], default: medium }
-      assignee:    { type: string }
-      due_date:    { type: datetime }
+      details:   { type: string }
+      status:    { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled] }
+      priority:  { type: enum, choices: [low, medium, high, critical] }
+      assignee:  { type: string }
+      due_date:  { type: datetime }
+    relations:
+      - name: task_note
+        description: "Note associated with a task (comment or clarification)"
+        directed: true
+        predicates: [ANNOTATES]
+        source: note
+        target: task
 
   - name: note
     parent: memo
-    description: "A simple note."
+    description: "A simple note with a short 'details' field."
     anchor: statement
     fields:
       details: { type: string, required: true }
-
-relations:
-  - name: memo_related
-    description: "Generic relation between memos"
-    directed: true
-    predicates: [RELATED_TO]
-    source: memo
-    target: memo
+    relations:
+      - name: note_document
+        description: "Note providing additional context to a document"
+        directed: true
+        predicates: [ANNOTATES]
+        source: note
+        target: document
