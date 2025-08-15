@@ -122,11 +122,11 @@ def test_graph_neighbors_with_real_kuzu():
         kuzu.add_node("Memory", node1)
         kuzu.add_node("Memory", node2)
 
-        # Add relationship
+        # Add relationship using YAML-defined predicate
         kuzu.add_relationship(
             from_table="Memory",
             to_table="Memory",
-            rel_type="TEST_REL",
+            rel_type="RELATED_TO",  # Valid YAML predicate from memo_related relation
             from_id=node1_id,
             to_id=node2_id,
         )
@@ -142,7 +142,7 @@ def test_graph_neighbors_with_real_kuzu():
 
         assert len(neighbors) == 1
         assert neighbors[0]["id"] == node2_id
-        assert neighbors[0]["rel_type"] == "TEST_REL"
+        assert neighbors[0]["rel_type"] == "RELATED_TO"
 
     finally:
         # Clean up - would require a delete operation in production

@@ -32,7 +32,7 @@ def test_delete_memory_removes_from_qdrant_and_kuzu_no_dangling_edges(
     kuzu_fake.add_relationship(
         from_table="Memory",
         to_table="Memory",
-        rel_type="REFERENCES",
+        rel_type="RELATED_TO",
         from_id="memory-1",
         to_id="memory-2",
     )

@@ -30,7 +30,7 @@ def test_build_graph_query_for_memos_basic():
 def test_build_graph_query_for_memos_with_relation_names():
     """Test building a graph query with custom relation names."""
     query, params = _build_graph_query_for_memos(
-        "test query", user_id="test-user", limit=10, relation_names=["REFERENCES", "CONTAINS"]
+        "test query", user_id="test-user", limit=10, relation_names=["RELATED_TO", "SUPPORTS"]
     )
 
     # Current lean core: relation_names parameter exists but simple query doesn't use entity joins
@@ -213,7 +213,7 @@ def test_append_neighbors(kuzu_fake):
     kuzu_fake.add_relationship(
         from_table="Memory",
         to_table="Memory",
-        rel_type="REFERENCES",
+        rel_type="RELATED_TO",
         from_id="memory-1",
         to_id="memory-2",
     )
@@ -221,7 +221,7 @@ def test_append_neighbors(kuzu_fake):
     kuzu_fake.add_relationship(
         from_table="Memory",
         to_table="Memory",
-        rel_type="REFERENCES",
+        rel_type="RELATED_TO",
         from_id="memory-1",
         to_id="memory-3",
     )
@@ -233,7 +233,7 @@ def test_append_neighbors(kuzu_fake):
 
     # Append neighbors
     expanded_results = _append_neighbors(
-        search_results, kuzu_fake, neighbor_limit=5, relation_names=["REFERENCES"]
+        search_results, kuzu_fake, neighbor_limit=5, relation_names=["RELATED_TO"]
     )
 
     assert len(expanded_results) == 3  # Original + 2 neighbors
@@ -280,7 +280,7 @@ def test_neighbor_cap_respected(kuzu_fake):
         kuzu_fake.add_relationship(
             from_table="Memory",
             to_table="Memory",
-            rel_type="REFERENCES",
+            rel_type="RELATED_TO",
             from_id="memory-1",
             to_id=memory.id,
         )
@@ -292,7 +292,7 @@ def test_neighbor_cap_respected(kuzu_fake):
 
     # Append neighbors with cap of 3
     expanded_results = _append_neighbors(
-        search_results, kuzu_fake, neighbor_limit=3, relation_names=["REFERENCES"]
+        search_results, kuzu_fake, neighbor_limit=3, relation_names=["RELATED_TO"]
     )
 
     # Should have 4 results: original + 3 neighbors (capped)
@@ -380,7 +380,7 @@ def test_search_graph_first_rerank_then_neighbors(embedder, qdrant_fake, kuzu_fa
     kuzu_fake.add_relationship(
         from_table="Memory",
         to_table="Memory",
-        rel_type="REFERENCES",
+        rel_type="RELATED_TO",
         from_id="memory-1",
         to_id="memory-2",
     )

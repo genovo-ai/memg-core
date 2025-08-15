@@ -96,7 +96,7 @@ def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
     kuzu_fake.add_relationship(
         from_table="Memory",
         to_table="Memory",
-        rel_type="REFERENCES",
+        rel_type="RELATED_TO",
         from_id="node-1",
         to_id="node-2",
         props=relationship_props,
@@ -106,7 +106,7 @@ def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
     neighbors = kuzu_fake.neighbors(
         node_label="Memory",
         node_id="node-1",
-        rel_types=["REFERENCES"],
+        rel_types=["RELATED_TO"],
         direction="out",
         limit=10,
         neighbor_label="Memory",
@@ -115,7 +115,7 @@ def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
     assert len(neighbors) == 1
     assert neighbors[0]["id"] == "node-2"
     assert neighbors[0]["content"] == "Node 2 content"
-    assert neighbors[0]["rel_type"] == "REFERENCES"
+    assert neighbors[0]["rel_type"] == "RELATED_TO"
 
 
 def test_query_empty_returns_list(kuzu_fake):
@@ -178,7 +178,7 @@ def test_add_relationship_validates_nodes(kuzu_fake):
         kuzu_fake.add_relationship(
             from_table="Memory",
             to_table="Memory",
-            rel_type="REFERENCES",
+            rel_type="RELATED_TO",
             from_id="node-1",
             to_id="non-existent",
         )
