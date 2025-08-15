@@ -4,7 +4,6 @@ import pytest
 
 pytestmark = pytest.mark.lifecycle
 
-from memg_core.core.models import Memory
 from memg_core.core.pipeline.indexer import add_memory_index
 
 
@@ -55,7 +54,8 @@ def test_delete_memory_removes_from_qdrant_and_kuzu_no_dangling_edges(
 
     # Filter relationships to remove those involving memory-2
     kuzu_fake.relationships = [
-        rel for rel in kuzu_fake.relationships
+        rel
+        for rel in kuzu_fake.relationships
         if not (rel["from_id"] == "memory-2" or rel["to_id"] == "memory-2")
     ]
 

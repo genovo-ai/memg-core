@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any
-
 from typing import Protocol
 
 
@@ -59,7 +57,7 @@ class SimilarityMockEmbedder(EmbeddingInterface):
         words = text.lower().split()
 
         # Create base vector for each unique word
-        if not hasattr(self, '_base_seed'):
+        if not hasattr(self, "_base_seed"):
             self._base_seed = 0
 
         # Generate embedding based on key words
@@ -70,8 +68,7 @@ class SimilarityMockEmbedder(EmbeddingInterface):
                 # Create consistent vector for each word
                 word_hash = hash(word) % (2**31)  # Ensure positive
                 self._word_vectors[word] = [
-                    ((word_hash >> i) % 256 / 255.0) * 2.0 - 1.0
-                    for i in range(self.dimension)
+                    ((word_hash >> i) % 256 / 255.0) * 2.0 - 1.0 for i in range(self.dimension)
                 ]
 
             # Add word vector to text vector

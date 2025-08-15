@@ -1,24 +1,26 @@
+from datetime import UTC, datetime
 import os
 from pathlib import Path
 from types import SimpleNamespace
-from datetime import datetime, UTC
+from typing import cast
 
 import pytest
-from typing import cast
+
+from memg_core.api.public import add_memory
+from memg_core.api.public import search as public_search
+from memg_core.core.exceptions import ValidationError
+from memg_core.core.interfaces.embedder import Embedder
+from memg_core.core.interfaces.kuzu import KuzuInterface
+from memg_core.core.interfaces.qdrant import QdrantInterface
 
 # ---- Imports from core ----
 from memg_core.core.models import Memory, SearchResult
-from memg_core.core.exceptions import ValidationError
 from memg_core.core.pipeline.indexer import add_memory_index
 from memg_core.core.pipeline.retrieval import graph_rag_search
-from memg_core.core.yaml_translator import create_memory_from_yaml, build_anchor_text
-from memg_core.api.public import add_memory, search as public_search
-from memg_core.core.interfaces.qdrant import QdrantInterface
-from memg_core.core.interfaces.kuzu import KuzuInterface
-from memg_core.core.interfaces.embedder import Embedder
-
+from memg_core.core.yaml_translator import build_anchor_text, create_memory_from_yaml
 
 # ----------------------------- Fakes -----------------------------
+
 
 class FakeEmbedder:
     def __init__(self, *_, **__):
@@ -40,36 +42,49 @@ class FakeQdrant:
         return True
 
     # upsert
-    def add_point(self, vector, payload, point_id: str | None = None, collection: str | None = None):
-        pid = point_id or f"p_{len(self.points)+1}"
+    def add_point(
+        self, vector, payload, point_id: str | None = None, collection: str | None = None
+    ):
+        pid = point_id or f"p_{len(self.points) + 1}"
         self.points[pid] = {"vector": vector, "payload": payload}
         return True, pid
 
     # search
-    def search_points(self, vector, limit: int = 5, collection: str | None = None, user_id: str | None = None, filters: dict | None = None):
+    def search_points(
+        self,
+        vector,
+        limit: int = 5,
+        collection: str | None = None,
+        user_id: str | None = None,
+        filters: dict | None = None,
+    ):
         # Fabricate two hits with descending scores
         results = []
         for i in range(2):
-            pid = f"p{i+1}"
-            results.append({
-                "id": pid,
-                "score": 1.0 - i * 0.1,
-                "payload": {
-                                            "core": {
+            pid = f"p{i + 1}"
+            results.append(
+                {
+                    "id": pid,
+                    "score": 1.0 - i * 0.1,
+                    "payload": {
+                        "core": {
                             "user_id": user_id or "u",
-                            "memory_type": filters.get("core.memory_type", "memo") if filters else "memo",
+                            "memory_type": filters.get("core.memory_type", "memo")
+                            if filters
+                            else "memo",
                             "created_at": datetime.now(UTC).isoformat(),
                             "hrid": f"MEMO_AAA10{i}",  # make deterministic and usable in ordering tests
                         },
-                    "entity": {
-                        "statement": f"vector-hit-{i+1}",  # Use content as anchor for notes
-                        "details": f"details-{i+1}",
+                        "entity": {
+                            "statement": f"vector-hit-{i + 1}",  # Use content as anchor for notes
+                            "details": f"details-{i + 1}",
+                        },
+                        # Flat mirrors for backward compatibility - retrieval still expects statement
+                        "statement": f"vector-hit-{i + 1}",  # Use content as anchor for notes
+                        "details": f"details-{i + 1}",
                     },
-                    # Flat mirrors for backward compatibility - retrieval still expects statement
-                    "statement": f"vector-hit-{i+1}",  # Use content as anchor for notes
-                    "details": f"details-{i+1}",
-                },
-            })
+                }
+            )
         return results[:limit]
 
     def get_point(self, point_id: str, collection: str | None = None):
@@ -86,10 +101,18 @@ class FakeKuzu:
         self.edges: list[tuple[str, str, str]] = []
 
     def add_node(self, table: str, properties: dict):
-        _id = properties.get("id") or properties.get("uuid") or f"m_{len(self.nodes)+1}"
+        _id = properties.get("id") or properties.get("uuid") or f"m_{len(self.nodes) + 1}"
         self.nodes[_id] = properties
 
-    def add_relationship(self, from_table: str, to_table: str, rel_type: str, from_id: str, to_id: str, props: dict | None = None):
+    def add_relationship(
+        self,
+        from_table: str,
+        to_table: str,
+        rel_type: str,
+        from_id: str,
+        to_id: str,
+        props: dict | None = None,
+    ):
         self.edges.append((from_id, to_id, rel_type))
 
     def query(self, cypher: str, params: dict | None = None):
@@ -99,7 +122,7 @@ class FakeKuzu:
         uid = (params or {}).get("user_id") or "u"
         rows = [
             {
-                "m.id": f"g1",
+                "m.id": "g1",
                 "m.user_id": uid,
                 "m.memory_type": mt,
                 "m.statement": "graph-candidate-1",  # Use statement as anchor
@@ -108,7 +131,7 @@ class FakeKuzu:
                 "m.updated_at": datetime.now(UTC).isoformat(),
             },
             {
-                "m.id": f"g2",
+                "m.id": "g2",
                 "m.user_id": uid,
                 "m.memory_type": mt,
                 "m.statement": "graph-candidate-2",  # Use statement as anchor
@@ -119,7 +142,15 @@ class FakeKuzu:
         ]
         return rows
 
-    def neighbors(self, node_label: str, node_id: str, rel_types=None, direction: str = "any", limit: int = 5, neighbor_label: str | None = None):
+    def neighbors(
+        self,
+        node_label: str,
+        node_id: str,
+        rel_types=None,
+        direction: str = "any",
+        limit: int = 5,
+        neighbor_label: str | None = None,
+    ):
         # Produce a single neighbor per seed
         return [
             {
@@ -134,6 +165,7 @@ class FakeKuzu:
 
 # ----------------------------- Fixtures -----------------------------
 
+
 @pytest.fixture()
 def tmp_yaml(tmp_path: Path):
     # TESTS MUST USE REAL YAML - no invalid temporary schemas
@@ -145,6 +177,7 @@ def tmp_yaml(tmp_path: Path):
 
 # ----------------------------- Tests: YAML translator -----------------------------
 
+
 def test_yaml_translator_anchor_and_validation(tmp_yaml):
     mem = create_memory_from_yaml("document", {"statement": "sum", "details": "body"}, user_id="u")
     assert mem.statement == "sum"
@@ -154,6 +187,7 @@ def test_yaml_translator_anchor_and_validation(tmp_yaml):
 
 
 # ----------------------------- Tests: Indexer -----------------------------
+
 
 def test_indexer_adds_to_both_stores(monkeypatch, tmp_yaml):
     # monkeypatch interfaces used by indexer caller
@@ -172,7 +206,9 @@ def test_indexer_adds_to_both_stores(monkeypatch, tmp_yaml):
     fk = FakeKuzu()
     e = FakeEmbedder()
 
-    pid = add_memory_index(m, cast(QdrantInterface, fq), cast(KuzuInterface, fk), cast(Embedder, e))
+    pid = add_memory_index(
+        m, cast("QdrantInterface", fq), cast("KuzuInterface", fk), cast("Embedder", e)
+    )
     assert pid in fq.points
     # Node mirrored with YAML anchor text (now uses dynamic anchor field name)
     assert any(v.get("id") == m.id for v in fk.nodes.values())  # kuzu stores the memory node
@@ -186,10 +222,11 @@ def test_indexer_adds_to_both_stores(monkeypatch, tmp_yaml):
 
 # ----------------------------- Tests: Retrieval -----------------------------
 
+
 def test_retrieval_vector_first(monkeypatch, tmp_yaml):
-    q = cast(QdrantInterface, FakeQdrant())
-    k = cast(KuzuInterface, FakeKuzu())
-    e = cast(Embedder, FakeEmbedder())
+    q = cast("QdrantInterface", FakeQdrant())
+    k = cast("KuzuInterface", FakeKuzu())
+    e = cast("Embedder", FakeEmbedder())
 
     results = graph_rag_search(
         query="find",
@@ -215,9 +252,9 @@ def test_retrieval_vector_first(monkeypatch, tmp_yaml):
 
 
 def test_retrieval_graph_first(monkeypatch, tmp_yaml):
-    q = cast(QdrantInterface, FakeQdrant())
-    k = cast(KuzuInterface, FakeKuzu())
-    e = cast(Embedder, FakeEmbedder())
+    q = cast("QdrantInterface", FakeQdrant())
+    k = cast("KuzuInterface", FakeKuzu())
+    e = cast("Embedder", FakeEmbedder())
 
     results = graph_rag_search(
         query=None,
@@ -240,6 +277,7 @@ def test_retrieval_graph_first(monkeypatch, tmp_yaml):
 
 # ----------------------------- Tests: Public API -----------------------------
 
+
 def test_public_add_memory_validates_document_schema(monkeypatch, tmp_yaml):
     # patch public API dependencies
     import memg_core.api.public as pub
@@ -259,10 +297,11 @@ def test_public_add_memory_validates_document_schema(monkeypatch, tmp_yaml):
     monkeypatch.setattr(pub, "get_config", lambda: _Cfg())
 
     # Test strict YAML validation - document must have required fields
-    m = add_memory("document", {
-        "statement": "Test document summary",
-        "details": "This is the full document body content"
-    }, user_id="u")
+    m = add_memory(
+        "document",
+        {"statement": "Test document summary", "details": "This is the full document body content"},
+        user_id="u",
+    )
 
     assert m.statement == "Test document summary"
     assert m.payload["details"] == "This is the full document body content"
@@ -294,6 +333,7 @@ def test_public_search_validation(monkeypatch, tmp_yaml):
     if res:
         assert isinstance(res[0], SearchResult)
 
+
 def test_retrieval_uses_hrid_for_ties(monkeypatch, tmp_yaml):
     # two vector hits with same score but different HRIDs → order by hrid_to_index
     class _Q(FakeQdrant):
@@ -317,9 +357,9 @@ def test_retrieval_uses_hrid_for_ties(monkeypatch, tmp_yaml):
             b = make_result("pB", "MEMO_AAA050")
             return [a, b]
 
-    q = cast(QdrantInterface, _Q())
-    k = cast(KuzuInterface, FakeKuzu())
-    e = cast(Embedder, FakeEmbedder())
+    q = cast("QdrantInterface", _Q())
+    k = cast("KuzuInterface", FakeKuzu())
+    e = cast("Embedder", FakeEmbedder())
     results = graph_rag_search(
         query="tie",
         user_id="u",
@@ -334,9 +374,9 @@ def test_retrieval_uses_hrid_for_ties(monkeypatch, tmp_yaml):
 
 def test_neighbors_default_whitelist_applies(monkeypatch, tmp_yaml):
     # With relation_names=None, no neighbors should be added (no hardcoded defaults)
-    q = cast(QdrantInterface, FakeQdrant())
-    k = cast(KuzuInterface, FakeKuzu())
-    e = cast(Embedder, FakeEmbedder())
+    q = cast("QdrantInterface", FakeQdrant())
+    k = cast("KuzuInterface", FakeKuzu())
+    e = cast("Embedder", FakeEmbedder())
 
     res = graph_rag_search(
         query="find",
@@ -355,9 +395,9 @@ def test_neighbors_default_whitelist_applies(monkeypatch, tmp_yaml):
 
 
 def test_projection_prunes_payload_fields(monkeypatch, tmp_yaml):
-    q = cast(QdrantInterface, FakeQdrant())
-    k = cast(KuzuInterface, FakeKuzu())
-    e = cast(Embedder, FakeEmbedder())
+    q = cast("QdrantInterface", FakeQdrant())
+    k = cast("KuzuInterface", FakeKuzu())
+    e = cast("Embedder", FakeEmbedder())
 
     # Create a memory to be returned by the search
     res_none = graph_rag_search(
@@ -422,7 +462,6 @@ def test_public_api_projection_integration(monkeypatch, tmp_yaml):
     )
     q.add_point(vector=[0.1] * 8, payload=memory.to_qdrant_payload(), point_id="p1")
     monkeypatch.setattr(pub, "QdrantInterface", lambda *args, **kwargs: q)
-
 
     # Test default behavior (include_details="self" - includes all fields)
     res_default = pub.search(query="test", user_id="u", limit=1, mode="vector")

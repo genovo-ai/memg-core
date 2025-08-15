@@ -3,11 +3,10 @@
 import pytest
 
 pytestmark = pytest.mark.pipeline
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 from memg_core.core.exceptions import ProcessingError
 from memg_core.core.pipeline.indexer import add_memory_index
-from memg_core.core.models import Memory
 
 
 def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake, mem_factory):
@@ -20,7 +19,7 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
         statement="This is a test memory",
         payload={
             "details": "This is the detail for the test memory.",
-        }
+        },
     )
 
     # Add to index
@@ -44,7 +43,9 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
     # Kuzu only stores core fields, not payload fields like statement
 
 
-def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuzu_fake, mem_factory):
+def test_add_memory_index_uses_override_when_provided(
+    embedder, qdrant_fake, kuzu_fake, mem_factory
+):
     """Test that add_memory_index uses index_text_override when provided."""
     # Create a memory
     memory = mem_factory(
@@ -54,13 +55,11 @@ def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuz
         statement="This is a test memory",
         payload={
             "details": "This is the detail for the test memory.",
-        }
+        },
     )
 
     # Add to index with override
-    point_id = add_memory_index(
-        memory, qdrant_fake, kuzu_fake, embedder
-    )
+    point_id = add_memory_index(memory, qdrant_fake, kuzu_fake, embedder)
 
     # Check that the memory was stored in Qdrant
     qdrant_point = qdrant_fake.get_point(point_id)
@@ -76,14 +75,12 @@ def test_add_memory_index_uses_override_when_provided(embedder, qdrant_fake, kuz
     assert stored_vector == statement_vector
 
 
-def test_add_memory_index_qdrant_succeeds_kuzu_fails_logs_and_raises(embedder, qdrant_fake, mem_factory):
+def test_add_memory_index_qdrant_succeeds_kuzu_fails_logs_and_raises(
+    embedder, qdrant_fake, mem_factory
+):
     """Test that add_memory_index handles Qdrant success but Kuzu failure."""
     # Create a memory
-    memory = mem_factory(
-        id="test-memory-1",
-        user_id="test-user",
-        statement="This is a test memory"
-    )
+    memory = mem_factory(id="test-memory-1", user_id="test-user", statement="This is a test memory")
 
     # Create a failing Kuzu mock
     failing_kuzu = MagicMock()
@@ -105,17 +102,12 @@ def test_add_memory_index_qdrant_succeeds_kuzu_fails_logs_and_raises(embedder, q
 def test_add_memory_index_with_collection_name(embedder, qdrant_fake, kuzu_fake, mem_factory):
     """Test that add_memory_index respects collection name."""
     # Create a memory
-    memory = mem_factory(
-        id="test-memory-1",
-        user_id="test-user",
-        statement="This is a test memory"
-    )
+    memory = mem_factory(id="test-memory-1", user_id="test-user", statement="This is a test memory")
 
     # Add to index with custom collection
     custom_collection = "custom_memories"
     point_id = add_memory_index(
-        memory, qdrant_fake, kuzu_fake, embedder,
-        collection=custom_collection
+        memory, qdrant_fake, kuzu_fake, embedder, collection=custom_collection
     )
 
     # Check that it's in the custom collection

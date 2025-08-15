@@ -1,8 +1,9 @@
 """Unit tests for core models and validators."""
 
-import pytest
 from datetime import UTC, datetime, timedelta
+
 from pydantic import ValidationError
+import pytest
 
 pytestmark = pytest.mark.unit
 
@@ -31,9 +32,11 @@ def test_memory_type_required():
 def test_memory_to_qdrant_payload_shapes_by_type():
     """Test that Memory.to_qdrant_payload() returns correct nested structure."""
     # Test NOTE type
-    note_memory = Memory(user_id="test-user",
+    note_memory = Memory(
+        user_id="test-user",
         memory_type="note",
-        payload={"statement": "Test content",
+        payload={
+            "statement": "Test content",
             "details": "This is the detail for the test note.",
         },
         created_at=datetime(2023, 1, 1, tzinfo=UTC),
@@ -51,9 +54,11 @@ def test_memory_to_qdrant_payload_shapes_by_type():
 
     # Test TASK type with task fields
     due_date = datetime.now(UTC) + timedelta(days=1)
-    task_memory = Memory(user_id="test-user",
+    task_memory = Memory(
+        user_id="test-user",
         memory_type="task",
-        payload={"statement": "Fix bug",
+        payload={
+            "statement": "Fix bug",
             "details": "Detailed description",
             "status": "todo",
             "priority": "high",
@@ -74,12 +79,14 @@ def test_memory_to_qdrant_payload_shapes_by_type():
 def test_memory_to_kuzu_node_core_fields_only():
     """Test that Memory.to_kuzu_node() stores only core metadata."""
     # Create a memory with detailed payload
-    memory = Memory(user_id="test-user",
+    memory = Memory(
+        user_id="test-user",
         memory_type="task",
-        payload={"statement": "Test task",
+        payload={
+            "statement": "Test task",
             "details": "x" * 1000,  # Long content should NOT be in Kuzu
             "status": "in_progress",
-            "assignee": "developer"
+            "assignee": "developer",
         },
     )
 
@@ -104,21 +111,26 @@ def test_task_due_date_handling():
     tomorrow = now + timedelta(days=1)
 
     # Create tasks with different due dates
-    overdue_task = Memory(user_id="test-user",
+    overdue_task = Memory(
+        user_id="test-user",
         memory_type="task",
-        payload={"statement": "Overdue task",
+        payload={
+            "statement": "Overdue task",
             "due_date": yesterday,
         },
     )
 
-    future_task = Memory(user_id="test-user",
+    future_task = Memory(
+        user_id="test-user",
         memory_type="task",
-        payload={"statement": "Future task",
+        payload={
+            "statement": "Future task",
             "due_date": tomorrow,
         },
     )
 
-    no_due_date_task = Memory(user_id="test-user",
+    no_due_date_task = Memory(
+        user_id="test-user",
         memory_type="task",
         payload={"statement": "No due date task"},
     )

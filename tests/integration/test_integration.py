@@ -5,17 +5,16 @@ They are marked with the 'integration' marker and can be skipped with:
 pytest -m "not integration"
 """
 
-import os
-import pytest
 from datetime import UTC, datetime
+import os
 from uuid import uuid4
+
+import pytest
 
 from memg_core.core.interfaces.embedder import Embedder
 from memg_core.core.interfaces.kuzu import KuzuInterface
 from memg_core.core.interfaces.qdrant import QdrantInterface
 from memg_core.core.models import Memory
-from memg_core.core.pipeline.indexer import add_memory_index
-from memg_core.core.pipeline.retrieval import graph_rag_search
 
 
 @pytest.mark.integration
@@ -71,7 +70,7 @@ def test_index_and_search_with_real_qdrant():
 
     finally:
         # Clean up
-                    qdrant.delete_points(["12345678-1234-5678-1234-567812345678"])
+        qdrant.delete_points(["12345678-1234-5678-1234-567812345678"])
 
 
 @pytest.mark.integration

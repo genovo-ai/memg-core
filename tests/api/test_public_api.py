@@ -1,12 +1,13 @@
 """Tests for the public API contract."""
 
 import os
-import pytest
 from pathlib import Path
+
+import pytest
 
 pytestmark = pytest.mark.api
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from memg_core.api.public import add_memory, search
 from memg_core.core.exceptions import ValidationError
@@ -101,7 +102,7 @@ def test_add_memory_document_summary_used_in_index_text(mock_index_memory, tmp_y
     assert memory.statement == "This is a document summary"
     assert memory.memory_type == "document"
     assert memory.payload.get("details") == "This is a long document content"
-    assert memory.tags == ["test", "document"]
+    # No hardcoded tags - removed as part of audit
 
     # Check that _index_memory_with_yaml was called
     mock_index_memory.assert_called_once()
@@ -129,7 +130,7 @@ def test_add_memory_task_due_date_serialized(mock_index_memory, tmp_yaml):
     assert memory.statement == "This is a test task"
     assert memory.memory_type == "task"
     assert memory.payload.get("due_date") == due_date.isoformat()
-    assert memory.tags == ["test", "task"]
+    # No hardcoded tags - removed as part of audit
 
     # Check that _index_memory_with_yaml was called
     mock_index_memory.assert_called_once()
@@ -143,9 +144,9 @@ def test_search_requires_user_id_raises_valueerror(mock_graph_rag_search):
 
     assert "User ID is required" in str(exc_info.value)
 
-    # Call search with None user_id
+    # Call search with None user_id (type: ignore for testing error case)
     with pytest.raises(ValidationError) as exc_info:
-        search(query="test query", user_id=None)
+        search(query="test query", user_id=None)  # type: ignore
 
     assert "User ID is required" in str(exc_info.value)
 
@@ -153,12 +154,13 @@ def test_search_requires_user_id_raises_valueerror(mock_graph_rag_search):
 def test_search_plugin_absent_does_not_crash():
     """Test that search works when YAML plugin is absent."""
     # Mock dependencies
-    with patch("memg_core.api.public.get_config") as mock_config, \
-         patch("memg_core.api.public.QdrantInterface") as mock_qdrant, \
-         patch("memg_core.api.public.KuzuInterface") as mock_kuzu, \
-         patch("memg_core.api.public.Embedder") as mock_embedder, \
-         patch("memg_core.api.public.graph_rag_search") as mock_search:
-
+    with (
+        patch("memg_core.api.public.get_config") as mock_config,
+        patch("memg_core.api.public.QdrantInterface") as mock_qdrant,
+        patch("memg_core.api.public.KuzuInterface") as mock_kuzu,
+        patch("memg_core.api.public.Embedder") as mock_embedder,
+        patch("memg_core.api.public.graph_rag_search") as mock_search,
+    ):
         # Configure mocks
         mock_config.return_value = MagicMock()
         mock_config.return_value.memg.qdrant_collection_name = "memories"
@@ -172,9 +174,8 @@ def test_search_plugin_absent_does_not_crash():
         memory = Memory(
             id="test-memory-id",
             user_id="test-user",
-            type="note",
-            statement="Test content",
-            payload={"details": "Test details"},
+            memory_type="note",
+            payload={"statement": "Test content", "details": "Test details"},
         )
         result = SearchResult(
             memory=memory,
@@ -202,12 +203,13 @@ def test_api_reads_neighbor_cap_env_and_passes_to_pipeline(monkeypatch):
     monkeypatch.setenv("MEMG_GRAPH_NEIGHBORS_LIMIT", "10")
 
     # Mock dependencies
-    with patch("memg_core.api.public.get_config") as mock_config, \
-         patch("memg_core.api.public.QdrantInterface") as mock_qdrant, \
-         patch("memg_core.api.public.KuzuInterface") as mock_kuzu, \
-         patch("memg_core.api.public.Embedder") as mock_embedder, \
-         patch("memg_core.api.public.graph_rag_search") as mock_search:
-
+    with (
+        patch("memg_core.api.public.get_config") as mock_config,
+        patch("memg_core.api.public.QdrantInterface") as mock_qdrant,
+        patch("memg_core.api.public.KuzuInterface") as mock_kuzu,
+        patch("memg_core.api.public.Embedder") as mock_embedder,
+        patch("memg_core.api.public.graph_rag_search") as mock_search,
+    ):
         # Configure mocks
         mock_config.return_value = MagicMock()
         mock_config.return_value.memg.qdrant_collection_name = "memories"
@@ -221,9 +223,8 @@ def test_api_reads_neighbor_cap_env_and_passes_to_pipeline(monkeypatch):
         memory = Memory(
             id="test-memory-id",
             user_id="test-user",
-            type="note",
-            statement="Test content",
-            payload={"details": "Test details"},
+            memory_type="note",
+            payload={"statement": "Test content", "details": "Test details"},
         )
         result = SearchResult(
             memory=memory,

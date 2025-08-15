@@ -4,23 +4,20 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from memg_core.core.exceptions import (
-    ConfigurationError,
     DatabaseError,
-    MemorySystemError,
-    ProcessingError,
     ValidationError,
-    wrap_exception,
     handle_with_context,
+    wrap_exception,
 )
 from memg_core.core.logging import (
     MemorySystemLogger,
-    get_logger,
-    log_operation,
     log_error,
+    log_operation,
 )
 
 
@@ -74,6 +71,7 @@ def test_wrap_exception_with_context():
 
 def test_handle_with_context_preserves_operation():
     """Test that handle_with_context decorator preserves operation name."""
+
     @handle_with_context("test_operation")
     def function_that_raises():
         raise ValueError("Test error")
@@ -87,6 +85,7 @@ def test_handle_with_context_preserves_operation():
 
 def test_handle_with_context_passes_through_memory_system_errors():
     """Test that handle_with_context passes through MemorySystemErrors."""
+
     @handle_with_context("test_operation")
     def function_that_raises_memory_error():
         raise ValidationError("Already wrapped", operation="original_operation")
@@ -107,7 +106,7 @@ def test_memory_system_logger_setup(mock_logger):
 
     with patch("logging.getLogger") as mock_get_logger:
         mock_get_logger.return_value = mock_logger
-        logger = MemorySystemLogger.setup_logging(level="INFO")
+        _ = MemorySystemLogger.setup_logging(level="INFO")
 
         # Check that the root logger was created
         mock_get_logger.assert_called_with("memg_core")

@@ -1,18 +1,15 @@
 """Test fixtures and test doubles for memg_core tests."""
 
-import hashlib
-import json
-import os
+from collections.abc import Callable
 from datetime import UTC, datetime
+import hashlib
+import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 from uuid import uuid4
 
 import pytest
-from pydantic import BaseModel
 
-from memg_core.api.public import add_memory, search
-from memg_core.core.interfaces.embedder import Embedder
 from memg_core.core.interfaces.kuzu import KuzuInterface
 from memg_core.core.interfaces.qdrant import QdrantInterface
 from memg_core.core.models import Memory
@@ -35,7 +32,9 @@ def setup_yaml_schema():
             break
 
     if config_path is None:
-        raise FileNotFoundError(f"Config file not found in any of: {[str(p) for p in possible_paths]}")
+        raise FileNotFoundError(
+            f"Config file not found in any of: {[str(p) for p in possible_paths]}"
+        )
 
     os.environ["MEMG_YAML_SCHEMA"] = str(config_path)
     return config_path
@@ -49,7 +48,7 @@ class DummyEmbedder:
         self.vector_size = vector_size
         # Skip parent initialization to avoid API key requirements
 
-    def get_embedding(self, text: str) -> List[float]:
+    def get_embedding(self, text: str) -> list[float]:
         """Generate a deterministic vector based on text hash."""
         # Create a hash of the input text
         text_hash = hashlib.md5(text.encode()).hexdigest()
@@ -72,15 +71,15 @@ class FakeQdrant(QdrantInterface):
     def __init__(self, collection_name: str = "memories"):
         """Initialize with in-memory storage."""
         self.collection_name = collection_name
-        self.collections: Dict[str, Dict[str, Dict]] = {}
-        self.points: Dict[str, Dict[str, Any]] = {}  # collection_name -> {id: {vector, payload}}
+        self.collections: dict[str, dict[str, dict]] = {}
+        self.points: dict[str, dict[str, Any]] = {}  # collection_name -> {id: {vector, payload}}
 
-    def collection_exists(self, collection: Optional[str] = None) -> bool:
+    def collection_exists(self, collection: str | None = None) -> bool:
         """Check if collection exists."""
         collection = collection or self.collection_name
         return collection in self.collections
 
-    def create_collection(self, collection: Optional[str] = None, vector_size: int = 384) -> bool:
+    def create_collection(self, collection: str | None = None, vector_size: int = 384) -> bool:
         """Create a new collection."""
         collection = collection or self.collection_name
         if collection not in self.collections:
@@ -88,7 +87,7 @@ class FakeQdrant(QdrantInterface):
             self.points[collection] = {}
         return True
 
-    def ensure_collection(self, collection: Optional[str] = None, vector_size: int = 384) -> bool:
+    def ensure_collection(self, collection: str | None = None, vector_size: int = 384) -> bool:
         """Ensure collection exists, create if it doesn't."""
         collection = collection or self.collection_name
         if collection not in self.collections:
@@ -97,11 +96,11 @@ class FakeQdrant(QdrantInterface):
 
     def add_point(
         self,
-        vector: List[float],
-        payload: Dict[str, Any],
-        point_id: Optional[str] = None,
-        collection: Optional[str] = None,
-    ) -> Tuple[bool, str]:
+        vector: list[float],
+        payload: dict[str, Any],
+        point_id: str | None = None,
+        collection: str | None = None,
+    ) -> tuple[bool, str]:
         """Add a single point to collection."""
         collection = collection or self.collection_name
         self.ensure_collection(collection)
@@ -117,7 +116,7 @@ class FakeQdrant(QdrantInterface):
         }
         return True, point_id
 
-    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
         """Calculate cosine similarity between two vectors."""
         if len(vec1) != len(vec2):
             # Handle different vector sizes by padding the shorter one
@@ -126,7 +125,7 @@ class FakeQdrant(QdrantInterface):
             else:
                 vec2 = vec2 + [0.0] * (len(vec1) - len(vec2))
 
-        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        dot_product = sum(a * b for a, b in zip(vec1, vec2, strict=False))
         norm_a = sum(a * a for a in vec1) ** 0.5
         norm_b = sum(b * b for b in vec2) ** 0.5
 
@@ -137,12 +136,12 @@ class FakeQdrant(QdrantInterface):
 
     def search_points(
         self,
-        vector: List[float],
+        vector: list[float],
         limit: int = 5,
-        collection: Optional[str] = None,
-        user_id: Optional[str] = None,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        collection: str | None = None,
+        user_id: str | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """Search for similar points with optional filtering."""
         collection = collection or self.collection_name
         if collection not in self.points:
@@ -159,7 +158,7 @@ class FakeQdrant(QdrantInterface):
                     return None
             return current
 
-        def _passes_filters(payload: Dict[str, Any]) -> bool:
+        def _passes_filters(payload: dict[str, Any]) -> bool:
             # support both nested payload {"core": {...}, "entity": {...}}
             # and dotted filter keys like "core.user_id"
             if user_id:
@@ -206,7 +205,7 @@ class FakeQdrant(QdrantInterface):
             return True
 
         # Calculate similarities for all points
-        sims: List[tuple[str, float]] = []
+        sims: list[tuple[str, float]] = []
         for point_id, point_data in self.points[collection].items():
             payload = point_data["payload"]
             if not _passes_filters(payload):
@@ -226,7 +225,7 @@ class FakeQdrant(QdrantInterface):
             results.append({"id": pid, "score": score, "payload": pd["payload"]})
         return results
 
-    def get_point(self, point_id: str, collection: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def get_point(self, point_id: str, collection: str | None = None) -> dict[str, Any] | None:
         """Get a single point by ID."""
         collection = collection or self.collection_name
         if collection not in self.points or point_id not in self.points[collection]:
@@ -239,7 +238,7 @@ class FakeQdrant(QdrantInterface):
             "payload": point_data["payload"],
         }
 
-    def delete_points(self, point_ids: List[str], collection: Optional[str] = None) -> bool:
+    def delete_points(self, point_ids: list[str], collection: str | None = None) -> bool:
         """Delete points by IDs."""
         collection = collection or self.collection_name
         if collection not in self.points:
@@ -251,7 +250,7 @@ class FakeQdrant(QdrantInterface):
 
         return True
 
-    def get_collection_info(self, collection: Optional[str] = None) -> Dict[str, Any]:
+    def get_collection_info(self, collection: str | None = None) -> dict[str, Any]:
         """Get collection information."""
         collection = collection or self.collection_name
         if collection not in self.collections:
@@ -280,15 +279,15 @@ class FakeQdrant(QdrantInterface):
 class FakeKuzu(KuzuInterface):
     """Test double for KuzuInterface with in-memory storage."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         """Initialize with in-memory storage."""
         # Skip parent initialization to avoid database requirements
-        self.nodes: Dict[str, Dict[str, Dict[str, Any]]] = {
+        self.nodes: dict[str, dict[str, dict[str, Any]]] = {
             "Memory": {},
         }
-        self.relationships: List[Dict[str, Any]] = []
+        self.relationships: list[dict[str, Any]] = []
 
-    def add_node(self, table: str, properties: Dict[str, Any]) -> None:
+    def add_node(self, table: str, properties: dict[str, Any]) -> None:
         """Add a node to the graph."""
         if table not in self.nodes:
             self.nodes[table] = {}
@@ -306,7 +305,7 @@ class FakeKuzu(KuzuInterface):
         rel_type: str,
         from_id: str,
         to_id: str,
-        props: Optional[Dict[str, Any]] = None,
+        props: dict[str, Any] | None = None,
     ) -> None:
         """Add relationship between nodes."""
         # Validate that nodes exist
@@ -320,16 +319,18 @@ class FakeKuzu(KuzuInterface):
         rel_type = "".join(c for c in rel_type if c.isalnum() or c == "_")
 
         # Add relationship
-        self.relationships.append({
-            "from_table": from_table,
-            "to_table": to_table,
-            "rel_type": rel_type,
-            "from_id": from_id,
-            "to_id": to_id,
-            "props": props or {},
-        })
+        self.relationships.append(
+            {
+                "from_table": from_table,
+                "to_table": to_table,
+                "rel_type": rel_type,
+                "from_id": from_id,
+                "to_id": to_id,
+                "props": props or {},
+            }
+        )
 
-    def query(self, cypher: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    def query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Return rows shaped like the lean core expects (m.statement, m.hrid, etc.)."""
         params = params or {}
         if "MATCH (m:Memory)" not in cypher:
@@ -338,8 +339,8 @@ class FakeKuzu(KuzuInterface):
         user_id = params.get("user_id")
         limit = params.get("limit", 10)
 
-        rows: List[Dict[str, Any]] = []
-        for node_id, node in self.nodes["Memory"].items():
+        rows: list[dict[str, Any]] = []
+        for _node_id, node in self.nodes["Memory"].items():
             if user_id and node.get("user_id") != user_id:
                 continue
 
@@ -348,38 +349,50 @@ class FakeKuzu(KuzuInterface):
             if memory_type == "note":
                 anchor_field_value = node.get("content") or node.get("title") or ""
             elif memory_type == "document":
-                anchor_field_value = node.get("summary") or node.get("title") or node.get("content") or ""
+                anchor_field_value = (
+                    node.get("summary") or node.get("title") or node.get("content") or ""
+                )
             else:
-                anchor_field_value = node.get("statement") or node.get("title") or node.get("content") or ""
+                anchor_field_value = (
+                    node.get("statement") or node.get("title") or node.get("content") or ""
+                )
 
             # Use a placeholder if the anchor is still empty or not found
             if not anchor_field_value:
                 anchor_field_value = f"missing-anchor-for-{memory_type}-{node.get('hrid')}"
 
-            rows.append({
-                "node": node,  # Return the full node object under 'node' key
-            })
-        rows.sort(key=lambda r: r.get("node", {}).get("created_at") or "", reverse=True) # Sort by created_at in node
+            rows.append(
+                {
+                    "node": node,  # Return the full node object under 'node' key
+                }
+            )
+        rows.sort(
+            key=lambda r: r.get("node", {}).get("created_at") or "", reverse=True
+        )  # Sort by created_at in node
         return rows[:limit]
 
     def neighbors(
         self,
         node_label: str,
         node_id: str,
-        rel_types: Optional[List[str]] = None,
+        rel_types: list[str] | None = None,
         direction: str = "any",
         limit: int = 10,
-        neighbor_label: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        neighbor_label: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Return neighbor Memory nodes — anchors-only (statement) to match v1 policy."""
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for rel in self.relationships:
             if rel_types and rel["rel_type"] not in rel_types:
                 continue
 
             is_out = rel["from_table"] == node_label and rel["from_id"] == node_id
             is_in = rel["to_table"] == node_label and rel["to_id"] == node_id
-            if not ((direction == "out" and is_out) or (direction == "in" and is_in) or (direction == "any" and (is_out or is_in))):
+            if not (
+                (direction == "out" and is_out)
+                or (direction == "in" and is_in)
+                or (direction == "any" and (is_out or is_in))
+            ):
                 continue
 
             # choose the neighbor side
@@ -397,9 +410,19 @@ class FakeKuzu(KuzuInterface):
             if memory_type == "note":
                 anchor_field_value = neighbor.get("content") or neighbor.get("title") or ""
             elif memory_type == "document":
-                anchor_field_value = neighbor.get("summary") or neighbor.get("title") or neighbor.get("content") or ""
+                anchor_field_value = (
+                    neighbor.get("summary")
+                    or neighbor.get("title")
+                    or neighbor.get("content")
+                    or ""
+                )
             else:
-                anchor_field_value = neighbor.get("statement") or neighbor.get("title") or neighbor.get("content") or ""
+                anchor_field_value = (
+                    neighbor.get("statement")
+                    or neighbor.get("title")
+                    or neighbor.get("content")
+                    or ""
+                )
 
             if not anchor_field_value:
                 anchor_field_value = f"missing-anchor-for-{memory_type}-{neighbor.get('hrid')}"

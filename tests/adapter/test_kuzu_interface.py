@@ -1,10 +1,11 @@
 """Tests for KuzuInterface using FakeKuzu."""
 
 import os
+
 import pytest
 
 pytestmark = pytest.mark.adapter
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from memg_core.core.exceptions import DatabaseError
 from memg_core.core.interfaces.kuzu import KuzuInterface
@@ -104,7 +105,7 @@ def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
         rel_type="REFERENCES",
         from_id="node-1",
         to_id="node-2",
-        props=relationship_props
+        props=relationship_props,
     )
 
     # Query neighbors
@@ -114,7 +115,7 @@ def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
         rel_types=["REFERENCES"],
         direction="out",
         limit=10,
-        neighbor_label="Memory"
+        neighbor_label="Memory",
     )
 
     assert len(neighbors) == 1

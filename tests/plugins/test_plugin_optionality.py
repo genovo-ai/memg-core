@@ -1,7 +1,7 @@
 """Tests for plugin optionality."""
 
 import os
-import sys
+
 import pytest
 
 pytestmark = pytest.mark.plugin
@@ -33,7 +33,7 @@ def test_core_has_no_plugins_imports_grep():
         assert source_file is not None
 
         # Read the source code
-        with open(source_file, "r") as f:
+        with open(source_file) as f:
             source_code = f.read()
 
         # Check for imports from plugins
@@ -48,13 +48,14 @@ def test_api_safe_plugin_import_missing():
     # Mock environment variable to enable YAML schema
     with patch.dict(os.environ, {"MEMG_ENABLE_YAML_SCHEMA": "true"}):
         # Mock dependencies
-        with patch("memg_core.api.public.get_config") as mock_config, \
-             patch("memg_core.api.public.QdrantInterface") as mock_qdrant, \
-             patch("memg_core.api.public.KuzuInterface") as mock_kuzu, \
-             patch("memg_core.api.public.Embedder") as mock_embedder, \
-             patch("memg_core.api.public.graph_rag_search") as mock_search, \
-             patch("importlib.import_module") as mock_import:
-
+        with (
+            patch("memg_core.api.public.get_config") as mock_config,
+            patch("memg_core.api.public.QdrantInterface"),
+            patch("memg_core.api.public.KuzuInterface"),
+            patch("memg_core.api.public.Embedder"),
+            patch("memg_core.api.public.graph_rag_search") as mock_search,
+            patch("importlib.import_module") as mock_import,
+        ):
             # Configure mocks
             mock_config.return_value.memg.qdrant_collection_name = "memories"
             mock_config.return_value.memg.kuzu_database_path = "/tmp/kuzu"

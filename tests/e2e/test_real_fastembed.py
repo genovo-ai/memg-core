@@ -1,8 +1,8 @@
 """End-to-end tests using real FastEmbed embedder - no mocking"""
 
 import os
-import tempfile
 from pathlib import Path
+import tempfile
 
 import pytest
 
