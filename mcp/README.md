@@ -29,6 +29,8 @@
    docker-compose up -d
    ```
 
+   **Note**: The docker-compose is configured with `pull_policy: always` to ensure you always get the latest image from the GitHub Container Registry, never using local cached versions.
+
 3. **Test it's working:**
    ```bash
    curl http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health
@@ -49,12 +51,17 @@ The MCP server is now **100% YAML-schema compliant**:
 
 **Zero hardcoded fields** - everything flows from `core.minimal.yaml` schema!
 
-## Available MCP Tools
+## Available MCP Tools (3 Total)
+
+The MCP server provides exactly **3 YAML-driven tools**:
 
 ### Memory Management
-- **`mcp_gmem_add_memory`** - Pure YAML-driven memory addition
+- **`mcp_gmem_add_memory`** - Pure YAML-driven memory addition (supports all YAML entity types)
 - **`mcp_gmem_search_memories`** - Search memories with filtering
 - **`mcp_gmem_get_system_info`** - Get YAML schema details and system stats
+
+### ⚠️ Important Note
+The server uses **one generic `add_memory` tool** that works with all YAML-defined entity types (`memo`, `note`, `task`, `document`) rather than separate tools for each type. This maintains YAML-first principles.
 
 ### Example Usage (YAML-Compliant)
 ```bash

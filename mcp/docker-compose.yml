@@ -3,6 +3,7 @@ services:
   memg-mcp-server:
     image: ghcr.io/genovo-ai/memg-core-mcp:latest
     platform: linux/amd64  # Force AMD64 platform for ARM64 compatibility via Colima
+    pull_policy: always  # Always pull latest from remote registry, never use local cache
     container_name: memg-mcp-server-${MEMORY_SYSTEM_MCP_PORT:-8787}
     ports:
       - "${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787}"
