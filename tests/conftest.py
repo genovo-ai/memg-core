@@ -335,15 +335,11 @@ class FakeKuzu(KuzuInterface):
             # TODO: This should eventually be replaced by the YAML-defined anchor field logic
             memory_type = node.get("memory_type")
             if memory_type == "note":
-                anchor_field_value = node.get("content") or node.get("title") or ""
+                anchor_field_value = node.get("content") or ""
             elif memory_type == "document":
-                anchor_field_value = (
-                    node.get("summary") or node.get("title") or node.get("content") or ""
-                )
+                anchor_field_value = node.get("summary") or node.get("content") or ""
             else:
-                anchor_field_value = (
-                    node.get("statement") or node.get("title") or node.get("content") or ""
-                )
+                anchor_field_value = node.get("statement") or node.get("content") or ""
 
             # Use a placeholder if the anchor is still empty or not found
             if not anchor_field_value:
@@ -396,21 +392,11 @@ class FakeKuzu(KuzuInterface):
             # TODO: This should eventually be replaced by the YAML-defined anchor field logic
             memory_type = neighbor.get("memory_type")
             if memory_type == "note":
-                anchor_field_value = neighbor.get("content") or neighbor.get("title") or ""
+                anchor_field_value = neighbor.get("content") or ""
             elif memory_type == "document":
-                anchor_field_value = (
-                    neighbor.get("summary")
-                    or neighbor.get("title")
-                    or neighbor.get("content")
-                    or ""
-                )
+                anchor_field_value = neighbor.get("summary") or neighbor.get("content") or ""
             else:
-                anchor_field_value = (
-                    neighbor.get("statement")
-                    or neighbor.get("title")
-                    or neighbor.get("content")
-                    or ""
-                )
+                anchor_field_value = neighbor.get("statement") or neighbor.get("content") or ""
 
             if not anchor_field_value:
                 anchor_field_value = f"missing-anchor-for-{memory_type}-{neighbor.get('hrid')}"
@@ -466,7 +452,6 @@ def mem_factory() -> Callable[..., Memory]:
             "user_id": "test-user",
             "memory_type": memory_type,
             "payload": payload,
-            "tags": ["test"],
             "confidence": 0.8,
             "is_valid": True,
             "created_at": datetime.now(UTC),

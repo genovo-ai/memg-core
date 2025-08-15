@@ -87,7 +87,6 @@ def test_add_memory_endpoint_with_valid_params(client):
                 "details": "This is the detail for the generic memory test.",
             },
             "user_id": "test_user",
-            "tags": ["test", "generic"],
         },
     )
     assert response.status_code in [200, 400]  # May fail due to missing env vars

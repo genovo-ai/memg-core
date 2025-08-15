@@ -37,7 +37,6 @@ def test_index_and_search_with_real_qdrant():
         memory_type="note",
         payload={
             "content": "This is an integration test memory",  # YAML schema: note uses content
-            "title": "Integration Test",
         },
         created_at=datetime.now(UTC),
     )
@@ -89,10 +88,8 @@ def test_graph_neighbors_with_real_kuzu():
         "user_id": "test-user",
         "content": "Test node 1",
         "memory_type": "note",
-        "title": "Test Node 1",
         "summary": "",
         "source": "user",
-        "tags": "test,integration",
         "confidence": 0.8,
         "is_valid": 1.0,
         "created_at": datetime.now(UTC).isoformat(),
@@ -106,10 +103,8 @@ def test_graph_neighbors_with_real_kuzu():
         "user_id": "test-user",
         "content": "Test node 2",
         "memory_type": "note",
-        "title": "Test Node 2",
         "summary": "",
         "source": "user",
-        "tags": "test,integration",
         "confidence": 0.8,
         "is_valid": 1.0,
         "created_at": datetime.now(UTC).isoformat(),

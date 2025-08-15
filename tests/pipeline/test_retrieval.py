@@ -60,7 +60,6 @@ def test_rows_to_memories():
                 "statement": "Memory 1 content",
                 "memory_type": "note",
                 "created_at": "2023-01-01T00:00:00+00:00",
-                "tags": "tag1,tag2",
                 "confidence": 0.8,
             }
         },
@@ -71,7 +70,6 @@ def test_rows_to_memories():
                 "statement": "Memory 2 summary",
                 "memory_type": "document",
                 "created_at": "2023-01-02T00:00:00+00:00",
-                "tags": "tag2,tag3",
                 "confidence": 0.9,
             }
         },
@@ -405,9 +403,9 @@ def test_search_graph_first_rerank_then_neighbors(embedder, qdrant_fake, kuzu_fa
     assert sources.intersection({"qdrant", "graph_rerank", "neighbors"})
 
 
-def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuzu_fake):
-    """Test that filters and user_id propagate to Qdrant search."""
-    # Create memories for different users with different tags
+def test_filters_user_id_propagate_to_qdrant(embedder, qdrant_fake, kuzu_fake):
+    """Test that user_id filter propagates to Qdrant search."""
+    # Create memories for different users
     memory1 = Memory(
         id="memory-1",
         user_id="user1",
@@ -420,11 +418,7 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
         id="memory-2",
         user_id="user2",
         memory_type="note",
-        payload={
-            "statement": "Content for user2",
-            "details": "This is a note for user 2.",
-            "tags": ["tag3"],  # Add tag3 to entity payload (YAML-defined)
-        },
+        payload={"statement": "Content for user2", "details": "This is a note for user 2."},
     )
 
     # Add to Qdrant
@@ -448,18 +442,16 @@ def test_filters_user_id_and_tags_propagate_to_qdrant(embedder, qdrant_fake, kuz
     assert len(results_user1) == 1
     assert results_user1[0].memory.user_id == "user1"
 
-    # Search with user_id and tags filter
-    results_user2_tag3 = graph_rag_search(
+    # Test basic user_id filtering - no hardcoded entity fields
+    results_user2 = graph_rag_search(
         query="content",
         user_id="user2",
         limit=10,
         qdrant=qdrant_fake,
         kuzu=kuzu_fake,
         embedder=embedder,
-        filters={"entity.tags": ["tag3"]},
         mode="vector",
     )
 
-    assert len(results_user2_tag3) == 1
-    assert results_user2_tag3[0].memory.user_id == "user2"
-    # No hardcoded tags - removed as part of audit
+    assert len(results_user2) == 1
+    assert results_user2[0].memory.user_id == "user2"

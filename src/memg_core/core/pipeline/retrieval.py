@@ -172,7 +172,6 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
                 node_data.get("updated_at") or row.get("m.updated_at") or row.get("updated_at")
             ),
             "hrid": node_data.get("hrid") or row.get("m.hrid") or row.get("hrid"),
-            "tags": node_data.get("tags") or row.get("m.tags") or row.get("tags") or [],
         }
 
         # All other fields from the node/row are considered part of the payload
@@ -184,7 +183,6 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
             "created_at",
             "updated_at",
             "hrid",
-            "tags",
             "vector",
         }
 
@@ -200,10 +198,6 @@ def _rows_to_memories(rows: list[dict[str, Any]]) -> list[Memory]:
                 for key, value in row.items()
                 if key.replace("m.", "") not in core_field_names
             }
-
-        # Normalize tags if they are a string
-        if isinstance(core_fields["tags"], str):
-            core_fields["tags"] = [t.strip() for t in core_fields["tags"].split(",") if t.strip()]
 
         out.append(Memory(payload=payload, **core_fields))
     return out
@@ -286,7 +280,6 @@ def _append_neighbors(
                 "id",
                 "user_id",
                 "memory_type",
-                "tags",
                 "created_at",
                 "updated_at",
                 "hrid",

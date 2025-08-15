@@ -38,37 +38,27 @@ def test_filter_points_by_user_and_tags(qdrant_fake):
 
     qdrant_fake.add_point(
         vector=vector1,
-        payload={"user_id": "user1", "content": "User 1 content", "tags": ["tag1", "tag2"]},
+        payload={"user_id": "user1", "content": "User 1 content"},
     )
     qdrant_fake.add_point(
         vector=vector2,
-        payload={"user_id": "user1", "content": "User 1 content 2", "tags": ["tag2", "tag3"]},
+        payload={"user_id": "user1", "content": "User 1 content 2"},
     )
     qdrant_fake.add_point(
         vector=vector3,
-        payload={"user_id": "user2", "content": "User 2 content", "tags": ["tag1", "tag3"]},
+        payload={"user_id": "user2", "content": "User 2 content"},
     )
 
     # Search with user_id filter
     results_user1 = qdrant_fake.search_points(vector=vector1, limit=10, user_id="user1")
+    results_user2 = qdrant_fake.search_points(vector=vector1, limit=10, user_id="user2")
 
     assert len(results_user1) == 2
     assert all(r["payload"]["user_id"] == "user1" for r in results_user1)
 
-    # Search with user_id and tags filter
-    results_user1_tag2 = qdrant_fake.search_points(
-        vector=vector1, limit=10, user_id="user1", filters={"tags": ["tag2"]}
-    )
-
-    assert len(results_user1_tag2) == 2
-    assert all(r["payload"]["user_id"] == "user1" for r in results_user1_tag2)
-    assert all("tag2" in r["payload"]["tags"] for r in results_user1_tag2)
-
-    # Search with specific tag
-    results_tag1 = qdrant_fake.search_points(vector=vector1, limit=10, filters={"tags": ["tag1"]})
-
-    assert len(results_tag1) == 2
-    assert all("tag1" in r["payload"]["tags"] for r in results_tag1)
+    # Test basic filtering functionality - no hardcoded entity fields
+    assert len(results_user1) == 2  # Both user1 entries
+    assert len(results_user2) == 1  # One user2 entry
 
 
 def test_get_point_returns_payload_only(qdrant_fake):

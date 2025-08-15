@@ -96,7 +96,6 @@ class MemgCoreBridge:
                     "hrid": r.memory.hrid,
                     "memory_type": r.memory.memory_type,
                     "payload": r.memory.payload,
-                    "tags": r.memory.tags,
                     "score": r.score,
                     "source": r.source,
                 }
