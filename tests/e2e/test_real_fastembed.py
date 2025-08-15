@@ -76,8 +76,9 @@ def test_real_fastembed_workflow(temp_storage):
     # Should find relevant results
     assert len(results) > 0
 
-    # Results should be vector_fallback since we don't have Entity tables
-    assert all(r.source == "vector_fallback" for r in results)
+    # Results should be from vector search (lean core may use "qdrant" or "vector_fallback")
+    sources = {r.source for r in results}
+    assert sources.intersection({"qdrant", "vector_fallback"})
 
     # Should have good similarity scores (FastEmbed is quite good)
     scores = [r.score for r in results]

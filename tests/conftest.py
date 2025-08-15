@@ -16,6 +16,16 @@ from memg_core.core.interfaces.qdrant import QdrantInterface
 from memg_core.core.models import Memory
 
 
+def _dig(d: Dict[str, Any], dotted: str) -> Any:
+    """Fetch nested value using dotted keys, e.g. 'core.user_id'."""
+    cur = d
+    for part in dotted.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return None
+        cur = cur[part]
+    return cur
+
+
 class DummyEmbedder:
     """Test double for Embedder that returns deterministic vectors."""
 
@@ -123,80 +133,71 @@ class FakeQdrant(QdrantInterface):
         if collection not in self.points:
             return []
 
-        # Calculate similarities for all points
-        similarities = []
-        for point_id, point_data in self.points[collection].items():
-            # Apply filters if provided
-            if filters or user_id:
-                payload = point_data["payload"]
+        def _passes_filters(payload: Dict[str, Any]) -> bool:
+            # support both nested payload {"core": {...}, "entity": {...}}
+            # and dotted filter keys like "core.user_id"
+            if user_id:
+                # core user_id lives at core.user_id
+                core_uid = _dig(payload, "core.user_id") or payload.get("user_id")
+                if core_uid != user_id:
+                    return False
 
-                # Apply user_id filter
-                if user_id and payload.get("user_id") != user_id:
+            if not filters:
+                return True
+
+            for k, expected in filters.items():
+                # Prefer dotted lookup, then direct top-level
+                actual = _dig(payload, k)
+                if actual is None:
+                    actual = payload.get(k)
+
+                # Ranges (gte/gt/lte/lt)
+                if isinstance(expected, dict):
+                    if "gt" in expected and not (actual > expected["gt"]):
+                        return False
+                    if "gte" in expected and not (actual >= expected["gte"]):
+                        return False
+                    if "lt" in expected and not (actual < expected["lt"]):
+                        return False
+                    if "lte" in expected and not (actual <= expected["lte"]):
+                        return False
                     continue
 
-                # Apply additional filters
-                if filters:
-                    skip = False
-                    for key, value in filters.items():
-                        if key not in payload:
-                            skip = True
-                            break
+                # List membership (e.g., tags)
+                if isinstance(expected, list):
+                    if isinstance(actual, list):
+                        if not any(v in actual for v in expected):
+                            return False
+                    else:
+                        if actual not in expected:
+                            return False
+                    continue
 
-                        # Handle dict filters (range queries)
-                        if isinstance(value, dict):
-                            if "gt" in value and not (payload[key] > value["gt"]):
-                                skip = True
-                                break
-                            if "gte" in value and not (payload[key] >= value["gte"]):
-                                skip = True
-                                break
-                            if "lt" in value and not (payload[key] < value["lt"]):
-                                skip = True
-                                break
-                            if "lte" in value and not (payload[key] <= value["lte"]):
-                                skip = True
-                                break
-                        # Handle list values - check if any filter value is in the payload list
-                        elif isinstance(value, list):
-                            payload_value = payload[key]
-                            if isinstance(payload_value, list):
-                                # Check if any filter value is in the payload list
-                                if not any(v in payload_value for v in value):
-                                    skip = True
-                                    break
-                            else:
-                                # Payload value is not a list, check direct membership
-                                if payload_value not in value:
-                                    skip = True
-                                    break
-                        # Handle simple equality
-                        elif payload[key] != value:
-                            skip = True
-                            break
+                # Simple equality
+                if actual != expected:
+                    return False
 
-                    if skip:
-                        continue
+            return True
 
-            # Calculate similarity and normalize to [0, 1] range
+        # Calculate similarities for all points
+        sims: List[tuple[str, float]] = []
+        for point_id, point_data in self.points[collection].items():
+            payload = point_data["payload"]
+            if not _passes_filters(payload):
+                continue
+
+            # cosine similarity, normalized to [0, 1]
             similarity = self._cosine_similarity(vector, point_data["vector"])
-            # Normalize from [-1, 1] to [0, 1]
-            normalized_score = (similarity + 1.0) / 2.0
-            similarities.append((point_id, normalized_score))
+            normalized = (similarity + 1.0) / 2.0
+            sims.append((point_id, normalized))
 
-        # Sort by similarity (descending) and take top limit
-        similarities.sort(key=lambda x: x[1], reverse=True)
-        top_similarities = similarities[:limit]
+        sims.sort(key=lambda x: x[1], reverse=True)
+        sims = sims[:limit]
 
-        # Format results
         results = []
-        for point_id, score in top_similarities:
-            point_data = self.points[collection][point_id]
-            results.append({
-                "id": point_id,
-                "score": score,
-                "payload": point_data["payload"],
-            })
-
+        for pid, score in sims:
+            pd = self.points[collection][pid]
+            results.append({"id": pid, "score": score, "payload": pd["payload"]})
         return results
 
     def get_point(self, point_id: str, collection: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -304,55 +305,40 @@ class FakeKuzu(KuzuInterface):
         })
 
     def query(self, cypher: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Execute Cypher query and return results."""
+        """Return rows shaped like the lean core expects (m.statement, m.hrid, etc.)."""
         params = params or {}
+        if "MATCH (m:Memory)" not in cypher:
+            return []
 
-        # Simple implementation that handles basic memory queries
-        if "MATCH (m:Memory)" in cypher:
-            # Extract user_id filter if present
-            user_id = params.get("user_id")
+        user_id = params.get("user_id")
+        limit = params.get("limit", 10)
 
-            # Extract query text if present
-            query_text = params.get("q", "").lower()
+        rows: List[Dict[str, Any]] = []
+        for node_id, node in self.nodes["Memory"].items():
+            if user_id and node.get("user_id") != user_id:
+                continue
 
-            # Extract limit
-            limit = params.get("limit", 10)
-
-            # Filter memories
-            results = []
-            for node_id, node in self.nodes["Memory"].items():
-                # Apply user_id filter
-                if user_id and node.get("user_id") != user_id:
-                    continue
-
-                # Apply text search filter
-                content = node.get("content", "").lower()
-                title = node.get("title", "").lower()
-                if query_text and query_text not in content and query_text not in title:
-                    continue
-
-                # Add to results
-                results.append({
+            rows.append(
+                {
                     "m.id": node_id,
                     "m.user_id": node.get("user_id"),
-                    "m.content": node.get("content"),
-                    "m.title": node.get("title"),
                     "m.memory_type": node.get("memory_type"),
-                    "m.created_at": node.get("created_at"),
-                    "m.summary": node.get("summary"),
-                    "m.source": node.get("source"),
+                    "m.hrid": node.get("hrid"),
+                    # Anchor-first: statement may be absent on legacy nodes → fallback to title/content
+                    "m.statement": node.get("statement") or node.get("title") or node.get("content") or "",
                     "m.tags": node.get("tags"),
-                    "m.confidence": node.get("confidence"),
-                })
+                    "m.created_at": node.get("created_at"),
+                    # optional key the query sometimes returns; keep for parity
+                    "m.updated_at": node.get("updated_at"),
+                    # keep legacy fields if tests read them
+                    "m.title": node.get("title"),
+                    "m.summary": node.get("summary"),
+                    "m.content": node.get("content"),  # legacy field for backward compatibility
+                }
+            )
 
-            # Sort by created_at (descending)
-            results.sort(key=lambda x: x.get("m.created_at", ""), reverse=True)
-
-            # Apply limit
-            return results[:limit]
-
-        # Return empty list for unsupported queries
-        return []
+        rows.sort(key=lambda r: r.get("m.created_at") or "", reverse=True)
+        return rows[:limit]
 
     def neighbors(
         self,
@@ -363,57 +349,42 @@ class FakeKuzu(KuzuInterface):
         limit: int = 10,
         neighbor_label: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Fetch neighbors of a node."""
-        results = []
-
-        # Find relationships involving the node
+        """Return neighbor Memory nodes — anchors-only (statement) to match v1 policy."""
+        out: List[Dict[str, Any]] = []
         for rel in self.relationships:
-            rel_type = rel["rel_type"]
-
-            # Filter by relation type if specified
-            if rel_types and rel_type not in rel_types:
+            if rel_types and rel["rel_type"] not in rel_types:
                 continue
 
-            # Check direction and node label
-            is_outgoing = (rel["from_table"] == node_label and rel["from_id"] == node_id)
-            is_incoming = (rel["to_table"] == node_label and rel["to_id"] == node_id)
+            is_out = rel["from_table"] == node_label and rel["from_id"] == node_id
+            is_in = rel["to_table"] == node_label and rel["to_id"] == node_id
+            if not ((direction == "out" and is_out) or (direction == "in" and is_in) or (direction == "any" and (is_out or is_in))):
+                continue
 
-            if (direction == "out" and is_outgoing) or (direction == "in" and is_incoming) or (direction == "any" and (is_outgoing or is_incoming)):
-                # Determine the neighbor node
-                if is_outgoing:
-                    neighbor_table = rel["to_table"]
-                    neighbor_id = rel["to_id"]
-                else:
-                    neighbor_table = rel["from_table"]
-                    neighbor_id = rel["from_id"]
+            # choose the neighbor side
+            neighbor_table, neighbor_id = (
+                (rel["to_table"], rel["to_id"]) if is_out else (rel["from_table"], rel["from_id"])
+            )
+            if neighbor_label and neighbor_table != neighbor_label:
+                continue
+            neighbor = self.nodes.get(neighbor_table, {}).get(neighbor_id)
+            if not neighbor or neighbor_table != "Memory":
+                continue
 
-                # Filter by neighbor label if specified
-                if neighbor_label and neighbor_table != neighbor_label:
-                    continue
-
-                # Get the neighbor node
-                if neighbor_id in self.nodes.get(neighbor_table, {}):
-                    neighbor = self.nodes[neighbor_table][neighbor_id]
-
-                    # Format result based on neighbor type
-                    if neighbor_table == "Memory":
-                        results.append({
-                            "id": neighbor_id,
-                            "user_id": neighbor.get("user_id"),
-                            "content": neighbor.get("content"),
-                            "title": neighbor.get("title"),
-                            "memory_type": neighbor.get("memory_type"),
-                            "created_at": neighbor.get("created_at"),
-                            "rel_type": rel_type,
-                        })
-                    else:
-                        results.append({
-                            "node": neighbor,
-                            "rel_type": rel_type,
-                        })
-
-        # Apply limit
-        return results[:limit]
+            out.append(
+                {
+                    "id": neighbor_id,
+                    "user_id": neighbor.get("user_id"),
+                    "memory_type": neighbor.get("memory_type"),
+                    "statement": neighbor.get("statement") or neighbor.get("title") or neighbor.get("content") or "",
+                    "created_at": neighbor.get("created_at"),
+                    "hrid": neighbor.get("hrid"),
+                    # legacy fields for backward compatibility
+                    "content": neighbor.get("content"),
+                    "title": neighbor.get("title"),
+                    "rel_type": rel["rel_type"],  # include relationship type for tests
+                }
+            )
+        return out[:limit]
 
 
 @pytest.fixture

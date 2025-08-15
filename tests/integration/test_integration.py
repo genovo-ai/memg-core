@@ -8,6 +8,7 @@ pytest -m "not integration"
 import os
 import pytest
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from memg_core.core.interfaces.embedder import Embedder
 from memg_core.core.interfaces.kuzu import KuzuInterface
@@ -58,7 +59,8 @@ def test_index_and_search_with_real_qdrant():
         results = qdrant.search_points(
             vector=vector,
             limit=5,
-            user_id="test-user",
+            # real adapter filters by payload path; pass filters instead of user_id param
+            filters={"core.user_id": "test-user"},
         )
 
         assert len(results) > 0
@@ -116,7 +118,9 @@ def test_graph_neighbors_with_real_kuzu():
     }
 
     try:
-        # Add nodes
+        # use unique IDs to avoid PK collisions if DB persists
+        node1["id"] = f"test-node-{uuid4()}"
+        node2["id"] = f"test-node-{uuid4()}"
         kuzu.add_node("Memory", node1)
         kuzu.add_node("Memory", node2)
 
