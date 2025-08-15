@@ -69,14 +69,14 @@ def add_note(
     title: str | None = None,
     tags: list[str] | None = None,
 ) -> Memory:
-    """Add a note-type memory (anchor = `statement`)."""
+    """Add a note-type memory (anchor = `content`)."""
     if not text or not text.strip():
         raise ValidationError("Note content cannot be empty")
     if not user_id:
         raise ValidationError("User ID is required")
 
     payload: dict[str, Any] = {
-        "statement": text.strip(),
+        "content": text.strip(),
         "source": "user",
     }
     if title:
@@ -95,8 +95,8 @@ def add_document(
     """Add a document-type memory.
 
     Normalization:
-    - `statement` = provided summary or truncated text
-    - `details`   = full text body
+    - `summary` = provided summary or truncated text
+    - `body`   = full text body
     """
     if not text or not text.strip():
         raise ValidationError("Document content cannot be empty")
@@ -105,12 +105,12 @@ def add_document(
 
     text_clean = text.strip()
     payload: dict[str, Any] = {
-        "statement": (
+        "summary": (
             summary.strip()
             if summary and summary.strip()
             else (text_clean[:200] + "..." if len(text_clean) > 200 else text_clean)
         ),
-        "details": text_clean,
+        "body": text_clean,
         "source": "user",
     }
     if title:
@@ -126,14 +126,14 @@ def add_task(
     due_date: datetime | None = None,
     tags: list[str] | None = None,
 ) -> Memory:
-    """Add a task-type memory (anchor = `statement`, with lifecycle fields)."""
+    """Add a task-type memory (anchor = `summary`, with lifecycle fields)."""
     if not text or not text.strip():
         raise ValidationError("Task content cannot be empty")
     if not user_id:
         raise ValidationError("User ID is required")
 
     payload: dict[str, Any] = {
-        "statement": text.strip(),
+        "summary": text.strip(),
         "source": "user",
         "status": "OPEN",
     }

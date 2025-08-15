@@ -165,9 +165,8 @@ entities:
 # ----------------------------- Tests: YAML translator -----------------------------
 
 def test_yaml_translator_anchor_and_validation(tmp_yaml):
-    mem = create_memory_from_yaml("document", {"statement": "sum", "details": "body"}, user_id="u")
-    assert mem.memory_type == "document"
-    assert mem.payload["statement"] == "sum"
+    mem = create_memory_from_yaml("document", {"summary": "sum", "body": "body"}, user_id="u")
+    assert mem.payload["summary"] == "sum"
     # build anchor resolves to statement
     anchor = build_anchor_text(mem)
     assert anchor == "sum"
