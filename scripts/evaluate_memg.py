@@ -171,7 +171,7 @@ def main() -> None:
         "--mode",
         choices=["offline", "live"],
         default="offline",
-        help="offline: schema/db-only, live: full processing (embeddings + storage)",
+        help="offline: config/db-only, live: full processing (embeddings + storage)",
     )
     args = parser.parse_args()
 

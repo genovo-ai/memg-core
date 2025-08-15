@@ -6,6 +6,7 @@ This MCP server uses the latest memg-core public API with the lean core architec
 """
 
 import os
+import logging
 from typing import Any, Optional
 
 from fastmcp import FastMCP
@@ -17,6 +18,13 @@ from memg_core.core.models import SearchResult
 from memg_core import __version__
 from memg_core.core.yaml_translator import get_yaml_translator
 from memg_core.core.exceptions import ValidationError
+
+# Setup comprehensive logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 def get_dynamic_tool_docstring() -> str:
@@ -46,20 +54,25 @@ class MemgCoreBridge:
 
     def add_memory(self, memory_type: str, user_id: str, payload: dict) -> dict[str, Any]:
         """Directly calls the generic add_memory function with YAML-validated payload."""
+        logger.info(f"🚀 Starting add_memory: type={memory_type}, user={user_id}, payload={payload}")
         try:
+            logger.debug(f"📝 Calling core add_memory function...")
             memory = add_memory(
                 memory_type=memory_type,
                 user_id=user_id,
                 payload=payload
             )
+            logger.info(f"✅ Memory created successfully: id={memory.id}, hrid={memory.hrid}")
             return {
                 "success": True,
                 "memory_id": memory.id,
                 "hrid": memory.hrid,
             }
         except ValidationError as e:
+            logger.error(f"❌ Validation Error: {e}")
             return {"success": False, "error": f"Validation Error: {e}"}
         except Exception as e:
+            logger.error(f"💥 Unexpected Error in add_memory: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
     def search_memories(
@@ -112,8 +125,14 @@ bridge: Optional[MemgCoreBridge] = None
 def initialize_bridge() -> MemgCoreBridge:
     """Initialize the MEMG Core bridge."""
     global bridge
-    bridge = MemgCoreBridge()
-    return bridge
+    logger.info("🏗️ Initializing MEMG Core bridge...")
+    try:
+        bridge = MemgCoreBridge()
+        logger.info("✅ Bridge initialized successfully")
+        return bridge
+    except Exception as e:
+        logger.error(f"💥 Failed to initialize bridge: {e}", exc_info=True)
+        raise
 
 
 def setup_health_endpoints(app: FastMCP) -> None:
@@ -162,34 +181,45 @@ def register_tools(app: FastMCP) -> None:
         - task: {"statement": "Task description", "details": "More info", "status": "todo", "priority": "high"}
         - document: {"statement": "Document title", "details": "Document content"}
         """
+        logger.info(f"🔧 MCP Tool called: add_memory_tool(type={memory_type}, user={user_id}, payload={payload})")
+
         if not bridge:
+            logger.error("❌ Bridge not initialized")
             return {"result": "❌ Bridge not initialized"}
 
         # Validate that memory_type exists in YAML schema
         try:
+            logger.debug(f"🔍 Validating memory_type '{memory_type}' against YAML schema...")
             translator = get_yaml_translator()
             if memory_type not in translator._entities_map():
                 available_types = list(translator._entities_map().keys())
+                logger.error(f"❌ Invalid memory_type '{memory_type}'. Available: {available_types}")
                 return {
                     "result": f"❌ Invalid memory_type '{memory_type}'",
                     "error": f"Available types: {available_types}"
                 }
+            logger.debug(f"✅ Memory type '{memory_type}' is valid")
         except Exception as e:
+            logger.error(f"💥 Schema validation failed: {e}", exc_info=True)
             return {"result": f"❌ Schema validation failed: {e}"}
 
+        logger.debug(f"📞 Calling bridge.add_memory...")
         result = bridge.add_memory(
             memory_type=memory_type,
             user_id=user_id,
             payload=payload
         )
+        logger.debug(f"📤 Bridge returned: {result}")
 
         if result["success"]:
+            logger.info(f"🎉 Tool successful: {memory_type} added with ID {result['memory_id']}")
             return {
                 "result": f"✅ {memory_type.title()} added successfully",
                 "memory_id": result["memory_id"],
                 "hrid": result.get("hrid"),
             }
         else:
+            logger.error(f"💔 Tool failed: {result.get('error', 'Unknown error')}")
             return {
                 "result": f"❌ Failed to add {memory_type}",
                 "error": result.get("error", "Unknown error")

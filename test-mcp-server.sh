@@ -22,7 +22,7 @@ docker run -d \
     -p ${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787} \
     -e QDRANT_STORAGE_PATH=/qdrant \
     -e KUZU_DB_PATH=/kuzu/memory_db \
-    -e MEMG_YAML_SCHEMA=/app/schema/core.minimal.yaml \
+    -e MEMG_YAML_SCHEMA=/app/config/core.minimal.yaml \
     ghcr.io/genovo-ai/memg-core-mcp:latest
 
 # Wait for startup

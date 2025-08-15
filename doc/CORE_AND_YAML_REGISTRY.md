@@ -239,7 +239,7 @@ The translator (currently `src/memg_core/plugins/yaml_schema.py`, to be made cor
 - Env vars:
   - `MEMG_YAML_SCHEMA=/path/to/registry.yaml` (required for normal operation)
   - `EMBEDDING_DIMENSION_LEN=384` (must match registry defaults)
-- Docker images should include a default registry under `/app/schema/core.minimal.yaml` and set `MEMG_YAML_SCHEMA` accordingly, while allowing overrides.
+- Docker images should include a default registry under `/app/config/core.minimal.yaml` and set `MEMG_YAML_SCHEMA` accordingly, while allowing overrides.
 
 ## Decisions (final)
 

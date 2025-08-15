@@ -12,7 +12,7 @@ RUN mkdir -p /qdrant /kuzu
 # Set environment variables
 ENV QDRANT_STORAGE_PATH=/qdrant
 ENV KUZU_DB_PATH=/kuzu/memory_db
-ENV MEMG_YAML_SCHEMA=/app/schema/core.minimal.yaml
+ENV MEMG_YAML_SCHEMA=/app/config/core.minimal.yaml
 # MEMORY_SYSTEM_MCP_PORT will be set by docker-compose from .env file
 
 # Install MCP server dependencies first (these change less often)
@@ -31,9 +31,9 @@ RUN set -e; \
         pip install --no-cache-dir memg-core; \
     fi
 
-# Create schema directory and copy the YAML schema to fixed location
-RUN mkdir -p /app/schema
-COPY config/core.minimal.yaml /app/schema/
+# Create config directory and copy the YAML schema to fixed location
+RUN mkdir -p /app/config
+COPY config/core.minimal.yaml /app/config/
 
 # Copy the MCP server (changes often, so do last)
 COPY mcp/mcp_server.py /app/
