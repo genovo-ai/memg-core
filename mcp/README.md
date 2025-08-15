@@ -82,8 +82,8 @@ KUZU_DB_PATH=/path/to/kuzu/db
 # Server settings
 MEMORY_SYSTEM_MCP_PORT=8787
 
-# Optional: YAML template for entity definitions
-MEMG_TEMPLATE=software_development
+# Note: Current lean core uses fixed schema (core.minimal.yaml)
+# Future: MEMG_TEMPLATE for domain-specific templates
 ```
 
 ## Architecture
