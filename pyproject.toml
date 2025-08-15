@@ -322,9 +322,10 @@ ignore = [
 # Allow unused variables when they start with underscore
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
+# Per-file ignores for specific directories
 [tool.ruff.lint.per-file-ignores]
-# Tests can use assert statements and have longer lines
-"tests/**/*.py" = ["S101", "E501"]
+# Tests can use assert statements, have longer lines, imports after pytestmark, and nested with statements for clarity
+"tests/**/*.py" = ["S101", "E501", "E402", "SIM117"]
 # Init files can have unused imports
 "**/__init__.py" = ["F401"]
 
