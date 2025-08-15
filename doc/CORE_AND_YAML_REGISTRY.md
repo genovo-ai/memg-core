@@ -197,7 +197,7 @@ The translator (currently `src/memg_core/plugins/yaml_schema.py`, to be made cor
 ## Migration Plan (make YAML core)
 
 1. Registry files:
-   - Add `integration/config/core.minimal.yaml` with `note`, `document`, `task` (anchors per above).
+   - Add `config/core.minimal.yaml` with `note`, `document`, `task` (anchors per above).
    - Optionally add `core.software_dev.yaml` and `core.knowledge.yaml` later.
 
 2. Core types decoupling:
@@ -239,7 +239,7 @@ The translator (currently `src/memg_core/plugins/yaml_schema.py`, to be made cor
 - Env vars:
   - `MEMG_YAML_SCHEMA=/path/to/registry.yaml` (required for normal operation)
   - `EMBEDDING_DIMENSION_LEN=384` (must match registry defaults)
-- Docker images should include a default registry under `/app/integration/config/core.minimal.yaml` and set `MEMG_YAML_SCHEMA` accordingly, while allowing overrides.
+- Docker images should include a default registry under `/app/schema/core.minimal.yaml` and set `MEMG_YAML_SCHEMA` accordingly, while allowing overrides.
 
 ## Decisions (final)
 

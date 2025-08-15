@@ -77,7 +77,7 @@ for r in results:
 
 ### YAML registries (optional)
 
-Core ships with three tiny registries under `integration/config/`:
+Core ships with three tiny registries under `config/`:
 
 - `core.minimal.yaml`: basic types `note`, `document`, `task` with anchors and generic relations
 - `core.software_dev.yaml`: adds `bug` + `solution` and `bug_solution` relation
@@ -87,7 +87,7 @@ Enable:
 
 ```bash
 export MEMG_ENABLE_YAML_SCHEMA=true
-export MEMG_YAML_SCHEMA=$(pwd)/integration/config/core.minimal.yaml
+export MEMG_YAML_SCHEMA=$(pwd)/config/core.minimal.yaml
 ```
 
 ## Embedding Configuration

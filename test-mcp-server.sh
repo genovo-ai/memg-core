@@ -40,6 +40,7 @@ docker run -d \
     -p 8787:8787 \
     -e QDRANT_STORAGE_PATH=/qdrant \
     -e KUZU_DB_PATH=/kuzu/memory_db \
+    -e MEMG_YAML_SCHEMA=/app/schema/core.minimal.yaml \
     memg-core-mcp:test
 
 # Wait for startup

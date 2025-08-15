@@ -13,7 +13,7 @@ The YAML schema feature is currently **DISABLED BY DEFAULT** but the README sugg
 ## Current Issues
 
 1. **Feature is optional** (`MEMG_ENABLE_YAML_SCHEMA=false` by default)
-2. **Integration configs missing** (README mentions `integration/config/` but directory doesn't exist)
+2. **Config directory exists** (README was updated to use `config/` instead of `integration/config/`)
 3. **Try/except blocks** for "optional" imports when it should be core
 4. **Documentation inconsistency** - README says it "ships with" YAML configs but they're missing
 
@@ -29,7 +29,7 @@ The YAML schema feature is currently **DISABLED BY DEFAULT** but the README sugg
 ### Option A: Make YAML Schema Core (Recommended)
 - Remove `MEMG_ENABLE_YAML_SCHEMA` env var checks
 - Remove try/except "plugin is optional" blocks
-- Create the missing `integration/config/` YAML files
+- Create the missing `config/` YAML files (already done - core.minimal.yaml exists)
 - Make YAML schema always enabled
 
 ### Option B: Make YAML Schema Truly Optional

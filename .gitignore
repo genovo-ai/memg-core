@@ -234,7 +234,6 @@ integration/*
 !integration/__init__.py
 !integration/mcp/
 !integration/sync_wrapper.py
-!integration/config/
 
 _stash/
 artifacts/
