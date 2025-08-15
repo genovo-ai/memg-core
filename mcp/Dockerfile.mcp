@@ -16,7 +16,11 @@ ENV MEMG_YAML_SCHEMA=/app/config/core.minimal.yaml
 # MEMORY_SYSTEM_MCP_PORT will be set by docker-compose from .env file
 
 # Install MCP server dependencies first (these change less often)
-RUN pip install --no-cache-dir "fastmcp>=0.2.0" "starlette>=0.37"
+RUN pip install --no-cache-dir \
+    "fastmcp>=0.2.0" \
+    "uvicorn>=0.30.0" \
+    "pydantic>=2.0.0" \
+    "starlette>=0.37"
 
 # Copy and install wheel (this changes most often, so do it last)
 COPY dist/ /tmp/dist/
@@ -46,7 +50,7 @@ EXPOSE 8787
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f "http://localhost:${MEMORY_SYSTEM_MCP_PORT}/health" || exit 1
+    CMD curl -f "http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health" || exit 1
 
 # Run the MCP server
 CMD ["python", "mcp_server.py"]
