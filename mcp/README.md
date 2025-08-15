@@ -1,6 +1,6 @@
-# MEMG Core MCP Server - Lean Core API
+# MEMG Core MCP Server - Pure YAML-Driven API
 
-🚀 **Updated MCP server using the latest lean core API**
+🚀 **YAML-first MCP server with zero hardcoded entity types**
 
 ## Quick Test with Latest Code
 
@@ -40,27 +40,41 @@
    docker-compose down
    ```
 
-## What's New in Lean Core API
+## What's New: Pure YAML-Driven Architecture
 
-The MCP server now uses the **lean core public API**:
-- ✅ `add_memory(memory_type, payload, user_id, tags)` - Generic memory addition
+The MCP server is now **100% YAML-schema compliant**:
+- ✅ `add_memory(memory_type, payload, user_id)` - Pure YAML validation
 - ✅ `search(query, user_id, limit, mode="vector|graph|hybrid")` - Unified search
+- ✅ Dynamic schema discovery via `get_system_info` tool
 
-All memory types and field names are defined in YAML schema - no hardcoded types!
+**Zero hardcoded fields** - everything flows from `core.minimal.yaml` schema!
 
 ## Available MCP Tools
 
 ### Memory Management
-- **`mcp_gmem_add_memory`** - Generic memory addition (YAML-defined types)
-- **`mcp_gmem_search_memories`** - Search memories
-- **`mcp_gmem_get_system_info`** - Get system stats
+- **`mcp_gmem_add_memory`** - Pure YAML-driven memory addition
+- **`mcp_gmem_search_memories`** - Search memories with filtering
+- **`mcp_gmem_get_system_info`** - Get YAML schema details and system stats
 
-### Example Usage
+### Example Usage (YAML-Compliant)
 ```bash
-# Add a memory (type must be defined in YAML schema)
+# Get schema information first
+curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_get_system_info
+
+# Add a memo (basic type)
 curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_add_memory \
   -H "Content-Type: application/json" \
-  -d '{"memory_type": "note", "payload": {"content": "Remember to update docs"}, "user_id": "test_user"}'
+  -d '{"memory_type": "memo", "user_id": "test_user", "payload": {"statement": "Remember to update docs"}}'
+
+# Add a task (with YAML-defined fields)
+curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_add_memory \
+  -H "Content-Type: application/json" \
+  -d '{"memory_type": "task", "user_id": "test_user", "payload": {"statement": "Update documentation", "details": "Need to update MCP README", "status": "todo", "priority": "high"}}'
+
+# Add a note (with details)
+curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_add_memory \
+  -H "Content-Type: application/json" \
+  -d '{"memory_type": "note", "user_id": "test_user", "payload": {"statement": "Meeting notes", "details": "Discussed YAML compliance"}}'
 
 # Search memories
 curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_search_memories \
@@ -79,8 +93,9 @@ KUZU_DB_PATH=/path/to/kuzu/db
 # Server settings
 MEMORY_SYSTEM_MCP_PORT=8787  # Change for multiple instances
 
-# Note: Current lean core uses fixed schema (core.minimal.yaml)
-# Future: MEMG_TEMPLATE for domain-specific templates
+# Schema configuration
+MEMG_YAML_SCHEMA=/app/schema/core.minimal.yaml  # Fixed in Docker
+# Note: All entity types and fields come from this YAML schema
 ```
 
 ## Architecture

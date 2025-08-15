@@ -33,17 +33,9 @@ def get_dynamic_tool_docstring() -> str:
         doc += "Available Schemas:\n"
 
         for name, spec_data in spec_map.items():
-            spec = translator.get_entity_spec(name)
-            doc += f"  - memory_type: '{spec.name}'\n"
-            doc += f"    Anchor Field: '{spec.anchor}'\n"
-            doc += f"    Fields:\n"
-            if spec.fields:
-                for field_name, props in spec.fields.items():
-                    if props.get('system'):
-                        continue
-                    req_str = " (required)" if props.get('required') else ""
-                    type_str = props.get('type', 'any')
-                    doc += f"      - {field_name}: {type_str}{req_str}\n"
+            doc += f"  - memory_type: '{name}'\n"
+            doc += f"    Anchor Field: '{translator.get_anchor_field(name)}'\n"
+            doc += f"    Available in YAML schema\n"
         return doc
     except Exception as e:
         return f"Could not generate dynamic docstring. Error: {e}"
@@ -52,14 +44,13 @@ def get_dynamic_tool_docstring() -> str:
 class MemgCoreBridge:
     """A lean bridge to the memg-core public API."""
 
-    def add_memory(self, memory_type: str, user_id: str, payload: dict, tags: Optional[list[str]] = None) -> dict[str, Any]:
-        """Directly calls the generic add_memory function."""
+    def add_memory(self, memory_type: str, user_id: str, payload: dict) -> dict[str, Any]:
+        """Directly calls the generic add_memory function with YAML-validated payload."""
         try:
             memory = add_memory(
                 memory_type=memory_type,
                 user_id=user_id,
-                payload=payload,
-                tags=tags or []
+                payload=payload
             )
             return {
                 "success": True,
@@ -153,55 +144,43 @@ def register_tools(app: FastMCP) -> None:
     def add_memory_tool(
         memory_type: str,
         user_id: str,
-        statement: str,
-        details: str = None,
-        tags: str = None,
-        status: str = None,
-        priority: str = None,
-        assignee: str = None,
-        due_date: str = None
+        payload: dict
     ):
-        """Add a memory using YAML-driven schema.
+        """Add a memory using pure YAML-driven schema validation.
 
-        Core required fields:
-        - memory_type: Type of memory (must be defined in YAML schema)
-        - user_id: User ID
-        - statement: The anchor text (required for all memory types)
+        Args:
+            memory_type (str): Type of memory (must be defined in YAML schema)
+            user_id (str): User ID to associate with the memory
+            payload (dict): Complete payload conforming to YAML schema for the memory_type
 
-        Optional fields (based on YAML schema):
-        - details: Additional details
-        - tags: Comma-separated tags
-        - status: Task status (for task type)
-        - priority: Task priority (for task type)
-        - assignee: Task assignee (for task type)
-        - due_date: Task due date (for task type)
+        Valid memory types and their required/optional fields are defined in the YAML schema.
+        Use the get_system_info tool to see available schemas and field requirements.
+
+        Example payloads:
+        - memo: {"statement": "Remember this"}
+        - note: {"statement": "Note text", "details": "Additional details"}
+        - task: {"statement": "Task description", "details": "More info", "status": "todo", "priority": "high"}
+        - document: {"statement": "Document title", "details": "Document content"}
         """
         if not bridge:
             return {"result": "❌ Bridge not initialized"}
 
-        # Build payload from YAML-driven fields - NO HARDCODING
-        payload = {"statement": statement}
-
-        # Add optional fields to payload if provided
-        optional_fields = {
-            "details": details,
-            "status": status,
-            "priority": priority,
-            "assignee": assignee,
-            "due_date": due_date
-        }
-
-        for key, value in optional_fields.items():
-            if value is not None:
-                payload[key] = value
-
-        parsed_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+        # Validate that memory_type exists in YAML schema
+        try:
+            translator = get_yaml_translator()
+            if memory_type not in translator._entities_map():
+                available_types = list(translator._entities_map().keys())
+                return {
+                    "result": f"❌ Invalid memory_type '{memory_type}'",
+                    "error": f"Available types: {available_types}"
+                }
+        except Exception as e:
+            return {"result": f"❌ Schema validation failed: {e}"}
 
         result = bridge.add_memory(
             memory_type=memory_type,
             user_id=user_id,
-            payload=payload,
-            tags=parsed_tags
+            payload=payload
         )
 
         if result["success"]:
@@ -250,16 +229,27 @@ def register_tools(app: FastMCP) -> None:
 
     @app.tool("mcp_gmem_get_system_info")
     def get_system_info_tool():
-        """Get system information and available memory schemas."""
+        """Get system information and complete YAML schema details."""
         if not bridge:
             return {"result": {"status": "Bridge not initialized"}}
 
         stats = bridge.get_stats()
         try:
             translator = get_yaml_translator()
-            stats["yaml_schemas"] = translator._entities_map()
+
+            # Build schema info using available translator methods
+            schema_details = {}
+            for entity_name in translator._entities_map():
+                schema_details[entity_name] = {
+                    "anchor_field": translator.get_anchor_field(entity_name),
+                    "description": f"Entity type defined in YAML schema"
+                }
+
+            stats["yaml_schema_details"] = schema_details
+            stats["valid_memory_types"] = list(translator._entities_map().keys())
+
         except Exception as e:
-            stats["yaml_schemas"] = {"error": f"Could not load schemas: {e}"}
+            stats["yaml_schema_error"] = f"Could not load schemas: {e}"
 
         return {"result": stats}
 
