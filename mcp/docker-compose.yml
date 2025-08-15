@@ -1,9 +1,7 @@
 services:
   # MEMG Core MCP Server with Lean Core API
   memg-mcp-server:
-    build:
-      context: ..
-      dockerfile: mcp/Dockerfile.mcp
+    image: ghcr.io/genovo-ai/memg-core-mcp:latest
     container_name: memg-mcp-server-${MEMORY_SYSTEM_MCP_PORT:-8787}
     ports:
       - "${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787}"
