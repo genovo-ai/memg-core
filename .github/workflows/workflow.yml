@@ -122,7 +122,7 @@ jobs:
         with:
           context: .
           file: mcp/Dockerfile.mcp
-          platforms: linux/amd64  # Temporarily amd64 only for faster builds
+          platforms: linux/amd64,linux/arm64  # Support both Intel and Apple Silicon
           push: true
           tags: ghcr.io/${{ github.repository }}-mcp:latest
           labels: |
