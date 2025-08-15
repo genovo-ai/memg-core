@@ -16,15 +16,13 @@ def test_delete_memory_removes_from_qdrant_and_kuzu_no_dangling_edges(
     memory1 = mem_factory(
         id="memory-1",
         user_id="test-user",
-        statement="Memory 1 content",
-        type="note",
+        memory_type="note",
     )
 
     memory2 = mem_factory(
         id="memory-2",
         user_id="test-user",
-        statement="Memory 2 content",
-        type="note",
+        memory_type="note",
     )
 
     # Add memories to index
@@ -84,9 +82,9 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
     memory = mem_factory(
         id="memory-1",
         user_id="test-user",
-        type="note",
-        statement="Initial content",
+        memory_type="note",
         payload={
+            "statement": "Initial content",
             "details": "Initial details",
         },
     )
@@ -100,17 +98,17 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
     assert qdrant_point["payload"]["entity"]["details"] == "Initial details"
 
     kuzu_node = kuzu_fake.nodes["Memory"]["memory-1"]
-    # Current core doesn't store content in Kuzu, only title
+    # Current core stores only core fields in Kuzu, not payload details
     assert "details" not in kuzu_node
-    assert kuzu_node["statement"] == "Initial content"
+    assert kuzu_node["memory_type"] == "note"
 
     # Update memory with same ID
     updated_memory = mem_factory(
         id="memory-1",
         user_id="test-user",
-        type="note",
-        statement="Updated content",
+        memory_type="note",
         payload={
+            "statement": "Updated content",
             "details": "Updated details",
         },
     )
@@ -124,6 +122,6 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
     assert qdrant_point["payload"]["entity"]["details"] == "Updated details"
 
     kuzu_node = kuzu_fake.nodes["Memory"]["memory-1"]
-    # Current core doesn't store content in Kuzu, only title
+    # Current core stores only core fields in Kuzu, not payload details
     assert "details" not in kuzu_node
-    assert kuzu_node["statement"] == "Updated content"
+    assert kuzu_node["memory_type"] == "note"

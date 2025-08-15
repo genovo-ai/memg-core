@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 from uuid import uuid4
 
@@ -15,6 +16,18 @@ from memg_core.core.interfaces.embedder import Embedder
 from memg_core.core.interfaces.kuzu import KuzuInterface
 from memg_core.core.interfaces.qdrant import QdrantInterface
 from memg_core.core.models import Memory
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_yaml_schema():
+    """Global YAML schema fixture that uses the real config file."""
+    # Use the actual config file from the project
+    config_path = Path(__file__).parent.parent / "config" / "core.minimal.yaml"
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    os.environ["MEMG_YAML_SCHEMA"] = str(config_path)
+    return config_path
 
 
 class DummyEmbedder:
@@ -410,30 +423,39 @@ def mem_factory() -> Callable[..., Memory]:
     """Fixture for creating Memory objects with defaults."""
 
     def _create_memory(**kwargs) -> Memory:
-        memory_type = kwargs.get("type", "memo")
+        memory_type = kwargs.get("memory_type", kwargs.get("type", "memo"))
+
+        # Build payload with statement inside it
+        payload = {
+            "statement": f"This is a test statement for {memory_type}.",
+        }
+
+        # Add type-specific fields to payload
+        if memory_type == "note":
+            payload["details"] = "This is the detail for the test note."
+        elif memory_type == "document":
+            payload["details"] = "This is the body of the document."
+        elif memory_type == "task":
+            payload["details"] = "This is a test task."
+            payload["status"] = "todo"
+
         defaults = {
             "id": str(uuid4()),
             "user_id": "test-user",
-            "type": memory_type,
-            "statement": f"This is a test statement for {memory_type}.",
-            "payload": {},
+            "memory_type": memory_type,
+            "payload": payload,
             "tags": ["test"],
             "confidence": 0.8,
             "is_valid": True,
             "created_at": datetime.now(UTC),
             "updated_at": None,
         }
-        if memory_type == "document":
-            defaults["payload"] = {
-                "details": "This is the body of the document.",
-            }
-        elif memory_type == "task":
-            defaults["payload"] = {
-                "details": "This is a test task.",
-                "status": "todo",
-            }
-        # Allow kwargs to override defaults
+
+        # Allow kwargs to override defaults, but merge payload properly
         final_attrs = {**defaults, **kwargs}
+        if "payload" in kwargs:
+            final_attrs["payload"] = {**payload, **kwargs["payload"]}
+
         return Memory(**final_attrs)
 
     return _create_memory

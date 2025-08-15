@@ -16,7 +16,7 @@ defaults:
 entities:
   - name: memo
     description: "Base memory unit"
-    # anchor is fixed in code: statement
+    anchor: statement
     fields:
       id:          { type: string, required: true, system: true }
       user_id:     { type: string, required: true, system: true }
@@ -31,12 +31,14 @@ entities:
   - name: document
     parent: memo
     description: "Document-like memo with long body"
+    anchor: statement
     fields:
       details:     { type: string, required: true }   # long text body
 
   - name: task
     parent: memo
     description: "Task-like memo"
+    anchor: statement
     fields:
       details:     { type: string }                    # optional extra context
       status:      { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled], default: todo }
@@ -47,6 +49,7 @@ entities:
   - name: note
     parent: memo
     description: "A simple note."
+    anchor: statement
     fields:
       details: { type: string, required: true }
 
