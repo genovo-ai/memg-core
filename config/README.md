@@ -1,12 +1,20 @@
 # MEMG Schema Specification
 
-This document defines the structure and generation pattern of the YAML schema used in `memg-core`, an AI memory system for agents. The schema is modular, human-readable, and designed for extensibility across memory types such as notes, tasks, and documents.
+This document defines the structure and generation pattern of the YAML schema used in `memg-core`, an AI memory system for agents. The schema is modular, human-readable, and designed for extensibility across memory types.
+
+---
+
+## Available Schema Files
+
+- **`core.memo.yaml`**: Minimal schema with just the base `memo` entity
+- **`core.test.yaml`**: Extended schema with `memo` and `memo_test` entities for development/testing
+- **Custom schemas**: Can be created following the patterns below
 
 ---
 
 ## Overview
 
-Each memory type is represented as an `entity`. These are structured hierarchically and support inheritance. Entities can declare `fields` (data properties) and `relations` (directed edges to other entities). The schema also defines system-wide defaults for ID generation, timestamp management, and vector embedding.
+Each memory type is represented as an `entity`. Entities can declare `fields` (data properties) and `relations` (directed edges to other entities). The schema also defines system-wide defaults for ID generation, timestamp management, and vector embedding.
 
 ---
 
@@ -53,7 +61,7 @@ Each object in the `entities` list is a memory unit definition.
 * `fields`: Field map with types and constraints
 * `relations`: List of directed links from/to other entities
 
-#### Example: Base Entity
+#### Example: Base Entity (`core.memo.yaml`)
 
 ```yaml
 - name: memo
@@ -75,22 +83,31 @@ Each object in the `entities` list is a memory unit definition.
       target: memo
 ```
 
-#### Example: Inherited Entity
+#### Example: Extended Entity (`core.test.yaml`)
 
 ```yaml
-- name: note
-  parent: memo
-  description: "A simple note with a short 'details' field."
+- name: memo_test
+  description: "Ad-hoc test entity combining note, task, and document"
   anchor: statement
   fields:
-    details: { type: string, required: true }
+    id:         { type: string, required: true, system: true }
+    user_id:    { type: string, required: true, system: true }
+    statement:  { type: string, required: true, max_length: 8000 }
+    details:    { type: string }  # optional for doc/note-style
+    status:     { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled] }
+    priority:   { type: enum, choices: [low, medium, high, critical] }
+    assignee:   { type: string }
+    due_date:   { type: datetime }
+    created_at: { type: datetime, required: true, system: true }
+    updated_at: { type: datetime, system: true }
+    vector:     { type: vector, derived_from: statement, system: true }
   relations:
-    - name: note_document
-      description: "Note providing additional context to a document"
+    - name: memo_test_related
+      description: "Generic relation between test memos"
       directed: true
-      predicates: [ANNOTATES]
-      source: note
-      target: document
+      predicates: [RELATED_TO, ANNOTATES, SUPPORTS, REFERENCED_BY]
+      source: memo_test
+      target: memo_test
 ```
 
 ---
@@ -116,18 +133,49 @@ Each object in the `entities` list is a memory unit definition.
 
 ---
 
-## Inheritance Rules
+## Schema Design Patterns
 
-* All `fields` and `relations` declared in a `parent` entity are inherited by its children
-* Children can override or extend both `fields` and `relations`
-* This enables a minimal and reusable core schema for all memory types
+### Core Entity Pattern
+The `memo` entity serves as the foundational memory unit with essential fields:
+- **System fields**: `id`, `user_id`, `created_at`, `updated_at`, `vector` (automatically managed)
+- **Content field**: `statement` (the primary content, used for vectorization via `anchor`)
+- **Relations**: Generic `RELATED_TO` connections between memos
+
+### Extended Entity Pattern
+The `memo_test` entity demonstrates how to extend functionality:
+- **All core memo fields** plus additional optional fields
+- **Task-like fields**: `status`, `priority`, `assignee`, `due_date`
+- **Document-like fields**: `details` for extended content
+- **Rich relations**: Multiple predicates (`RELATED_TO`, `ANNOTATES`, `SUPPORTS`, `REFERENCED_BY`)
+
+### Custom Schema Creation
+To create custom schemas:
+1. Start with the `memo` base entity (or copy from `core.memo.yaml`)
+2. Add entities with domain-specific fields (following `memo_test` pattern)
+3. Define meaningful relations between entities
+4. Use inheritance sparingly - flat entities are often clearer
 
 ---
 
-## Output Requirements
+## Usage
+
+### Setting Schema in Environment
+```bash
+# Use minimal schema (memo only)
+export MEMG_YAML_SCHEMA=config/core.memo.yaml
+
+# Use test schema (memo + memo_test)  
+export MEMG_YAML_SCHEMA=config/core.test.yaml
+
+# Use custom schema
+export MEMG_YAML_SCHEMA=config/my_custom.yaml
+```
+
+### Schema Validation Requirements
 
 The final YAML must:
-
 * Follow standard YAML syntax
 * Be suitable for direct use in the MEMG config loader
 * Contain **no extra text** (comments are okay)
+* Include at least one entity with required system fields
+* Define valid field types and relation structures
