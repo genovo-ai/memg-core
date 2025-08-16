@@ -262,13 +262,15 @@ def setup_health_endpoints(app: FastMCP) -> None:
 def register_tools(app: FastMCP) -> None:
     """Register MCP tools."""
 
+    # Generate dynamic docstring first
+    dynamic_docstring = get_dynamic_tool_docstring()
+
     @app.tool("mcp_gmem_add_memory")
     def add_memory_tool(
         memory_type: str,
         user_id: str,
         payload: dict
     ):
-        # Dynamic docstring will be set below
         logger.info(f"🔧 MCP Tool called: add_memory_tool(type={memory_type}, user={user_id}, payload={payload})")
 
         if not bridge:
@@ -313,8 +315,8 @@ def register_tools(app: FastMCP) -> None:
                 "error": result.get("error", "Unknown error")
             }
 
-    # Dynamically set the docstring from the YAML schema
-    add_memory_tool.__doc__ = get_dynamic_tool_docstring()
+    # Set the dynamic docstring
+    add_memory_tool.__doc__ = dynamic_docstring
 
 
     @app.tool("mcp_gmem_search_memories")
