@@ -1,104 +1,124 @@
-# MEMG Core MCP Server - Pure YAML-Driven API
+# MEMG Core MCP Server - Enhanced YAML-Driven API
 
-🚀 **YAML-first MCP server with zero hardcoded entity types**
+🚀 **YAML-first MCP server with enhanced developer schema support**
 
 ## Quick Start
 
-### Option 1: Direct Python (Development)
+### Option 1: Docker Build & Run (Recommended)
 
 1. **Setup environment:**
    ```bash
-   cp ../env.example ../.env
-   # Edit .env if needed (No API keys required - uses FastEmbed locally!)
-   ```
-
-2. **Run MCP Server directly:**
-   ```bash
    cd mcp/
-   python mcp_server.py
+   cp ../env.example .env
+   # IMPORTANT: Edit .env to use the enhanced schema - based on your yaml policy
+   # Change: MEMG_YAML_SCHEMA=config/core.minimal.yaml
+   # To:     MEMG_YAML_SCHEMA=config/software_dev.yaml
    ```
 
-### Option 2: Docker (Local Build)
-
-1. **Setup environment:**
+2. **Build and start with automated script:**
    ```bash
-   cp ../env.example ../.env
+   ./build_and_run.sh
    ```
 
-2. **Start with Docker Compose:**
-   ```bash
-   cd mcp/
-   docker-compose up -d
-   ```
+   This script will:
+   - Load `.env` configuration
+   - Create required directories with proper permissions
+   - Build Docker image from source
+   - Start MCP server with health checks
+   - Show status and available tools
 
 3. **Test it's working:**
    ```bash
-   curl http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health
-   curl http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/
+   curl http://localhost:8787/health
+   curl http://localhost:8787/
    ```
 
-## What's New: Pure YAML-Driven Architecture
+### Option 2: Direct Docker Compose
 
-The MCP server is now **100% YAML-schema compliant**:
-- ✅ `add_memory(memory_type, payload, user_id)` - Pure YAML validation
-- ✅ `search(query, user_id, limit, mode="vector|graph|hybrid")` - Unified search
-- ✅ Dynamic schema discovery via `get_system_info` tool
+1. **Setup environment:**
+   ```bash
+   cd mcp/
+   cp ../env.example .env
+   # IMPORTANT: Edit .env to change YAML schema:
+   # MEMG_YAML_SCHEMA=config/software_dev.yaml
+   mkdir -p ~/.local/share/memory_system_8787/qdrant ~/.local/share/memory_system_8787/kuzu
+   ```
 
-**Zero hardcoded fields** - everything flows from `core.minimal.yaml` schema!
+2. **Start manually:**
+   ```bash
+   docker-compose up -d
+   ```
+
+## Enhanced Developer Schema
+
+🎯 **Now includes 6 entity types for full software development workflows**:
+- ✅ **Basic types**: `memo`, `document`, `task`, `note`
+- ✅ **Developer types**: `bug`, `solution`
+- ✅ Enhanced fields: severity levels, file paths, code snippets, status tracking
+- ✅ Rich relationships: bugs link to solutions, solutions implement tasks
+
+**Zero hardcoded fields** - everything flows from `config/software_dev.yaml` schema!
 
 ## Available MCP Tools (3 Total)
 
 The MCP server provides exactly **3 YAML-driven tools**:
 
 ### Memory Management
-- **`mcp_gmem_add_memory`** - Pure YAML-driven memory addition (supports all YAML entity types)
-- **`mcp_gmem_search_memories`** - Search memories with filtering
-- **`mcp_gmem_get_system_info`** - Get YAML schema details and system stats
+- **`mcp_gmem_add_memory`** - Pure YAML-driven memory addition (supports all 6 entity types)
+- **`mcp_gmem_search_memories`** - Semantic search with vector similarity scoring
+- **`mcp_gmem_get_system_info`** - Get complete YAML schema details and system stats
 
-### ⚠️ Important Note
-The server uses **one generic `add_memory` tool** that works with all YAML-defined entity types (`memo`, `note`, `task`, `document`) rather than separate tools for each type. This maintains YAML-first principles.
+### ✅ Verified Working
+All tools tested and working with enhanced schema including new `bug` and `solution` types.
 
-### Example Usage (YAML-Compliant)
+### Example Usage (Enhanced Schema)
 ```bash
 # Get schema information first
-curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_get_system_info
+curl -X POST http://localhost:8787/tools/mcp_gmem_get_system_info
 
-# Add a memo (basic type)
-curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_add_memory \
+# Add a bug (developer type with enhanced fields)
+curl -X POST http://localhost:8787/tools/mcp_gmem_add_memory \
   -H "Content-Type: application/json" \
-  -d '{"memory_type": "memo", "user_id": "test_user", "payload": {"statement": "Remember to update docs"}}'
+  -d '{"memory_type": "bug", "user_id": "cursor", "payload": {"statement": "Docker mount permission issue", "details": "Docker failing to mount volumes on macOS due to chown errors", "severity": "medium", "status": "resolved"}}'
 
-# Add a task (with YAML-defined fields)
-curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_add_memory \
+# Add a solution (with implementation details)
+curl -X POST http://localhost:8787/tools/mcp_gmem_add_memory \
   -H "Content-Type: application/json" \
-  -d '{"memory_type": "task", "user_id": "test_user", "payload": {"statement": "Update documentation", "details": "Need to update MCP README", "status": "todo", "priority": "high"}}'
+  -d '{"memory_type": "solution", "user_id": "cursor", "payload": {"statement": "Pre-create mount directories", "details": "Create directories before docker-compose runs", "implementation": "Modified build_and_run.sh to expand .env and mkdir -p required paths"}}'
 
-# Add a note (with details)
-curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_add_memory \
+# Add a task (basic type)
+curl -X POST http://localhost:8787/tools/mcp_gmem_add_memory \
   -H "Content-Type: application/json" \
-  -d '{"memory_type": "note", "user_id": "test_user", "payload": {"statement": "Meeting notes", "details": "Discussed YAML compliance"}}'
+  -d '{"memory_type": "task", "user_id": "cursor", "payload": {"statement": "Update MCP documentation", "status": "in_progress", "priority": "high"}}'
 
-# Search memories
-curl -X POST http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/tools/mcp_gmem_search_memories \
+# Search memories with semantic similarity
+curl -X POST http://localhost:8787/tools/mcp_gmem_search_memories \
   -H "Content-Type: application/json" \
-  -d '{"query": "documentation", "user_id": "test_user", "limit": 5}'
+  -d '{"query": "Docker permission", "user_id": "cursor", "limit": 5}'
 ```
 
 ## Configuration
 
-Key settings in `.env` file:
+Key settings in `.env` file (copy from `../env.example` and edit):
 ```bash
-# Storage paths (will be created automatically)
-QDRANT_STORAGE_PATH=/path/to/qdrant
-KUZU_DB_PATH=/path/to/kuzu/db
+# Storage and networking (REQUIRED)
+BASE_MEMORY_PATH=$HOME/.local/share/memory_system  # Will be expanded to full path
+MEMORY_SYSTEM_MCP_PORT=8787                        # Change for multiple instances
 
-# Server settings
-MEMORY_SYSTEM_MCP_PORT=8787  # Change for multiple instances
+# YAML Schema (MUST EDIT: change from core.minimal.yaml to software_dev.yaml)
+MEMG_YAML_SCHEMA=config/software_dev.yaml         # Enhanced schema with 6 types
 
-# Schema configuration
-MEMG_YAML_SCHEMA=config/software_dev.yaml  # Repo-relative path
-# Note: All entity types and fields come from this YAML schema
+# Note: The env.example defaults to core.minimal.yaml (4 types)
+# You MUST change it to software_dev.yaml to get bug/solution types
+# Available types: memo, document, task, note, bug, solution
 ```
+
+### Automatic Directory Creation
+The `build_and_run.sh` script automatically:
+- Reads `.env` configuration
+- Expands `$HOME` to full path
+- Creates `~/.local/share/memory_system_8787/qdrant` and `kuzu` directories
+- Sets proper permissions to avoid Docker mount issues
 
 ## Architecture
 
@@ -115,23 +135,40 @@ MEMG_YAML_SCHEMA=config/software_dev.yaml  # Repo-relative path
                                                └───────────────────┘
 ```
 
-## Development
+## Development & Troubleshooting
 
+### Quick Commands
 ```bash
-# Install development dependencies
-pip install -e ".[dev]"
+# View server logs
+docker-compose logs -f
 
-# Run MCP server with debugging
-python mcp_server.py --debug
+# Stop server
+docker-compose down
 
-# Test with latest code changes
-python -m pytest ../tests/ -v
+# Restart with fresh build
+./build_and_run.sh
+
+# Manual directory creation (if needed)
+mkdir -p ~/.local/share/memory_system_8787/{qdrant,kuzu}
 ```
 
-## Architecture Notes
+### Common Issues
 
-- **Local builds only**: No registry dependencies, everything builds from source
-- **MCP as side integration**: This will eventually move to the parent "memg" repo
-- **Requirements separation**: MCP dependencies in `requirements_mcp.txt` for lighter builds
+**Docker mount permission errors on macOS?**
+- The `build_and_run.sh` script automatically fixes this
+- Creates directories with proper permissions before Docker runs
 
-That's it! 🎉
+**MCP tools not available in Cursor?**
+- Ensure server is registered in Cursor MCP settings
+- Check server is running: `curl http://localhost:8787/health`
+
+### Architecture Notes
+
+- **Enhanced YAML schema**: 6 entity types for full developer workflows
+- **Local builds only**: No registry dependencies, builds from source
+- **Cross-platform**: Works on macOS and Linux with automatic path handling
+- **Persistent storage**: Memories stored in `~/.local/share/memory_system_*` directories
+
+## ✅ Status: Fully Working
+
+All 3 MCP tools tested and verified working with enhanced developer schema including `bug` and `solution` types! 🎉

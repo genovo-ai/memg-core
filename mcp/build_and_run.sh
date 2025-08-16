@@ -7,10 +7,31 @@ set -e
 echo "🚀 MEMG Core MCP Server - Local Docker Build & Run"
 echo "=================================================="
 
+# Load environment variables from .env file if it exists
+if [ -f .env ]; then
+    echo "📋 Loading environment from .env file..."
+    # Load .env but expand $HOME properly
+    while IFS= read -r line; do
+        if [[ ! "$line" =~ ^#.* ]] && [[ "$line" =~ ^[A-Z_].*=.* ]]; then
+            # Expand $HOME in the value
+            expanded_line=$(echo "$line" | envsubst)
+            export "$expanded_line"
+        fi
+    done < .env
+fi
+
 # Get the port from environment or use default
 MCP_PORT=${MEMORY_SYSTEM_MCP_PORT:-8787}
 
 echo "📍 Using port: $MCP_PORT"
+
+# Ensure BASE_MEMORY_PATH is fully expanded for docker-compose
+export BASE_MEMORY_PATH="${BASE_MEMORY_PATH:-$HOME/.local/share/memory_system}"
+
+# Ensure mount directories exist to avoid Docker chown issues
+VOLUME_BASE="${BASE_MEMORY_PATH}_${MCP_PORT}"
+echo "🔧 Ensuring volume directories exist at: ${VOLUME_BASE}"
+mkdir -p "${VOLUME_BASE}/qdrant" "${VOLUME_BASE}/kuzu"
 
 # Step 1: Shutdown any existing containers
 echo ""
