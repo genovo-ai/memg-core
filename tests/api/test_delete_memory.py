@@ -220,3 +220,133 @@ class TestDeleteMemory:
         # Verify all memories deleted
         search_results = search("memo", user_id="test-user", limit=10)
         assert len(search_results) == 0
+
+    def test_delete_memory_by_hrid(self, qdrant_fake, kuzu_fake, embedder, monkeypatch):
+        """Test deleting memory using HRID instead of UUID."""
+        # Setup environment and interfaces
+        monkeypatch.setenv("QDRANT_STORAGE_PATH", "/tmp/test_qdrant")
+        monkeypatch.setenv("KUZU_DB_PATH", "/tmp/test_kuzu.db")
+
+        from memg_core.api import public
+
+        monkeypatch.setattr(public, "QdrantInterface", lambda **kwargs: qdrant_fake)
+        monkeypatch.setattr(public, "KuzuInterface", lambda **kwargs: kuzu_fake)
+        monkeypatch.setattr(public, "Embedder", lambda: embedder)
+
+        # Create a memory first
+        memory = add_memory(
+            memory_type="memo",
+            payload={"statement": "Test memory for HRID deletion"},
+            user_id="test-user",
+        )
+
+        memory_uuid = memory.id
+        memory_hrid = memory.hrid
+
+        # Verify memory exists using UUID
+        search_results = search("HRID deletion", user_id="test-user", limit=5)
+        assert len(search_results) == 1
+        assert search_results[0].memory.id == memory_uuid
+
+        # Delete using HRID instead of UUID
+        result = delete_memory(memory_id=memory_hrid, user_id="test-user")
+        assert result is True
+
+        # Verify memory is gone from search
+        search_results = search("HRID deletion", user_id="test-user", limit=5)
+        assert len(search_results) == 0
+
+        # Verify memory is gone from Qdrant (using UUID)
+        point = qdrant_fake.get_point(memory_uuid)
+        assert point is None
+
+        # Verify memory is gone from Kuzu (using UUID)
+        assert memory_uuid not in kuzu_fake.nodes["Memory"]
+
+    def test_delete_memory_hrid_vs_uuid_equivalence(
+        self, qdrant_fake, kuzu_fake, embedder, monkeypatch
+    ):
+        """Test that deleting by HRID and UUID are equivalent operations."""
+        # Setup environment and interfaces
+        monkeypatch.setenv("QDRANT_STORAGE_PATH", "/tmp/test_qdrant")
+        monkeypatch.setenv("KUZU_DB_PATH", "/tmp/test_kuzu.db")
+
+        from memg_core.api import public
+
+        monkeypatch.setattr(public, "QdrantInterface", lambda **kwargs: qdrant_fake)
+        monkeypatch.setattr(public, "KuzuInterface", lambda **kwargs: kuzu_fake)
+        monkeypatch.setattr(public, "Embedder", lambda: embedder)
+
+        # Create two identical memories
+        memory1 = add_memory(
+            memory_type="memo",
+            payload={"statement": "Memory for UUID deletion"},
+            user_id="test-user",
+        )
+        memory2 = add_memory(
+            memory_type="memo",
+            payload={"statement": "Memory for HRID deletion"},
+            user_id="test-user",
+        )
+
+        # Delete first memory by UUID
+        result1 = delete_memory(memory_id=memory1.id, user_id="test-user")
+        assert result1 is True
+
+        # Delete second memory by HRID
+        result2 = delete_memory(memory_id=memory2.hrid, user_id="test-user")
+        assert result2 is True
+
+        # Verify both are deleted
+        point1 = qdrant_fake.get_point(memory1.id)
+        point2 = qdrant_fake.get_point(memory2.id)
+        assert point1 is None
+        assert point2 is None
+
+    def test_delete_memory_invalid_hrid_format(self, qdrant_fake, kuzu_fake, embedder, monkeypatch):
+        """Test deleting with invalid HRID format."""
+        # Setup environment and interfaces
+        monkeypatch.setenv("QDRANT_STORAGE_PATH", "/tmp/test_qdrant")
+        monkeypatch.setenv("KUZU_DB_PATH", "/tmp/test_kuzu.db")
+
+        from memg_core.api import public
+
+        monkeypatch.setattr(public, "QdrantInterface", lambda **kwargs: qdrant_fake)
+        monkeypatch.setattr(public, "KuzuInterface", lambda **kwargs: kuzu_fake)
+        monkeypatch.setattr(public, "Embedder", lambda: embedder)
+
+        # Try to delete with invalid HRID format
+        invalid_hrids = ["INVALID_HRID", "NOT_A_REAL_HRID_123", "FAKE_HRID_XYZ999"]
+
+        for invalid_hrid in invalid_hrids:
+            with pytest.raises(ValidationError, match=f"Memory with ID {invalid_hrid} not found"):
+                delete_memory(memory_id=invalid_hrid, user_id="test-user")
+
+    def test_delete_memory_hrid_wrong_user(self, qdrant_fake, kuzu_fake, embedder, monkeypatch):
+        """Test deleting memory by HRID with wrong user ID."""
+        # Setup environment and interfaces
+        monkeypatch.setenv("QDRANT_STORAGE_PATH", "/tmp/test_qdrant")
+        monkeypatch.setenv("KUZU_DB_PATH", "/tmp/test_kuzu.db")
+
+        from memg_core.api import public
+
+        monkeypatch.setattr(public, "QdrantInterface", lambda **kwargs: qdrant_fake)
+        monkeypatch.setattr(public, "KuzuInterface", lambda **kwargs: kuzu_fake)
+        monkeypatch.setattr(public, "Embedder", lambda: embedder)
+
+        # Create a memory with one user
+        memory = add_memory(
+            memory_type="memo", payload={"statement": "User A's memory"}, user_id="user-a"
+        )
+
+        memory_hrid = memory.hrid
+
+        # Try to delete with different user using HRID
+        with pytest.raises(
+            ValidationError, match=f"Memory {memory_hrid} does not belong to user user-b"
+        ):
+            delete_memory(memory_id=memory_hrid, user_id="user-b")
+
+        # Verify memory still exists using HRID search
+        search_results = search("User A's memory", user_id="user-a", limit=5)
+        assert len(search_results) == 1

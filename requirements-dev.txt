@@ -12,5 +12,3 @@ mypy>=1.17.0
 
 # Type stubs for mypy
 types-PyYAML>=6.0.12
-
-

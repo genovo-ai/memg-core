@@ -456,27 +456,30 @@ def register_tools(app: FastMCP) -> None:
         memory_id: str,
         user_id: str,
     ):
-        """Delete a single memory by UUID with user verification.
+        """Delete a single memory by UUID or HRID with user verification.
 
         Parameters
         ----------
         memory_id : str
-            UUID of the memory to delete. Must be exact UUID for safety.
+            UUID or HRID of the memory to delete. Supports both formats:
+            - UUID: e.g., "550e8400-e29b-41d4-a716-446655440000"
+            - HRID: e.g., "TASK_AAA001", "NOTE_BBB123"
         user_id : str
             Owner/namespace for the memory. Must match memory owner for deletion.
 
         Returns
         -------
         dict
-            { "result": "✅ Memory deleted successfully", "memory_id": "<uuid>", "deleted": true }
+            { "result": "✅ Memory deleted successfully", "memory_id": "<id>", "deleted": true }
             or { "result": "❌ Failed to delete memory", "error": "<error_message>" }
 
         Notes
         -----
+        - Accepts both UUID and HRID formats for maximum flexibility
         - Only deletes ONE memory at a time for safety
         - Verifies user ownership before deletion
         - Removes memory from both Qdrant (vector) and Kuzu (graph) storage
-        - UUID is required (not HRID) for precise identification
+        - Automatically resolves HRID to UUID internally
         - Operation is irreversible - use with caution
 
         Security
@@ -484,6 +487,7 @@ def register_tools(app: FastMCP) -> None:
         - User must own the memory to delete it
         - No bulk deletion to prevent accidental data loss
         - Memory existence and ownership verified before deletion
+        - Both UUID and HRID provide precise identification
         """
         logger.info(f"🔧 MCP Tool called: delete_memory_tool(id={memory_id}, user={user_id})")
 

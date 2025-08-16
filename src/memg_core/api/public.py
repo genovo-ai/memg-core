@@ -159,14 +159,53 @@ def search(
 # ----------------------------- public delete -----------------------------
 
 
+def _resolve_memory_id_to_uuid(memory_id: str, qdrant: QdrantInterface) -> str:
+    """Resolve either UUID or HRID to UUID.
+
+    Args:
+        memory_id: Either a UUID or HRID (e.g., "TASK_AAA001")
+        qdrant: QdrantInterface to search for HRID
+
+    Returns:
+        str: The UUID of the memory
+
+    Raises:
+        ValidationError: If memory not found or invalid format
+    """
+    # Try as UUID first (direct lookup)
+    point = qdrant.get_point(memory_id)
+    if point:
+        return memory_id
+
+    # If not found as UUID, try as HRID
+    # Check if it looks like an HRID format
+    if "_" in memory_id and memory_id.replace("_", "").replace("-", "").isalnum():
+        # Search by HRID filter
+        dummy_vector = [0.0] * 384  # Default embedding size for search
+
+        results = qdrant.search_points(
+            vector=dummy_vector, limit=1, filters={"core.hrid": memory_id}
+        )
+
+        if results and len(results) > 0:
+            # Found by HRID, return the UUID
+            result = results[0]
+            uuid = result.get("id")
+            if uuid:
+                return str(uuid)
+
+    # Neither UUID nor HRID worked
+    raise ValidationError(f"Memory with ID {memory_id} not found")
+
+
 def delete_memory(
     memory_id: str,
     user_id: str,
 ) -> bool:
-    """Delete a single memory by UUID with user verification.
+    """Delete a single memory by UUID or HRID with user verification.
 
     Args:
-        memory_id: UUID of the memory to delete
+        memory_id: UUID or HRID of the memory to delete (e.g., "uuid-string" or "TASK_AAA001")
         user_id: User ID for ownership verification
 
     Returns:
@@ -191,8 +230,11 @@ def delete_memory(
     )
     kuzu = KuzuInterface(db_path=kuzu_path)
 
-    # First verify the memory exists and belongs to the user
-    point = qdrant.get_point(memory_id)
+    # Resolve memory_id (UUID or HRID) to UUID
+    uuid = _resolve_memory_id_to_uuid(memory_id, qdrant)
+
+    # Get the memory to verify user ownership
+    point = qdrant.get_point(uuid)
     if not point:
         raise ValidationError(f"Memory with ID {memory_id} not found")
 
@@ -204,14 +246,14 @@ def delete_memory(
     if memory_user_id != user_id:
         raise ValidationError(f"Memory {memory_id} does not belong to user {user_id}")
 
-    # Delete from both storage backends
+    # Delete from both storage backends using the resolved UUID
     # Delete from Qdrant first (primary store)
-    qdrant_success = qdrant.delete_points([memory_id])
+    qdrant_success = qdrant.delete_points([uuid])
 
     # Try to delete from Kuzu (secondary store) - don't fail if this has issues
     kuzu_success = True
     try:
-        kuzu_success = kuzu.delete_node("Memory", memory_id)
+        kuzu_success = kuzu.delete_node("Memory", uuid)
     except (DatabaseError, Exception):
         # Ignore Kuzu deletion errors for now - Qdrant is the primary store
         # This handles issues with relationship constraints in Kuzu
