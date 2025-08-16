@@ -40,31 +40,20 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Development tools - NOT included in library build
-dev = [
- # Code quality and formatting
- "ruff>=0.12.0",
- "pylint>=3.3.7",
- "pre-commit>=4.2.0",
-
- # Testing
- "pytest>=8.4.1",
- "pytest-asyncio>=0.25.0",
- "pytest-cov>=6.0.0",
-
- # Security and type checking
- "bandit>=1.8.6",
- "mypy>=1.17.0",
-
- # Legacy formatters (can be removed if using ruff only)
- "black>=25.1.0",
- "isort>=6.0.1",
-]
-
-# Minimal testing dependencies (lighter than full dev)
+# Essential testing dependencies
 test = [
  "pytest>=8.4.1",
  "pytest-asyncio>=0.25.0",
+ "pytest-cov>=6.0.0",
+]
+
+# Development tools (for contributors)
+dev = [
+ "ruff>=0.12.0",
+ "mypy>=1.17.0",
+ "pytest>=8.4.1",
+ "pytest-asyncio>=0.25.0",
+ "pytest-cov>=6.0.0",
 ]
 
 [project.urls]
@@ -108,99 +97,11 @@ exclude = [
     "*.so",
     "*.egg-info",
     ".git*",
-    ".pre-commit*",
-    ".pylintrc",
     "pyrightconfig.json",
     "*.log",
-    "Dockerfile*",
-    "docker-compose*",
-    "build.sh",
-    "setup-dev.sh",
-    "start_server.sh",
 ]
 
-# PYLINT CONFIGURATION - CLEAN DEPENDENCIES
-[tool.pylint.main]
-# Add all required packages to recognized imports
-extension-pkg-allow-list = [
-    "kuzu",
-    "qdrant_client",
-    "pydantic",
-    "dotenv",
-    "fastembed"
-]
 
-# Only lint the src directory, not integration (has separate config)
-source-roots = ["src"]
-ignore-paths = ["integration/.*"]
-
-# Add source paths to help pylint find modules
-init-hook = '''
-import sys
-import os
-# Add src to path for core memory system
-sys.path.insert(0, os.path.join(os.getcwd(), "src"))
-# Add integration to path for MCP modules
-sys.path.insert(0, os.path.join(os.getcwd(), "integration"))
-# Add root to path for proper imports
-sys.path.insert(0, os.getcwd())
-'''
-
-[tool.pylint.messages_control]
-# Enable import checking but with proper configuration
-disable = [
- "too-many-arguments",
- "too-many-instance-attributes",
- "too-few-public-methods",
- "duplicate-code",
- "too-many-locals",
- "too-many-branches",
- "too-many-statements",
- "too-many-positional-arguments",
- "import-outside-toplevel",
- "broad-exception-caught",
- "logging-fstring-interpolation",
- "raise-missing-from",
- "no-self-argument",  # Pydantic validators use cls, not self
- "missing-function-docstring",  # Many small utility functions don't need docstrings
- "missing-module-docstring",  # Module docstrings are not always necessary
- "no-else-return",  # Sometimes else after return is more readable
- "no-member",  # Pydantic models have dynamic attributes
- "unused-argument",  # Some arguments are required by interface but not used
- "fixme",  # TODO comments are acceptable
- "protected-access",  # Sometimes accessing protected members is necessary
- "unused-import",  # Some imports are used dynamically
- "reimported",  # Re-importing for convenience is acceptable
- "global-statement",  # Global variables are sometimes necessary
- "global-variable-not-assigned",  # Global declarations without assignment are valid
- "unnecessary-pass",  # Pass statements in abstract methods are acceptable
- "too-many-return-statements",  # Complex logic sometimes requires many returns
- "too-many-nested-blocks",  # Complex processing sometimes requires nesting
- "consider-using-set-comprehension",  # List comprehensions are sometimes more readable
- "unrecognized-option",  # Ignore unknown pylint options
-]
-
-# Set high score requirement for production
-fail-under = 9.5
-
-[tool.pylint.imports]
-# Declare all third-party packages
-known-third-party = [
-    "kuzu",
-    "qdrant_client",
-    "pydantic",
-    "dotenv",
-    "httpx",
-    "typing_extensions",
-    "fastembed",
-    "fastmcp",
-    "uvicorn",
-    "starlette"
-]
-
-# Ignore import errors from files that don't exist in src/memg_core
-# (MCP files are now in integration/)
-ignored-classes = ["mcp_server", "mcp_server_core", "mcp_tools_core"]
 
 # MYPY CONFIGURATION
 [tool.mypy]
@@ -211,31 +112,9 @@ disallow_untyped_defs = false  # Too strict for current codebase
 ignore_missing_imports = true # Ignore missing stubs for some packages
 no_implicit_optional = false  # Allow implicit Optional for now
 
-# BLACK CONFIGURATION
-[tool.black]
-line-length = 88
-target-version = ['py310', 'py311', 'py312']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
- # directories
- \.eggs
- | \.git
- | \.hg
- | \.mypy_cache
- | \.tox
- | \.venv
- | build
- | dist
-)/
-'''
 
-# ISORT CONFIGURATION
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 88
-known_third_party = ["qdrant_client", "kuzu", "fastembed", "fastmcp"]
+
+
 
 # PYTEST CONFIGURATION
 [tool.pytest.ini_options]
@@ -245,10 +124,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --cov=src --cov-report=term-missing"
 
-# BANDIT SECURITY CONFIGURATION
-[tool.bandit]
-exclude_dirs = ["tests", "test_*"]
-skips = ["B101", "B104", "B601"]
+
 
 # RUFF CONFIGURATION
 [tool.ruff]
@@ -256,7 +132,7 @@ skips = ["B101", "B104", "B601"]
 target-version = "py311"
 
 # Include source directories
-include = ["src/**/*.py", "tests/**/*.py", "integration/**/*.py"]
+include = ["src/**/*.py", "tests/**/*.py"]
 
 # Exclude common directories and auto-generated files
 exclude = [
@@ -340,5 +216,6 @@ line-ending = "auto"
 [tool.ruff.lint.isort]
 # Organize imports
 known-first-party = ["memg_core"]
+known-third-party = ["qdrant_client", "kuzu", "fastembed", "pydantic"]
 force-single-line = false
 force-sort-within-sections = true
