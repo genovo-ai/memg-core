@@ -19,6 +19,7 @@ entities:
     fields:
       id:          { type: string, required: true, system: true }
       user_id:     { type: string, required: true, system: true }
+      project:     { type: string }  # Optional project namespace for filtering
       statement:   { type: string, required: true, max_length: 8000 }
       created_at:  { type: datetime, required: true, system: true }
       updated_at:  { type: datetime, system: true }
@@ -36,6 +37,7 @@ entities:
     description: "Document-like memo with extended content"
     anchor: statement
     fields:
+      project: { type: string }  # Optional project namespace for filtering
       details: { type: string, required: true }
       url:     { type: string }  # Reference URL for external docs
     relations:
@@ -57,6 +59,7 @@ entities:
     description: "Development task or work item"
     anchor: statement
     fields:
+      project:     { type: string }  # Optional project namespace for filtering
       details:     { type: string }
       status:      { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled] }
       priority:    { type: enum, choices: [low, medium, high, critical] }
@@ -88,6 +91,7 @@ entities:
     description: "General note or observation"
     anchor: statement
     fields:
+      project: { type: string }  # Optional project namespace for filtering
       details: { type: string, required: true }
     relations:
       - name: note_document
@@ -102,6 +106,7 @@ entities:
     description: "Bug report or issue"
     anchor: statement
     fields:
+      project:      { type: string }  # Optional project namespace for filtering
       details:      { type: string, required: true }
       severity:     { type: enum, choices: [low, medium, high, critical] }
       status:       { type: enum, choices: [open, investigating, in_progress, resolved, closed, wont_fix] }
@@ -127,6 +132,7 @@ entities:
     description: "Solution, fix, or implementation approach"
     anchor: statement
     fields:
+      project:      { type: string }  # Optional project namespace for filtering
       details:      { type: string, required: true }
       approach:     { type: enum, choices: [workaround, hotfix, proper_fix, refactor] }
       code_snippet: { type: string }  # Code example or snippet
