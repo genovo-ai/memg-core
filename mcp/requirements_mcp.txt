@@ -1,5 +1,0 @@
-# MCP Server specific dependencies
-fastmcp>=0.2.0
-uvicorn>=0.30.0
-pydantic>=2.0.0
-starlette>=0.37
