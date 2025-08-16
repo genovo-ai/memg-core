@@ -46,8 +46,8 @@ jobs:
 
   build:
     needs: quality
-    # Build wheel for download (PyPI publishing temporarily disabled)
-    if: github.ref == 'refs/heads/main'
+    # Build wheel for download and PyPI publishing
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +75,7 @@ jobs:
 
   pypi:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       id-token: write  # Required for trusted publishing
@@ -90,11 +90,17 @@ jobs:
           print-hash: true
 
   summary:
-    needs: [build, pypi]
+    needs: [build]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - run: |
-          echo "MEMG Core build and PyPI publish completed successfully!"
-          echo "Package published to PyPI: pip install memg-core"
-          echo "Wheel artifact also available for download from Actions > Artifacts"
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "MEMG Core ${{ github.ref_name }} released successfully!"
+            echo "Package published to PyPI: pip install memg-core"
+            echo "Wheel artifact also available for download from Actions > Artifacts"
+          else
+            echo "MEMG Core build completed successfully!"
+            echo "Wheel artifact available for download from Actions > Artifacts"
+            echo "PyPI publishing skipped (only on version tags)"
+          fi
