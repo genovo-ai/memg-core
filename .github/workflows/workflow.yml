@@ -73,30 +73,28 @@ jobs:
           echo ""
           echo "To download: Go to Actions > This workflow run > Artifacts section"
 
-  # PyPI publishing temporarily disabled for faster development
-  # To re-enable: uncomment this job and update summary dependency below
-  # pypi:
-  #   needs: build
-  #   if: github.ref == 'refs/heads/main'
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     id-token: write  # Required for trusted publishing
-  #   steps:
-  #     - uses: actions/download-artifact@v4
-  #       with:
-  #         name: dist
-  #         path: dist
-  #     - name: Publish to PyPI (Trusted Publishing)
-  #       uses: pypa/gh-action-pypi-publish@release/v1
-  #       with:
-  #         print-hash: true
+  pypi:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
 
   summary:
-    needs: [build]
+    needs: [build, pypi]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - run: |
-          echo "MEMG Core build completed successfully!"
-          echo "Wheel artifact available for download from Actions > Artifacts"
-          echo "Future PyPI: pip install memg-core"
+          echo "MEMG Core build and PyPI publish completed successfully!"
+          echo "Package published to PyPI: pip install memg-core"
+          echo "Wheel artifact also available for download from Actions > Artifacts"
