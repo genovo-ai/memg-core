@@ -44,7 +44,7 @@ The MCP server is now **100% YAML-schema compliant**:
 - ✅ `search(query, user_id, limit, mode="vector|graph|hybrid")` - Unified search
 - ✅ Dynamic schema discovery via `get_system_info` tool
 
-**Zero hardcoded fields** - everything flows from `core.minimal.yaml` schema!
+**Zero hardcoded fields** - everything flows from `core.memo.yaml` schema!
 
 ## Available MCP Tools (3 Total)
 
@@ -96,7 +96,7 @@ KUZU_DB_PATH=/path/to/kuzu/db
 MEMORY_SYSTEM_MCP_PORT=8787  # Change for multiple instances
 
 # Schema configuration
-MEMG_YAML_SCHEMA=/app/config/core.minimal.yaml  # Fixed in Docker
+MEMG_YAML_SCHEMA=/app/config/core.memo.yaml  # Fixed in Docker
 # Note: All entity types and fields come from this YAML schema
 ```
 

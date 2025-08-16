@@ -16,7 +16,7 @@ services:
       KUZU_DB_PATH: /kuzu/memory_db
       MEMORY_SYSTEM_MCP_PORT: ${MEMORY_SYSTEM_MCP_PORT:-8787}
       MEMORY_SYSTEM_MCP_HOST: "0.0.0.0"  # Docker container binding
-      MEMG_YAML_SCHEMA: ${MEMG_YAML_SCHEMA:-/app/config/core.minimal.yaml}
+      MEMG_YAML_SCHEMA: ${MEMG_YAML_SCHEMA:-/app/config/core.memo.yaml}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health"]
