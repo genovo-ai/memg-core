@@ -1,6 +1,17 @@
-# MEMG Core
+# 💾 memg-core
 
-**Lightweight memory system for AI agents with dual storage (Qdrant + Kuzu)**
+**The foundation of structured memory for AI agents.**
+
+memg-core is the deterministic, schema-driven memory engine at the heart of the larger MEMG system. It gives AI developers a fast, reliable, testable memory layer powered by:
+
+- **YAML-based schema definition** (for custom memory types)
+- **Dual-store backend** (Qdrant for vectors, Kuzu for graph queries)
+- **Public Python API** for all memory operations
+- **Built-in support** for auditability, structured workflows, and self-managed memory loops
+
+It's designed for AI agents that build, debug, and improve themselves — and for humans who demand clean, explainable, memory-driven systems.
+
+🧩 **This is just the core.** The full memg system builds on this to add multi-agent coordination, long-term memory policies, and deeper retrieval pipelines — currently in progress.
 
 ## Features
 
@@ -67,13 +78,13 @@ for r in results:
     print(f"[{source}] {r.memory.memory_type.value}: {r.memory.title} - Score: {r.score:.2f}")
 ```
 
-### YAML registries (optional)
+### YAML Schema Examples
 
-Core ships with three tiny registries under `config/`:
+Core ships with example schemas under `config/`:
 
-- `core.memo.yaml`: basic types `note`, `document`, `task` with anchors and generic relations
-- `core.software_dev.yaml`: adds `bug` + `solution` and `bug_solution` relation
-- `core.knowledge.yaml`: `concept` + `document` with `mentions`/`derived_from`
+- `core.memo.yaml`: Basic memory types (`memo`, `note`, `document`, `task`)
+- `software_dev.yaml`: Enhanced schema with `bug` and `solution` types for development workflows
+- `core.test.yaml`: Test configuration for development
 
 Enable:
 
@@ -116,6 +127,27 @@ EMBEDDING_DIMENSION_LEN=384
 
 - Python 3.11+
 - No API keys required!
+
+## Architecture
+
+memg-core provides a deterministic, YAML-driven memory layer with dual storage:
+
+- **YAML-driven schema engine** - Define custom memory types with zero hardcoded fields
+- **Qdrant/Kuzu dual-store** - Vector similarity + graph relationships
+- **Public Python API** - Clean interface for all memory operations
+- **Configurable schemas** - Examples in `config/` for different use cases
+
+### In Scope
+- ✅ YAML schema definition and validation
+- ✅ Memory CRUD operations with dual storage
+- ✅ Semantic search and "see also" discovery
+- ✅ Public Python API with full functionality
+
+### Coming in Full MEMG System
+- 🔄 Schema contracts and multi-agent coordination
+- 🔄 Async job processing and bulk operations
+- 🔄 Advanced memory policies and retention
+- 🔄 Multi-agent memory orchestration
 
 ## Links
 
