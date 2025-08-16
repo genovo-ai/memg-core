@@ -58,8 +58,8 @@ cover/
 # Django stuff:
 *.log
 local_settings.py
-mcp/*local*
-mcp/*.sh
+# MCP server components - local development only
+mcp/
 db.sqlite3
 db.sqlite3-journal
 
