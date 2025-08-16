@@ -183,7 +183,6 @@ class MemgCoreBridge:
         query: str,
         user_id: Optional[str] = None,
         limit: int = 5,
-        project: Optional[str] = None,
         **kwargs
     ) -> list[dict[str, Any]]:
         """Search memories using the lean core search function."""
@@ -465,7 +464,6 @@ def register_tools(app: FastMCP) -> None:
             user_id=user_id,
             limit=limit,
             memory_type=memory_type,
-            project=project,
             mode=mode,
             include_details=include_details,
             include_see_also=include_see_also,
