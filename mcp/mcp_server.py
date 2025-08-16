@@ -27,6 +27,8 @@ from memg_core.core.models import SearchResult
 from memg_core import __version__
 from memg_core.core.yaml_translator import get_yaml_translator
 from memg_core.core.exceptions import ValidationError, DatabaseError
+from memg_core.core.interfaces.qdrant import QdrantInterface
+from memg_core.core.config import get_config
 
 # Setup comprehensive logging
 logging.basicConfig(
@@ -178,6 +180,71 @@ class MemgCoreBridge:
             logger.error(f"💥 Unexpected Error in add_memory: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
+    def _try_direct_id_lookup(self, query: str, user_id: Optional[str]) -> Optional[dict[str, Any]]:
+        """Try to lookup memory directly by UUID or HRID."""
+        if not query or not query.strip():
+            return None
+
+        query = query.strip()
+
+        try:
+            # Initialize Qdrant interface for direct lookup
+            config = get_config()
+            qdrant_path = os.getenv("QDRANT_STORAGE_PATH", "qdrant_storage")
+            qdrant = QdrantInterface(
+                collection_name=config.memg.qdrant_collection_name,
+                storage_path=qdrant_path
+            )
+
+            # Try as UUID first (direct lookup)
+            point = qdrant.get_point(query)
+            if point and point.get("payload"):
+                payload = point["payload"]
+                # Check user ownership if user_id provided
+                if user_id and payload.get("core", {}).get("user_id") != user_id:
+                    return None
+                return {
+                    "memory_id": query,
+                    "hrid": payload.get("core", {}).get("hrid", ""),
+                    "memory_type": payload.get("core", {}).get("memory_type", ""),
+                    "payload": {k: v for k, v in payload.items() if not k.startswith("core.")},
+                    "score": 1.0,  # Perfect match
+                    "source": "direct_id_lookup",
+                }
+
+            # Try as HRID if it looks like one
+            if "_" in query and query.replace("_", "").replace("-", "").isalnum():
+                # Search by HRID filter
+                dummy_vector = [0.0] * 384  # Default embedding size
+                results = qdrant.search_points(
+                    vector=dummy_vector,
+                    limit=1,
+                    filters={"core.hrid": query}
+                )
+
+                if results:
+                    result = results[0]
+                    payload = result.get("payload", {})
+                    memory_id = result.get("id")
+
+                    # Check user ownership if user_id provided
+                    if user_id and payload.get("core", {}).get("user_id") != user_id:
+                        return None
+
+                    return {
+                        "memory_id": str(memory_id),
+                        "hrid": payload.get("core", {}).get("hrid", ""),
+                        "memory_type": payload.get("core", {}).get("memory_type", ""),
+                        "payload": {k: v for k, v in payload.items() if not k.startswith("core.")},
+                        "score": 1.0,  # Perfect match
+                        "source": "direct_id_lookup",
+                    }
+
+        except Exception as e:
+            logger.debug(f"Direct ID lookup failed for query '{query}': {e}")
+
+        return None
+
     def search_memories(
         self,
         query: str,
@@ -185,8 +252,14 @@ class MemgCoreBridge:
         limit: int = 5,
         **kwargs
     ) -> list[dict[str, Any]]:
-        """Search memories using the lean core search function."""
+        """Search memories using the lean core search function with ID detection."""
         try:
+            # First, try direct ID lookup if query looks like UUID or HRID
+            direct_result = self._try_direct_id_lookup(query, user_id)
+            if direct_result:
+                return [direct_result]
+
+            # Fall back to semantic search
             results: list[SearchResult] = search(
                 query=query,
                 user_id=user_id,
