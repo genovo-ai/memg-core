@@ -183,6 +183,7 @@ class MemgCoreBridge:
         query: str,
         user_id: Optional[str] = None,
         limit: int = 5,
+        project: Optional[str] = None,
         **kwargs
     ) -> list[dict[str, Any]]:
         """Search memories using the lean core search function."""
@@ -194,7 +195,8 @@ class MemgCoreBridge:
                 memo_type=kwargs.get("memory_type"),
                 mode=kwargs.get("mode", "vector"),
                 include_details=kwargs.get("include_details", "self"),
-                include_see_also=kwargs.get("include_see_also", False)
+                include_see_also=kwargs.get("include_see_also", False),
+                filters=kwargs.get("filters")
             )
 
             # The `__getattr__` on Memory model allows generic access to payload.
@@ -309,35 +311,37 @@ def register_tools(app: FastMCP) -> None:
         memo:
           anchor_field: statement (embedded for search)
           required: statement
+          optional: project
           example: {"statement": "Example memo statement"}
 
         document:
           anchor_field: statement (embedded for search)
           required: statement, details
-          optional: url
+          optional: project, url
           example: {"statement": "Example document statement", "details": "example_details_value"}
 
         task:
           anchor_field: statement (embedded for search)
           required: statement
-          optional: assignee, details, due_date, epic, priority, status, story_points
+          optional: assignee, details, due_date, epic, priority, project, status, story_points
           example: {"statement": "Example task statement"}
 
         note:
           anchor_field: statement (embedded for search)
           required: statement, details
+          optional: project
           example: {"statement": "Example note statement", "details": "example_details_value"}
 
         bug:
           anchor_field: statement (embedded for search)
           required: statement, details
-          optional: environment, file_path, line_number, reproduction, severity, status
+          optional: environment, file_path, line_number, project, reproduction, severity, status
           example: {"statement": "Example bug statement", "details": "example_details_value"}
 
         solution:
           anchor_field: statement (embedded for search)
           required: statement, details
-          optional: approach, code_snippet, file_path, test_status
+          optional: approach, code_snippet, file_path, project, test_status
           example: {"statement": "Example solution statement", "details": "example_details_value"}
 
         Behavior
@@ -406,6 +410,7 @@ def register_tools(app: FastMCP) -> None:
         user_id: str = None,
         limit: int = 5,
         memory_type: str = None,
+        project: str = None,
         mode: str = "vector",
         include_details: str = "self",
         include_see_also: bool = False,
@@ -422,6 +427,8 @@ def register_tools(app: FastMCP) -> None:
             Max number of results.
         memory_type : str, optional
             Filter by entity type (e.g., "task", "bug"). Must exist in YAML if provided.
+        project : str, optional
+            Filter by project namespace. Only returns memories from the specified project.
         mode : str, default "vector"
             Search mode passed through to core. Defaults to vector similarity.
             Other modes (e.g., "keyword", "hybrid") may be supported by core configuration.
@@ -448,14 +455,21 @@ def register_tools(app: FastMCP) -> None:
         if not bridge:
             return {"result": "❌ Bridge not initialized"}
 
+        # Build filters dict to handle project filtering
+        filters = {}
+        if project:
+            filters["entity.project"] = project
+
         results = bridge.search_memories(
             query=query,
             user_id=user_id,
             limit=limit,
             memory_type=memory_type,
+            project=project,
             mode=mode,
             include_details=include_details,
             include_see_also=include_see_also,
+            filters=filters if filters else None,
         )
 
         if results and "error" in results[0]:
