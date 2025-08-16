@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
+#!/usr/bin/env python3
 """
-MEMG Core MCP Server - Updated for lean core API.
+MEMG Core MCP Server (lean-core)
 
-This MCP server uses the latest memg-core public API with the lean core architecture.
+Exposes three MCP tools backed by memg-core's public API:
+
+- mcp_gmem_add_memory: Insert a memory validated against the **active YAML schema**.
+- mcp_gmem_search_memories: Search memories (vector by default) with optional filters.
+- mcp_gmem_get_system_info: Introspect version, active schema path, and per-entity field requirements.
+
+All validation rules, entity types, fields, enums, anchors, and relations are **owned by the YAML**.
+Change the YAML → behavior and tool help update automatically.
 """
 
 import os
@@ -29,11 +37,10 @@ logger = logging.getLogger(__name__)
 
 
 def _ensure_yaml_schema_env() -> None:
-    """Ensure MEMG_YAML_SCHEMA is explicitly set.
+    """Ensure MEMG_YAML_SCHEMA is set (container-safe).
 
-    - Uses MEMG_YAML_SCHEMA from environment or falls back to defaults
-    This sets the environment variable explicitly to satisfy the strict
-    requirement of the YAML translator while keeping server DX smooth.
+    Looks for MEMG_YAML_SCHEMA and normalizes repo-relative paths to /app/… when running in container.
+    This does **not** read/validate the file — it only ensures the env var is usable by the YAML translator.
     """
     if os.getenv("MEMG_YAML_SCHEMA"):
         logger.info(f"📄 Using YAML schema from MEMG_YAML_SCHEMA={os.getenv('MEMG_YAML_SCHEMA')}")
@@ -55,9 +62,10 @@ def _ensure_yaml_schema_env() -> None:
 
 
 def _summarize_entity_fields(translator) -> dict[str, dict[str, list[str]]]:
-    """Build a summary of required/optional fields for each entity from YAML.
+    """Return {entity: {"required": [...], "optional": [...]}} from YAML.
 
-    System fields are hidden since they are handled internally.
+    - Hides `system: true` fields (handled by core).
+    - Preserves YAML-requiredness; does not coerce or infer defaults.
     """
     summary: dict[str, dict[str, list[str]]] = {}
     for name, spec in translator._entities_map().items():
@@ -76,33 +84,76 @@ def _summarize_entity_fields(translator) -> dict[str, dict[str, list[str]]]:
 
 
 def get_dynamic_tool_docstring() -> str:
-    """Generates a dynamic docstring for the add_memory tool from the YAML schema."""
+    """Build the add_memory tool docstring from the **current YAML schema**.
+
+    Produces:
+      - MCP tool parameter descriptions
+      - Per-entity anchor field
+      - Required/optional fields (non-system)
+      - Example payloads for each entity type
+
+    This reflects the **live** schema loaded by memg_core.core.yaml_translator.
+    """
     try:
         translator = get_yaml_translator()
         spec_map = translator._entities_map()
         field_summary = _summarize_entity_fields(translator)
 
-        doc = "Adds a memory to the system based on a dynamic, YAML-defined schema.\n\n"
-        doc += "Args:\n"
-        doc += "    memory_type (str): The type of memory to add (must be defined in YAML schema).\n"
-        doc += "    user_id (str): The user ID to associate with the memory.\n"
-        doc += "    payload (dict): A dictionary of fields conforming to the schema for the given memory_type.\n\n"
-        doc += "Available Schemas:\n"
+        lines = []
+        lines.append("Add a memory using pure YAML-driven schema validation.")
+        lines.append("")
+        lines.append("Parameters")
+        lines.append("----------")
+        lines.append("memory_type : str")
+        lines.append("    Entity type defined in YAML schema. Must exactly match an entity key.")
+        lines.append(f"    Available types: {', '.join(spec_map.keys())}")
+        lines.append("user_id : str")
+        lines.append("    Owner/namespace for the memory. Required by core.")
+        lines.append("payload : dict")
+        lines.append("    Fields conforming to the YAML entity schema. System fields are auto-managed.")
+        lines.append("")
+        lines.append("Entity Schema Details")
+        lines.append("--------------------")
 
-        for name, _spec in spec_map.items():
-            req = ", ".join(field_summary.get(name, {}).get("required", [])) or "(none)"
-            opt = ", ".join(field_summary.get(name, {}).get("optional", [])) or "(none)"
-            doc += f"  - memory_type: '{name}'\n"
-            doc += f"    Anchor Field: '{translator.get_anchor_field(name)}'\n"
-            doc += f"    Required fields: {req}\n"
-            doc += f"    Optional fields: {opt}\n"
-        return doc
+        for name, spec in spec_map.items():
+            req = field_summary.get(name, {}).get("required", [])
+            opt = field_summary.get(name, {}).get("optional", [])
+            anchor = translator.get_anchor_field(name)
+
+            lines.append(f"{name}:")
+            lines.append(f"  anchor_field: {anchor} (embedded for search)")
+            if req:
+                lines.append(f"  required: {', '.join(req)}")
+            if opt:
+                lines.append(f"  optional: {', '.join(opt)}")
+
+            # Generate example payload
+            example = {anchor: f"Example {name} statement"}
+            if req:
+                for field in req:
+                    if field != anchor:
+                        example[field] = f"example_{field}_value"
+            lines.append(f"  example: {example}")
+            lines.append("")
+
+        lines.append("Behavior")
+        lines.append("--------")
+        lines.append("- Validates memory_type exists and payload matches entity schema")
+        lines.append("- System fields (id, timestamps, vector) are auto-managed")
+        lines.append("- Returns memory_id and hrid on success")
+        lines.append("- Use mcp_gmem_get_system_info for complete schema inspection")
+
+        return "\n".join(lines)
     except Exception as e:
         return f"Could not generate dynamic docstring. Error: {e}"
 
-
 class MemgCoreBridge:
-    """A lean bridge to the memg-core public API."""
+    """Thin adapter over memg-core public API.
+
+    - add_memory(..): Validates against YAML, returns {success, memory_id, hrid|error}.
+    - search_memories(..): Delegates to core search, returns scored hits (id, hrid, type, payload, score, source).
+    - get_stats(): Static service metadata (type, version, functions).
+    """
 
     def add_memory(self, memory_type: str, user_id: str, payload: dict) -> dict[str, Any]:
         """Directly calls the generic add_memory function with YAML-validated payload."""
@@ -217,22 +268,7 @@ def register_tools(app: FastMCP) -> None:
         user_id: str,
         payload: dict
     ):
-        """Add a memory using pure YAML-driven schema validation.
-
-        Args:
-            memory_type (str): Type of memory (must be defined in YAML schema)
-            user_id (str): User ID to associate with the memory
-            payload (dict): Complete payload conforming to YAML schema for the memory_type
-
-        Valid memory types and their required/optional fields are defined in the YAML schema.
-        Use the get_system_info tool to see available schemas and field requirements.
-
-        Example payloads:
-        - memo: {"statement": "Remember this"}
-        - note: {"statement": "Note text", "details": "Additional details"}
-        - task: {"statement": "Task description", "details": "More info", "status": "todo", "priority": "high"}
-        - document: {"statement": "Document title", "details": "Document content"}
-        """
+        # Dynamic docstring will be set below
         logger.info(f"🔧 MCP Tool called: add_memory_tool(type={memory_type}, user={user_id}, payload={payload})")
 
         if not bridge:
@@ -290,7 +326,37 @@ def register_tools(app: FastMCP) -> None:
         mode: str = "vector",
         include_details: str = "self",
     ):
-        """Search memories with the lean core search function."""
+        """Search memories (vector by default) with optional filters.
+
+        Parameters
+        ----------
+        query : str
+            Free-text query. Passed to core search (vector by default).
+        user_id : str, optional
+            Restrict results to this user. If omitted, core behavior applies.
+        limit : int, default 5
+            Max number of results.
+        memory_type : str, optional
+            Filter by entity type (e.g., "task", "bug"). Must exist in YAML if provided.
+        mode : str, default "vector"
+            Search mode passed through to core. Defaults to vector similarity.
+            Other modes (e.g., "keyword", "hybrid") may be supported by core configuration.
+        include_details : str, default "self"
+            Controls result payload shape. Passed through to core:
+            - "self": return the entity’s own payload
+            - Other values depend on core (e.g., expanded fields). If unknown, core falls back safely.
+
+        Returns
+        -------
+        dict
+            { "result": "✅ Found N memories", "memories": [{memory_id, hrid, memory_type, payload, score, source}, ...] }
+
+        Notes
+        -----
+        - Scores/sources originate from core (e.g., vector store).
+        - This tool does **not** transform or post-process results beyond packaging.
+        """
+
         if not bridge:
             return {"result": "❌ Bridge not initialized"}
 
@@ -313,7 +379,26 @@ def register_tools(app: FastMCP) -> None:
 
     @app.tool("mcp_gmem_get_system_info")
     def get_system_info_tool():
-        """Get system information and complete YAML schema details."""
+        """Get system information and complete YAML schema details.
+
+        Returns
+        -------
+        dict
+            Complete system information including:
+            - system_type: Service identifier
+            - version: MEMG Core version
+            - api_type: API architecture type
+            - available_functions: List of available core functions
+            - yaml_schema_details: Complete entity schema details with anchor fields
+            - valid_memory_types: All available entity types from YAML
+            - yaml_schema_path: Path to currently loaded YAML schema file
+
+        Notes
+        -----
+        Use this tool to inspect the currently active YAML schema, including all entity types,
+        their required/optional fields, anchor fields for embedding, and schema file location.
+        Essential for understanding what memory types and fields are available.
+        """
         if not bridge:
             return {"result": {"status": "Bridge not initialized"}}
 
