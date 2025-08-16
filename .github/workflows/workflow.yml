@@ -91,10 +91,6 @@ jobs:
   #       with:
   #         print-hash: true
 
-  # MCP Docker build removed - not part of memg-core scope
-  # MCP integration will be reintroduced in the larger MEMG system
-  # Docker files moved to local_development/mcp_docker/ for future use
-
   summary:
     needs: [build]
     runs-on: ubuntu-latest
