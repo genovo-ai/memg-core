@@ -41,7 +41,7 @@ def test_build_graph_query_for_memos_with_relation_names():
 def test_build_graph_query_for_memos_with_memo_type():
     """Test building a graph query with memo type filter."""
     query, params = _build_graph_query_for_memos(
-        "test query", user_id="test-user", limit=10, memo_type="note"
+        "test query", user_id="test-user", limit=10, memo_type="memo_test"
     )
 
     # Current lean core: simple Memory query with memo_type filter
@@ -58,7 +58,7 @@ def test_rows_to_memories():
                 "id": "memory-1",
                 "user_id": "test-user",
                 "statement": "Memory 1 content",
-                "memory_type": "note",
+                "memory_type": "memo_test",
                 "created_at": "2023-01-01T00:00:00+00:00",
                 "confidence": 0.8,
             }
@@ -68,7 +68,7 @@ def test_rows_to_memories():
                 "id": "memory-2",
                 "user_id": "test-user",
                 "statement": "Memory 2 summary",
-                "memory_type": "document",
+                "memory_type": "memo",
                 "created_at": "2023-01-02T00:00:00+00:00",
                 "confidence": 0.9,
             }
@@ -82,12 +82,12 @@ def test_rows_to_memories():
     assert memories[0].id == "memory-1"
     assert memories[0].user_id == "test-user"
     assert memories[0].payload["statement"] == "Memory 1 content"
-    assert memories[0].memory_type == "note"
+    assert memories[0].memory_type == "memo_test"
     assert memories[0].created_at.isoformat() == "2023-01-01T00:00:00+00:00"
     # No hardcoded tags - removed as part of audit
 
     assert memories[1].id == "memory-2"
-    assert memories[1].memory_type == "document"
+    assert memories[1].memory_type == "memo"
     assert memories[1].payload["statement"] == "Memory 2 summary"
 
 
@@ -122,7 +122,7 @@ def test_rows_to_memories_handles_invalid_date():
                 "id": "memory-1",
                 "user_id": "test-user",
                 "statement": "Memory 1 content",
-                "memory_type": "note",
+                "memory_type": "memo_test",
                 "created_at": "not-a-date",
             }
         }
@@ -141,20 +141,20 @@ def test_rerank_with_vectors(embedder, qdrant_fake):
     memory1 = Memory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={
             "statement": "aaaa aaaa aaaa",
-            "details": "This is a note with unrelated content.",
+            "details": "This is a memo_test with unrelated content.",
         },
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={
             "statement": "test query similar",
-            "details": "This is a note with similar content.",
+            "details": "This is a memo_test with similar content.",
         },
     )
 
@@ -186,21 +186,21 @@ def test_append_neighbors(kuzu_fake):
     memory1 = Memory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={"statement": "Memory 1 content", "details": "This is the detail for memory 1."},
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={"statement": "Memory 2 content", "details": "This is the detail for memory 2."},
     )
 
     memory3 = Memory(
         id="memory-3",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={"statement": "Memory 3 content", "details": "This is the detail for memory 3."},
     )
 
@@ -255,7 +255,7 @@ def test_neighbor_cap_respected(kuzu_fake):
     memory1 = Memory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={"statement": "Memory 1 content", "details": "This is the detail for memory 1."},
     )
 
@@ -265,7 +265,7 @@ def test_neighbor_cap_respected(kuzu_fake):
         memory = Memory(
             id=f"memory-{i}",
             user_id="test-user",
-            memory_type="note",
+            memory_type="memo_test",
             statement=f"Memory {i} content",
             payload={"details": f"This is the detail for memory {i}."},
         )
@@ -309,15 +309,21 @@ def test_search_vector_fallback_no_graph(embedder, qdrant_fake, kuzu_fake):
     memory1 = Memory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
-        payload={"statement": "Apple banana orange", "details": "This is a note about fruits."},
+        memory_type="memo_test",
+        payload={
+            "statement": "Apple banana orange",
+            "details": "This is a memo_test about fruits.",
+        },
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
-        memory_type="note",
-        payload={"statement": "Machine learning algorithm", "details": "This is a note about AI."},
+        memory_type="memo_test",
+        payload={
+            "statement": "Machine learning algorithm",
+            "details": "This is a memo_test about AI.",
+        },
     )
 
     # Add to Qdrant
@@ -349,20 +355,20 @@ def test_search_graph_first_rerank_then_neighbors(embedder, qdrant_fake, kuzu_fa
     memory1 = Memory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={
             "statement": "Database concepts with special keyword",
-            "details": "This is a note about databases.",
+            "details": "This is a memo_test about databases.",
         },
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={
             "statement": "Related concepts without special word",
-            "details": "This is a related note.",
+            "details": "This is a related memo_test.",
         },
     )
 
@@ -409,16 +415,16 @@ def test_filters_user_id_propagate_to_qdrant(embedder, qdrant_fake, kuzu_fake):
     memory1 = Memory(
         id="memory-1",
         user_id="user1",
-        memory_type="note",
-        payload={"statement": "Content for user1", "details": "This is a note for user 1."},
+        memory_type="memo_test",
+        payload={"statement": "Content for user1", "details": "This is a memo_test for user 1."},
         # No hardcoded tags - removed as part of audit
     )
 
     memory2 = Memory(
         id="memory-2",
         user_id="user2",
-        memory_type="note",
-        payload={"statement": "Content for user2", "details": "This is a note for user 2."},
+        memory_type="memo_test",
+        payload={"statement": "Content for user2", "details": "This is a memo_test for user 2."},
     )
 
     # Add to Qdrant

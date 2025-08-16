@@ -13,7 +13,7 @@ import re
 from typing import Any, Protocol
 
 # Matches HRIDs like TASK_AAA001, NOTE_ZZZ999
-_HRID_RE = re.compile(r"^(?P<type>[A-Z0-9]+)_(?P<alpha>[A-Z]{3})(?P<num>\d{3})$")
+_HRID_RE = re.compile(r"^(?P<type>[A-Z0-9_]+)_(?P<alpha>[A-Z]{3})(?P<num>\d{3})$")
 
 # Monotonic counters per type (in-memory; persistent store should be used in production)
 _COUNTERS: dict[str, tuple[int, int]] = {}  # {type: (alpha_idx, num)}

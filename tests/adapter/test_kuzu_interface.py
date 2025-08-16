@@ -18,7 +18,7 @@ def test_add_node_and_query_roundtrip(kuzu_fake):
         "id": "test-node-1",
         "user_id": "test-user",
         "content": "Test content",
-        "memory_type": "note",
+        "memory_type": "memo_test",
         "summary": "",
         "source": "user",
         "confidence": 0.8,
@@ -46,7 +46,7 @@ def test_add_node_and_query_roundtrip(kuzu_fake):
     assert results[0]["node"]["user_id"] == "test-user"  # Access user_id from node
     assert results[0]["node"]["content"] == "Test content"  # Access content from node
     assert results[0]["node"]["content"] == "Test content"  # Access content from node
-    assert results[0]["node"]["memory_type"] == "note"  # Access memory_type from node
+    assert results[0]["node"]["memory_type"] == "memo_test"  # Access memory_type from node
 
 
 def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
@@ -56,7 +56,7 @@ def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
         "id": "node-1",
         "user_id": "test-user",
         "content": "Node 1 content",
-        "memory_type": "note",
+        "memory_type": "memo_test",
         "summary": "",
         "source": "user",
         "confidence": 0.8,
@@ -71,7 +71,7 @@ def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
         "id": "node-2",
         "user_id": "test-user",
         "content": "Node 2 content",
-        "memory_type": "note",
+        "memory_type": "memo_test",
         "summary": "",
         "source": "user",
         "confidence": 0.8,

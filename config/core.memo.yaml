@@ -1,0 +1,32 @@
+version: v1
+
+id_policy:
+  kind: uuid
+  field: id
+
+defaults:
+  vector:
+    metric: cosine
+    normalize: true
+  timestamps:
+    auto_create: true
+    auto_update: true
+
+entities:
+  - name: memo
+    description: "Base memory unit"
+    anchor: statement
+    fields:
+      id:          { type: string, required: true, system: true }
+      user_id:     { type: string, required: true, system: true }
+      statement:   { type: string, required: true, max_length: 8000 }
+      created_at:  { type: datetime, required: true, system: true }
+      updated_at:  { type: datetime, system: true }
+      vector:      { type: vector, derived_from: statement, system: true }
+    relations:
+      - name: memo_related
+        description: "Generic relation between memos"
+        directed: true
+        predicates: [RELATED_TO]
+        source: memo
+        target: memo

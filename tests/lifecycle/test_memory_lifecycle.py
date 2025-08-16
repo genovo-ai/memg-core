@@ -15,13 +15,13 @@ def test_delete_memory_removes_from_qdrant_and_kuzu_no_dangling_edges(
     memory1 = mem_factory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
     )
 
     memory2 = mem_factory(
         id="memory-2",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
     )
 
     # Add memories to index
@@ -82,7 +82,7 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
     memory = mem_factory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={
             "statement": "Initial content",
             "details": "Initial details",
@@ -100,13 +100,13 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
     kuzu_node = kuzu_fake.nodes["Memory"]["memory-1"]
     # Current core stores only core fields in Kuzu, not payload details
     assert "details" not in kuzu_node
-    assert kuzu_node["memory_type"] == "note"
+    assert kuzu_node["memory_type"] == "memo_test"
 
     # Update memory with same ID
     updated_memory = mem_factory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={
             "statement": "Updated content",
             "details": "Updated details",
@@ -124,4 +124,4 @@ def test_readding_same_id_is_idempotent_or_overwrites_per_policy(
     kuzu_node = kuzu_fake.nodes["Memory"]["memory-1"]
     # Current core stores only core fields in Kuzu, not payload details
     assert "details" not in kuzu_node
-    assert kuzu_node["memory_type"] == "note"
+    assert kuzu_node["memory_type"] == "memo_test"

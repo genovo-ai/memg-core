@@ -74,11 +74,11 @@ class FakeQdrant:
                             "hrid": f"MEMO_AAA10{i}",  # make deterministic and usable in ordering tests
                         },
                         "entity": {
-                            "statement": f"vector-hit-{i + 1}",  # Use content as anchor for notes
+                            "statement": f"vector-hit-{i + 1}",  # Use content as anchor for memo_test
                             "details": f"details-{i + 1}",
                         },
                         # Flat mirrors for backward compatibility - retrieval still expects statement
-                        "statement": f"vector-hit-{i + 1}",  # Use content as anchor for notes
+                        "statement": f"vector-hit-{i + 1}",  # Use content as anchor for memo_test
                         "details": f"details-{i + 1}",
                     },
                 }
@@ -168,9 +168,9 @@ class FakeKuzu:
 
 
 def test_yaml_translator_anchor_and_validation():
-    mem = create_memory_from_yaml("document", {"statement": "sum", "details": "body"}, user_id="u")
+    mem = create_memory_from_yaml("memo", {"statement": "sum"}, user_id="u")
     assert mem.statement == "sum"
-    # build anchor resolves to summary for documents
+    # build anchor resolves to statement for memo
     anchor = build_anchor_text(mem)
     assert anchor == "sum"
 
@@ -187,7 +187,7 @@ def test_indexer_adds_to_both_stores(monkeypatch):
     monkeypatch.setattr(idx, "KuzuInterface", FakeKuzu)
 
     m = Memory(
-        memory_type="note",
+        memory_type="memo_test",
         payload={"statement": "hello", "details": "hello world"},
         user_id="u",
     )
@@ -255,7 +255,7 @@ def test_retrieval_graph_first(monkeypatch):
         filters=None,
         relation_names=[],
         neighbor_cap=1,
-        memo_type="task",
+        memo_type="memo_test",
         modified_within_days=7,
         mode="graph",
     )
@@ -267,7 +267,7 @@ def test_retrieval_graph_first(monkeypatch):
 # ----------------------------- Tests: Public API -----------------------------
 
 
-def test_public_add_memory_validates_document_schema(monkeypatch):
+def test_public_add_memory_validates_memo_test_schema(monkeypatch):
     # patch public API dependencies
     import memg_core.api.public as pub
 
@@ -285,16 +285,19 @@ def test_public_add_memory_validates_document_schema(monkeypatch):
 
     monkeypatch.setattr(pub, "get_config", lambda: _Cfg())
 
-    # Test strict YAML validation - document must have required fields
+    # Test strict YAML validation - memo_test must have required fields
     m = add_memory(
-        "document",
-        {"statement": "Test document summary", "details": "This is the full document body content"},
+        "memo_test",
+        {
+            "statement": "Test memo_test summary",
+            "details": "This is the full memo_test body content",
+        },
         user_id="u",
     )
 
-    assert m.statement == "Test document summary"
-    assert m.payload["details"] == "This is the full document body content"
-    assert m.memory_type == "document"
+    assert m.statement == "Test memo_test summary"
+    assert m.payload["details"] == "This is the full memo_test body content"
+    assert m.memory_type == "memo_test"
 
 
 def test_public_search_validation(monkeypatch):

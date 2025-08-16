@@ -17,14 +17,20 @@ from memg_core.core.models import Memory
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_yaml_schema():
-    """Global YAML schema fixture that uses the real config file."""
-    # Use the correct relative path from tests/ to config/
-    config_path = Path(__file__).parent.parent / "config" / "core.minimal.yaml"
+    """Global YAML schema fixture that uses the test config file."""
+    # Use the test config that includes memo and memo_test types
+    config_path = Path(__file__).parent.parent / "config" / "core.test.yaml"
 
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found at: {config_path}")
 
     os.environ["MEMG_YAML_SCHEMA"] = str(config_path)
+
+    # Initialize the TypeRegistry with the test config
+    from memg_core.core.types import initialize_types_from_yaml
+
+    initialize_types_from_yaml(str(config_path))
+
     return config_path
 
 
@@ -332,18 +338,14 @@ class FakeKuzu(KuzuInterface):
             if user_id and node.get("user_id") != user_id:
                 continue
 
-            # TODO: This should eventually be replaced by the YAML-defined anchor field logic
-            memory_type = node.get("memory_type")
-            if memory_type == "note":
-                anchor_field_value = node.get("content") or ""
-            elif memory_type == "document":
-                anchor_field_value = node.get("summary") or node.get("content") or ""
-            else:
-                anchor_field_value = node.get("statement") or node.get("content") or ""
+            # For memo and memo_test types, anchor field is always 'statement'
+            anchor_field_value = node.get("statement") or ""
 
             # Use a placeholder if the anchor is still empty or not found
             if not anchor_field_value:
-                anchor_field_value = f"missing-anchor-for-{memory_type}-{node.get('hrid')}"
+                anchor_field_value = (
+                    f"missing-anchor-for-{node.get('memory_type')}-{node.get('hrid')}"
+                )
 
             rows.append(
                 {
@@ -389,17 +391,13 @@ class FakeKuzu(KuzuInterface):
             if not neighbor or neighbor_table != "Memory":
                 continue
 
-            # TODO: This should eventually be replaced by the YAML-defined anchor field logic
-            memory_type = neighbor.get("memory_type")
-            if memory_type == "note":
-                anchor_field_value = neighbor.get("content") or ""
-            elif memory_type == "document":
-                anchor_field_value = neighbor.get("summary") or neighbor.get("content") or ""
-            else:
-                anchor_field_value = neighbor.get("statement") or neighbor.get("content") or ""
+            # For memo and memo_test types, anchor field is always 'statement'
+            anchor_field_value = neighbor.get("statement") or ""
 
             if not anchor_field_value:
-                anchor_field_value = f"missing-anchor-for-{memory_type}-{neighbor.get('hrid')}"
+                anchor_field_value = (
+                    f"missing-anchor-for-{neighbor.get('memory_type')}-{neighbor.get('hrid')}"
+                )
 
             # Return all fields from neighbor, not just selected ones
             neighbor_data = dict(neighbor)
@@ -439,13 +437,11 @@ def mem_factory() -> Callable[..., Memory]:
         }
 
         # Add type-specific fields to payload
-        if memory_type == "note":
-            payload["details"] = "This is the detail for the test note."
-        elif memory_type == "document":
-            payload["details"] = "This is the body of the document."
-        elif memory_type == "task":
-            payload["details"] = "This is a test task."
+        if memory_type == "memo_test":
+            payload["details"] = "This is additional detail for the memo_test."
             payload["status"] = "todo"
+            payload["priority"] = "medium"
+            payload["assignee"] = "test-assignee"
 
         defaults = {
             "id": str(uuid4()),
