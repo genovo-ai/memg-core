@@ -66,7 +66,7 @@ entities:
       epic:        { type: string }   # Epic or feature reference
     see_also:
       enabled: true
-      threshold: 0.7
+      threshold: 0.90
       limit: 3
       target_types: [bug, solution, note]
     relations:
@@ -111,7 +111,7 @@ entities:
       line_number:  { type: string }  # Line number reference
     see_also:
       enabled: true
-      threshold: 0.75
+      threshold: 0.90
       limit: 2
       target_types: [solution, task]
     relations:
@@ -134,7 +134,7 @@ entities:
       test_status:  { type: enum, choices: [untested, manual_test, unit_test, integration_test] }
     see_also:
       enabled: true
-      threshold: 0.7
+      threshold: 0.90
       limit: 3
       target_types: [bug, task, note]
     relations:

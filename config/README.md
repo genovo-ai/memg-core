@@ -52,6 +52,7 @@ Each object in the `entities` list is a memory unit definition.
 * `anchor`: Field to use as semantic reference (used for vectorization)
 * `fields`: Field map with types and constraints
 * `relations`: List of directed links from/to other entities
+* `see_also`: Optional configuration for semantic discovery of related memories
 
 #### Example: Base Entity
 
@@ -113,6 +114,49 @@ Each object in the `entities` list is a memory unit definition.
 * `predicates`: One or more semantics for the link (e.g., `ANNOTATES`, `REFERENCED_BY`)
 * `source`: Origin entity type
 * `target`: Destination entity type
+
+---
+
+## See Also Configuration
+
+The `see_also` field enables automatic discovery of semantically related memories through vector similarity search. When a user searches for memories of an entity type with `see_also` configured, the system automatically finds and includes related memories from specified target types.
+
+### See Also Properties
+
+* `enabled`: Boolean - whether to enable see_also functionality for this entity
+* `threshold`: Float (0.0-1.0) - minimum similarity score required (e.g., 0.7 = 70% similarity)
+* `limit`: Integer - maximum number of related memories to return per target type
+* `target_types`: Array of entity type names to search for related memories
+
+### Example: Task with See Also
+
+```yaml
+- name: task
+  parent: memo
+  description: "Development task or work item"
+  anchor: statement
+  fields:
+    details: { type: string }
+    status: { type: enum, choices: [todo, in_progress, done] }
+  see_also:
+    enabled: true
+    threshold: 0.7
+    limit: 3
+    target_types: [bug, solution, note]
+```
+
+### See Also Behavior
+
+When `include_see_also=true` is passed to search:
+
+1. **Primary Search**: Normal search returns memories matching the query
+2. **Related Discovery**: For each primary result with see_also config:
+   - Extract anchor text from the memory
+   - Search target_types for memories with similarity >= threshold
+   - Return up to `limit` memories per target type
+3. **Result Tagging**: Related memories have `source` field set to `see_also_{type}`
+
+This creates knowledge graph-style associative discovery where users find relevant content they weren't explicitly searching for.
 
 ---
 

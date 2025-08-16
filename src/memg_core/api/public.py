@@ -99,9 +99,45 @@ def search(
     neighbor_cap: int = 5,
     include_see_also: bool = False,  # NEW: enable see_also functionality
 ) -> list[SearchResult]:
-    """Unified search over memories (Graph+Vector).
+    """Unified search over memories (Graph+Vector) with optional semantic discovery.
 
     Requirements: at least one of `query` or `memo_type`.
+
+    Parameters
+    ----------
+    query : str, optional
+        Search query text for semantic matching
+    user_id : str
+        User identifier for filtering results
+    limit : int, default 20
+        Maximum number of results to return
+    filters : dict, optional
+        Additional filters to apply to search
+    memo_type : str, optional
+        Filter results to specific memory type
+    modified_within_days : int, optional
+        Filter to memories modified within N days
+    mode : str, optional
+        Search mode: 'vector', 'graph', or 'hybrid'
+    include_details : str, default "self"
+        Detail level: "none" or "self"
+    projection : dict, optional
+        Per-type field allow-list for result projection
+    relation_names : list[str], optional
+        Specific relation names to consider in graph search
+    neighbor_cap : int, default 5
+        Maximum number of neighbors to include
+    include_see_also : bool, default False
+        Enable semantic discovery of related memories. When True,
+        searches for memories semantically related to primary results
+        based on YAML see_also configuration. Related memories are
+        tagged with 'see_also_{type}' source attribution.
+
+    Returns
+    -------
+    list[SearchResult]
+        Search results including primary matches and (optionally)
+        semantically related memories found via see_also feature.
     """
     if (not query or not query.strip()) and not memo_type:
         raise ValidationError("Provide `query` or `memo_type`.")

@@ -8,6 +8,7 @@
 - **Graph Storage**: Optional relationship analysis with Kuzu
 - **Offline-First**: 100% local embeddings with FastEmbed - no API keys needed
 - **Type-Agnostic**: Configurable memory types via YAML schemas
+- **See Also Discovery**: Knowledge graph-style associative memory retrieval
 - **Lightweight**: Minimal dependencies, optimized for performance
 
 ## Quick Start
@@ -58,6 +59,12 @@ note = add_note(
 results = search("postgres performance", user_id="demo_user", limit=5)
 for r in results:
     print(f"[{r.memory.memory_type.value}] {r.memory.title} - Score: {r.score:.2f}")
+
+# Search with "See Also" discovery (finds semantically related memories)
+results = search("postgres setup", user_id="demo_user", limit=10, include_see_also=True)
+for r in results:
+    source = r.source  # 'qdrant' for primary, 'see_also_bug' for related
+    print(f"[{source}] {r.memory.memory_type.value}: {r.memory.title} - Score: {r.score:.2f}")
 ```
 
 ### YAML registries (optional)

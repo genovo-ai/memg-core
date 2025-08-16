@@ -56,8 +56,29 @@
 - ✅ **Developer types**: `bug`, `solution`
 - ✅ Enhanced fields: severity levels, file paths, code snippets, status tracking
 - ✅ Rich relationships: bugs link to solutions, solutions implement tasks
+- ✅ **See Also feature**: Automatic discovery of semantically related memories
 
 **Zero hardcoded fields** - everything flows from `config/software_dev.yaml` schema!
+
+### 🔍 See Also Feature
+
+The "See Also" functionality provides **knowledge graph-style associative discovery**:
+
+- **Automatic**: When enabled, searches return primary results PLUS semantically related memories
+- **YAML-configured**: Each entity type can specify target types, thresholds, and limits
+- **Transparent**: Related memories are clearly tagged with `see_also_*` source attribution
+- **Efficient**: Single Qdrant query with OR filtering across multiple target types
+
+**Example Configuration (in YAML schema):**
+```yaml
+entities:
+  - name: task
+    see_also:
+      enabled: true
+      threshold: 0.7        # 70% similarity required
+      limit: 3             # Max 3 suggestions per type
+      target_types: [bug, solution, note]
+```
 
 ## Available MCP Tools (3 Total)
 
@@ -95,6 +116,11 @@ curl -X POST http://localhost:8787/tools/mcp_gmem_add_memory \
 curl -X POST http://localhost:8787/tools/mcp_gmem_search_memories \
   -H "Content-Type: application/json" \
   -d '{"query": "Docker permission", "user_id": "cursor", "limit": 5}'
+
+# Search with "See Also" feature enabled (finds related memories automatically)
+curl -X POST http://localhost:8787/tools/mcp_gmem_search_memories \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Docker setup", "user_id": "cursor", "limit": 8, "include_see_also": true}'
 ```
 
 ## Configuration
