@@ -118,7 +118,7 @@ def _initialize_counter_from_storage(
                 # Skip invalid HRIDs but log for transparency
                 from ..core.logging import get_logger
 
-                logger = get_logger()
+                logger = get_logger("hrid")
                 logger.debug(f"Skipping invalid HRID format '{hrid}': {e}")
                 continue
 
@@ -137,7 +137,7 @@ def _initialize_counter_from_storage(
         # If storage query fails, fall back to fresh start but log the issue
         from ..core.logging import get_logger
 
-        logger = get_logger()
+        logger = get_logger("hrid")
         logger.warning(f"HRID storage query failed, falling back to fresh start: {e}")
         return (0, -1)
 
