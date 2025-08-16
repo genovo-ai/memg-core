@@ -6,6 +6,7 @@ This MCP server uses the latest memg-core public API with the lean core architec
 """
 
 import os
+from pathlib import Path
 import logging
 from typing import Any, Optional
 
@@ -27,11 +28,59 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _ensure_yaml_schema_env() -> None:
+    """Ensure MEMG_YAML_SCHEMA is explicitly set.
+
+    - Uses MEMG_YAML_SCHEMA from environment or falls back to defaults
+    This sets the environment variable explicitly to satisfy the strict
+    requirement of the YAML translator while keeping server DX smooth.
+    """
+    if os.getenv("MEMG_YAML_SCHEMA"):
+        logger.info(f"📄 Using YAML schema from MEMG_YAML_SCHEMA={os.getenv('MEMG_YAML_SCHEMA')}")
+        return
+
+    # Normalize repo-relative path to container path
+    env_val = os.getenv("MEMG_YAML_SCHEMA")
+    if env_val and not env_val.startswith("/app/"):
+        # If a repo-relative path is provided (e.g., from .env),
+        # translate it to the container path under /app.
+        candidate = Path("/app") / env_val
+        if candidate.exists():
+            os.environ["MEMG_YAML_SCHEMA"] = str(candidate)
+            logger.info(f"🧭 Normalized MEMG_YAML_SCHEMA to container path: {candidate}")
+            return
+
+    # Fallback: should not happen with proper .env setup
+    logger.warning("⚠️ MEMG_YAML_SCHEMA not properly set. Ensure .env file is configured.")
+
+
+def _summarize_entity_fields(translator) -> dict[str, dict[str, list[str]]]:
+    """Build a summary of required/optional fields for each entity from YAML.
+
+    System fields are hidden since they are handled internally.
+    """
+    summary: dict[str, dict[str, list[str]]] = {}
+    for name, spec in translator._entities_map().items():
+        fields = spec.get("fields", {})
+        required: list[str] = []
+        optional: list[str] = []
+        if isinstance(fields, dict):
+            for field_name, cfg in fields.items():
+                # Skip system fields
+                if isinstance(cfg, dict) and cfg.get("system"):
+                    continue
+                is_required = isinstance(cfg, dict) and cfg.get("required") is True
+                (required if is_required else optional).append(str(field_name))
+        summary[name] = {"required": sorted(required), "optional": sorted(optional)}
+    return summary
+
+
 def get_dynamic_tool_docstring() -> str:
     """Generates a dynamic docstring for the add_memory tool from the YAML schema."""
     try:
         translator = get_yaml_translator()
         spec_map = translator._entities_map()
+        field_summary = _summarize_entity_fields(translator)
 
         doc = "Adds a memory to the system based on a dynamic, YAML-defined schema.\n\n"
         doc += "Args:\n"
@@ -40,10 +89,13 @@ def get_dynamic_tool_docstring() -> str:
         doc += "    payload (dict): A dictionary of fields conforming to the schema for the given memory_type.\n\n"
         doc += "Available Schemas:\n"
 
-        for name, spec_data in spec_map.items():
+        for name, _spec in spec_map.items():
+            req = ", ".join(field_summary.get(name, {}).get("required", [])) or "(none)"
+            opt = ", ".join(field_summary.get(name, {}).get("optional", [])) or "(none)"
             doc += f"  - memory_type: '{name}'\n"
             doc += f"    Anchor Field: '{translator.get_anchor_field(name)}'\n"
-            doc += f"    Available in YAML schema\n"
+            doc += f"    Required fields: {req}\n"
+            doc += f"    Optional fields: {opt}\n"
         return doc
     except Exception as e:
         return f"Could not generate dynamic docstring. Error: {e}"
@@ -235,7 +287,8 @@ def register_tools(app: FastMCP) -> None:
         user_id: str = None,
         limit: int = 5,
         memory_type: str = None,
-        mode: str = "vector"
+        mode: str = "vector",
+        include_details: str = "self",
     ):
         """Search memories with the lean core search function."""
         if not bridge:
@@ -246,7 +299,8 @@ def register_tools(app: FastMCP) -> None:
             user_id=user_id,
             limit=limit,
             memory_type=memory_type,
-            mode=mode
+            mode=mode,
+            include_details=include_details,
         )
 
         if results and "error" in results[0]:
@@ -270,13 +324,17 @@ def register_tools(app: FastMCP) -> None:
             # Build schema info using available translator methods
             schema_details = {}
             for entity_name in translator._entities_map():
+                fields = _summarize_entity_fields(translator).get(entity_name, {})
                 schema_details[entity_name] = {
                     "anchor_field": translator.get_anchor_field(entity_name),
-                    "description": f"Entity type defined in YAML schema"
+                    "required_fields": fields.get("required", []),
+                    "optional_fields": fields.get("optional", []),
+                    "description": "Entity type defined in YAML schema",
                 }
 
             stats["yaml_schema_details"] = schema_details
             stats["valid_memory_types"] = list(translator._entities_map().keys())
+            stats["yaml_schema_path"] = os.getenv("MEMG_YAML_SCHEMA")
 
         except Exception as e:
             stats["yaml_schema_error"] = f"Could not load schemas: {e}"
@@ -287,6 +345,8 @@ def register_tools(app: FastMCP) -> None:
 def create_app() -> FastMCP:
     """Create and configure the FastMCP app."""
     app = FastMCP()
+    # Ensure YAML schema is explicitly set before initializing tools
+    _ensure_yaml_schema_env()
     initialize_bridge()
     setup_health_endpoints(app)
     register_tools(app)

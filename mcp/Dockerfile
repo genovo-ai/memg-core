@@ -22,12 +22,15 @@ RUN pip install --no-cache-dir -r requirements_mcp.txt
 # Create directories for persistent storage and config
 RUN mkdir -p /qdrant /kuzu /app/config
 
-# Copy the YAML schema and MCP server file
-COPY config/core.minimal.yaml /app/config/
+# Copy the MCP server file
 COPY mcp/mcp_server.py /app/
 
-# Set environment variables for YAML schema
-ENV MEMG_YAML_SCHEMA=/app/config/core.minimal.yaml
+# Copy the YAML schema specified in .env (build arg from compose)
+ARG MEMG_YAML_SCHEMA
+COPY ${MEMG_YAML_SCHEMA} /app/${MEMG_YAML_SCHEMA}
+
+# Set environment variable for YAML schema
+ENV MEMG_YAML_SCHEMA=${MEMG_YAML_SCHEMA}
 ENV MEMORY_SYSTEM_MCP_HOST=0.0.0.0
 
 EXPOSE 8787

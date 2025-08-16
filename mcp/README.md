@@ -96,7 +96,7 @@ KUZU_DB_PATH=/path/to/kuzu/db
 MEMORY_SYSTEM_MCP_PORT=8787  # Change for multiple instances
 
 # Schema configuration
-MEMG_YAML_SCHEMA=/app/config/core.minimal.yaml  # Fixed in Docker
+MEMG_YAML_SCHEMA=config/software_dev.yaml  # Repo-relative path
 # Note: All entity types and fields come from this YAML schema
 ```
 

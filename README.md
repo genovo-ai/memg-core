@@ -80,7 +80,7 @@ for r in results:
 Core ships with three tiny registries under `config/`:
 
 - `core.minimal.yaml`: basic types `note`, `document`, `task` with anchors and generic relations
-- `core.software_dev.yaml`: adds `bug` + `solution` and `bug_solution` relation
+- `software_dev.yaml`: adds `bug` and `solution` entities for developer workflows
 - `core.knowledge.yaml`: `concept` + `document` with `mentions`/`derived_from`
 
 Enable:
@@ -88,6 +88,8 @@ Enable:
 ```bash
 export MEMG_ENABLE_YAML_SCHEMA=true
 export MEMG_YAML_SCHEMA=$(pwd)/config/core.minimal.yaml
+# or use the developer-focused schema
+# export MEMG_YAML_SCHEMA=$(pwd)/config/software_dev.yaml
 ```
 
 ## Embedding Configuration
