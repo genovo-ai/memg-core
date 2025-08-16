@@ -17,13 +17,17 @@
 
 2. **Build and start with automated script:**
    ```bash
+   # Default: Build from local source (current behavior)
    ./build_and_run.sh
+
+   # Alternative: Install from PyPI (faster, uses published package)
+   ./build_and_run.sh --use-pypi
    ```
 
    This script will:
    - Load `.env` configuration
    - Create required directories with proper permissions
-   - Build Docker image from source
+   - Build Docker image (from source OR PyPI)
    - Start MCP server with health checks
    - Show status and available tools
 
@@ -46,7 +50,11 @@
 
 2. **Start manually:**
    ```bash
+   # Default: Build from local source
    docker-compose up -d
+
+   # Alternative: Use PyPI package (set environment variable)
+   USE_PYPI=true docker-compose up -d
    ```
 
 ## Enhanced Developer Schema
@@ -59,6 +67,24 @@
 - ✅ **See Also feature**: Automatic discovery of semantically related memories
 
 **Zero hardcoded fields** - everything flows from `config/software_dev.yaml` schema!
+
+## Installation Methods
+
+### 🔧 Local Source (Default)
+Builds from the current repository source code:
+```bash
+./build_and_run.sh
+```
+**Use when:** Developing/testing local changes, want latest unreleased features
+
+### 📦 PyPI Package
+Installs the published memg-core package from PyPI:
+```bash
+./build_and_run.sh --use-pypi
+```
+**Use when:** Production deployment, faster builds, using stable releases
+
+> **Note:** Both methods use identical functionality since src/ code is the same between main and dev-mcp branches
 
 ### 🔍 See Also Feature
 

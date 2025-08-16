@@ -4,8 +4,40 @@
 
 set -e
 
+# Parse command line arguments
+USE_PYPI=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --use-pypi)
+            USE_PYPI=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "OPTIONS:"
+            echo "  --use-pypi    Install memg-core from PyPI instead of local source"
+            echo "  -h, --help    Show this help message"
+            echo ""
+            echo "Default behavior: Install memg-core from local source (current behavior)"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
 echo "🚀 MEMG Core MCP Server - Local Docker Build & Run"
 echo "=================================================="
+
+if [ "$USE_PYPI" = true ]; then
+    echo "📦 Mode: Installing memg-core from PyPI"
+else
+    echo "🔧 Mode: Installing memg-core from local source (default)"
+fi
 
 # Load environment variables from .env file if it exists
 if [ -f .env ]; then
@@ -27,6 +59,9 @@ echo "📍 Using port: $MCP_PORT"
 
 # Ensure BASE_MEMORY_PATH is fully expanded for docker-compose
 export BASE_MEMORY_PATH="${BASE_MEMORY_PATH:-$HOME/.local/share/memory_system}"
+
+# Export USE_PYPI for docker-compose
+export USE_PYPI
 
 # Ensure mount directories exist to avoid Docker chown issues
 VOLUME_BASE="${BASE_MEMORY_PATH}_${MCP_PORT}"
@@ -53,7 +88,11 @@ fi
 
 # Step 2: Clean build (no cache)
 echo ""
-echo "🔨 Step 2: Building Docker image (no cache)..."
+if [ "$USE_PYPI" = true ]; then
+    echo "🔨 Step 2: Building Docker image with PyPI installation (no cache)..."
+else
+    echo "🔨 Step 2: Building Docker image with local source (no cache)..."
+fi
 docker-compose build --no-cache
 
 # Step 3: Start the service
@@ -108,6 +147,11 @@ echo "🔧 Management commands:"
 echo "  View logs:    docker-compose logs -f"
 echo "  Stop server:  docker-compose down"
 echo "  Restart:      ./build_and_run.sh"
+echo "  Help:         ./build_and_run.sh --help"
+echo ""
+echo "🏗️ Build options:"
+echo "  Local source: ./build_and_run.sh (default)"
+echo "  From PyPI:    ./build_and_run.sh --use-pypi"
 echo ""
 echo "📋 Available MCP tools:"
 echo "  - mcp_gmem_add_memory"

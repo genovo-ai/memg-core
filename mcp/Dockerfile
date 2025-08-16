@@ -8,12 +8,33 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy local core package and install in editable mode
-COPY pyproject.toml README.md requirements.txt /app/
-COPY src/ /app/src/
+# Build argument to control installation method
+ARG USE_PYPI=false
 
-# Install local memg-core from source (includes core deps from pyproject)
-RUN pip install --no-cache-dir -e .
+# Install memg-core - either from PyPI or local source
+RUN if [ "$USE_PYPI" = "true" ]; then \
+        echo "📦 Installing memg-core from PyPI..." && \
+        pip install --no-cache-dir memg-core; \
+    fi
+
+# Only copy local source files if NOT using PyPI
+# We do this conditionally to avoid layer bloat when using PyPI
+RUN if [ "$USE_PYPI" != "true" ]; then \
+        echo "🔧 Preparing for local source installation..."; \
+    fi
+
+# Copy local source files (only needed for local builds)
+COPY pyproject.toml README.md requirements.txt ./
+COPY src/ ./src/
+
+# Install from local source only if not using PyPI
+RUN if [ "$USE_PYPI" != "true" ]; then \
+        echo "📁 Installing from local source..." && \
+        pip install --no-cache-dir -e .; \
+    else \
+        echo "📦 Using PyPI package, removing unnecessary source files..." && \
+        rm -rf pyproject.toml README.md requirements.txt src/; \
+    fi
 
 # Copy and install MCP server dependencies
 COPY mcp/requirements_mcp.txt /app/requirements_mcp.txt
