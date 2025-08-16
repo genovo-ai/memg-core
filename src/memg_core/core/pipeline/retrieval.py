@@ -65,7 +65,7 @@ def _find_see_also_memories(
             # This could happen if memory lacks the anchor field or YAML schema issues
             from ..logging import get_logger
 
-            logger = get_logger()
+            logger = get_logger("retrieval")
             logger.debug(
                 f"Skipping see_also for memory {memory.id}: failed to extract anchor text - {e}"
             )
@@ -87,7 +87,7 @@ def _find_see_also_memories(
         )
 
         # Group results by type to respect per-type limits
-        results_by_type = {target_type: [] for target_type in target_types}
+        results_by_type: dict[str, list] = {target_type: [] for target_type in target_types}
 
         for point in similar_points:
             score = float(point.get("score", 0.0))
