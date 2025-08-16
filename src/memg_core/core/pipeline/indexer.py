@@ -70,7 +70,7 @@ def add_memory_index(
         # Ensure HRID exists (flows into both stores via payload/node)
         if not memory.hrid:
             try:
-                memory.hrid = generate_hrid(memory.memory_type)
+                memory.hrid = generate_hrid(memory.memory_type, qdrant)
             except Exception as gen_err:
                 raise ProcessingError(
                     "Failed to generate HRID",
