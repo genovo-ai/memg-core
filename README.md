@@ -7,27 +7,12 @@
 - **Vector Search**: Fast semantic search with Qdrant
 - **Graph Storage**: Optional relationship analysis with Kuzu
 - **Offline-First**: 100% local embeddings with FastEmbed - no API keys needed
-- **MCP Compatible**: Ready-to-use MCP server for AI agents
+- **Type-Agnostic**: Configurable memory types via YAML schemas
 - **Lightweight**: Minimal dependencies, optimized for performance
 
 ## Quick Start
 
-### Option 1: Docker (Recommended)
-```bash
-# 1. Create configuration (no API key needed!)
-cp env.example .env
-
-# 2. Run MEMG MCP Server (359MB)
-docker run -d \
-  -p ${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787} \
-  --env-file .env \
-  ghcr.io/genovo-ai/memg-core-mcp:latest
-
-# 3. Test it's working
-curl http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8787}/health
-```
-
-### Option 2: Python Package (Core Library)
+### Python Package
 ```bash
 pip install memg-core
 
