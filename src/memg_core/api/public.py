@@ -97,6 +97,7 @@ def search(
     projection: dict[str, list[str]] | None = None,  # NEW: per-type field allow-list
     relation_names: list[str] | None = None,
     neighbor_cap: int = 5,
+    include_see_also: bool = False,  # NEW: enable see_also functionality
 ) -> list[SearchResult]:
     """Unified search over memories (Graph+Vector).
 
@@ -153,6 +154,7 @@ def search(
         mode=mode,
         include_details=include_details,
         projection=projection,
+        include_see_also=include_see_also,
     )
 
 

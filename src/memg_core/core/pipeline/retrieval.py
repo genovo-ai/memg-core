@@ -22,6 +22,123 @@ from ..models import Memory, SearchResult
 # ----------------------------- helpers ---------------------------------
 
 
+def _find_see_also_memories(
+    primary_results: list[SearchResult],
+    qdrant: QdrantInterface,
+    embedder: Embedder,
+    user_id: str,
+) -> list[SearchResult]:
+    """Find semantically related memories based on YAML see_also configuration.
+
+    For each primary result, if it has see_also configuration:
+    1. Extract anchor text from the primary result
+    2. Search for similar memories in target_types
+    3. Apply threshold and limit filters
+    4. Return combined see_also results
+    """
+    from ..yaml_translator import get_see_also_config
+
+    see_also_results: list[SearchResult] = []
+
+    for primary_result in primary_results:
+        memory = primary_result.memory
+
+        # Get see_also config for this memory type
+        see_also_config = get_see_also_config(memory.memory_type)
+        if not see_also_config or not see_also_config.get("enabled"):
+            continue
+
+        threshold = see_also_config["threshold"]
+        limit = see_also_config["limit"]
+        target_types = see_also_config["target_types"]
+
+        if not target_types:
+            continue
+
+        # Get anchor text from the primary memory
+        from ..yaml_translator import build_anchor_text
+
+        try:
+            anchor_text = build_anchor_text(memory)
+        except Exception as e:
+            # Skip if we can't extract anchor text - log the specific issue for transparency
+            # This could happen if memory lacks the anchor field or YAML schema issues
+            from ..logging import get_logger
+
+            logger = get_logger()
+            logger.debug(
+                f"Skipping see_also for memory {memory.id}: failed to extract anchor text - {e}"
+            )
+            continue
+
+        # Search for similar memories in target types using efficient OR filtering
+        anchor_embedding = embedder.get_embedding(anchor_text)
+
+        # Use Qdrant's MatchAny for efficient OR filtering on multiple types
+        # This creates a single search across all target types at once
+        filters = {"core.memory_type": target_types}
+
+        # Single vector search across all target types
+        similar_points = qdrant.search_points(
+            vector=anchor_embedding,
+            limit=limit * len(target_types) * 2,  # Get enough candidates for all types
+            user_id=user_id,
+            filters=filters,
+        )
+
+        # Group results by type to respect per-type limits
+        results_by_type = {target_type: [] for target_type in target_types}
+
+        for point in similar_points:
+            score = float(point.get("score", 0.0))
+
+            # Apply threshold filter
+            if score < threshold:
+                continue
+
+            # Skip if it's the same memory as the primary result
+            if point.get("id") == memory.id:
+                continue
+
+            # Get memory type from the point
+            payload = point.get("payload", {})
+            core = payload.get("core", {})
+            entity = payload.get("entity", {})
+            point_memory_type = core.get("memory_type", "")
+
+            # Check if we've hit the limit for this type
+            if len(results_by_type.get(point_memory_type, [])) >= limit:
+                continue
+
+            # Convert point to Memory object
+            similar_memory = Memory(
+                id=point.get("id") or "",
+                user_id=core.get("user_id", ""),
+                memory_type=point_memory_type,
+                payload=dict(entity),
+                created_at=_parse_datetime(core.get("created_at")),
+                updated_at=_parse_datetime(core.get("updated_at")),
+                hrid=core.get("hrid"),
+            )
+
+            # Add to see_also results with special source marking
+            search_result = SearchResult(
+                memory=similar_memory,
+                score=score,
+                distance=None,
+                source=f"see_also_{point_memory_type}",
+                metadata={
+                    "see_also_source": memory.memory_type,
+                    "see_also_anchor": anchor_text[:100],  # Truncate for brevity
+                },
+            )
+
+            see_also_results.append(search_result)
+            results_by_type[point_memory_type].append(search_result)
+
+    return see_also_results
+
+
 # Deterministic field projection for payloads - YAML-driven
 def _project_payload(
     memory_type: str,
@@ -335,6 +452,7 @@ def graph_rag_search(
     mode: str | None = None,  # 'vector' | 'graph' | 'hybrid'
     include_details: str = "none",  # NEW: "none" | "self" (neighbors remain anchors-only in v1)
     projection: dict[str, list[str]] | None = None,  # NEW: per-type field allow-list
+    include_see_also: bool = False,  # NEW: enable see_also functionality
 ) -> list[SearchResult]:
     """Unified retrieval with graph-first approach as mandated by policy.
 
@@ -514,6 +632,11 @@ def graph_rag_search(
     # neighbors (anchors only)
     # The neighbor payload is constructed generically, so this should be fine.
     results = _append_neighbors(results, kuzu, neighbor_cap, relation_names)
+
+    # see_also functionality - find semantically related memories
+    if include_see_also and results:
+        see_also_memories = _find_see_also_memories(results, qdrant, embedder, user_id)
+        results.extend(see_also_memories)
 
     # final order & clamp - use the unified sort function
     results.sort(key=_sort_key)

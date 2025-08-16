@@ -193,7 +193,8 @@ class MemgCoreBridge:
                 limit=limit,
                 memo_type=kwargs.get("memory_type"),
                 mode=kwargs.get("mode", "vector"),
-                include_details=kwargs.get("include_details", "self")
+                include_details=kwargs.get("include_details", "self"),
+                include_see_also=kwargs.get("include_see_also", False)
             )
 
             # The `__getattr__` on Memory model allows generic access to payload.
@@ -350,6 +351,7 @@ def register_tools(app: FastMCP) -> None:
         memory_type: str = None,
         mode: str = "vector",
         include_details: str = "self",
+        include_see_also: bool = False,
     ):
         """Search memories (vector by default) with optional filters.
 
@@ -368,8 +370,12 @@ def register_tools(app: FastMCP) -> None:
             Other modes (e.g., "keyword", "hybrid") may be supported by core configuration.
         include_details : str, default "self"
             Controls result payload shape. Passed through to core:
-            - "self": return the entity’s own payload
+            - "self": return the entity's own payload
             - Other values depend on core (e.g., expanded fields). If unknown, core falls back safely.
+        include_see_also : bool, default False
+            Enable "see also" functionality to find semantically related memories.
+            When enabled, uses YAML see_also configuration to surface related memories
+            from target types based on anchor text similarity.
 
         Returns
         -------
@@ -392,6 +398,7 @@ def register_tools(app: FastMCP) -> None:
             memory_type=memory_type,
             mode=mode,
             include_details=include_details,
+            include_see_also=include_see_also,
         )
 
         if results and "error" in results[0]:

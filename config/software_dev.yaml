@@ -64,6 +64,11 @@ entities:
       due_date:    { type: datetime }
       story_points: { type: string }  # Estimation (e.g., "3", "5", "8")
       epic:        { type: string }   # Epic or feature reference
+    see_also:
+      enabled: true
+      threshold: 0.7
+      limit: 3
+      target_types: [bug, solution, note]
     relations:
       - name: task_note
         description: "Note associated with a task"
@@ -104,6 +109,11 @@ entities:
       environment:  { type: string }  # Environment details
       file_path:    { type: string }  # File where bug occurs
       line_number:  { type: string }  # Line number reference
+    see_also:
+      enabled: true
+      threshold: 0.75
+      limit: 2
+      target_types: [solution, task]
     relations:
       - name: bug_task
         description: "Task created to fix a bug"
@@ -122,6 +132,11 @@ entities:
       code_snippet: { type: string }  # Code example or snippet
       file_path:    { type: string }  # File being modified
       test_status:  { type: enum, choices: [untested, manual_test, unit_test, integration_test] }
+    see_also:
+      enabled: true
+      threshold: 0.7
+      limit: 3
+      target_types: [bug, task, note]
     relations:
       - name: solution_bug
         description: "Solution addressing a bug"

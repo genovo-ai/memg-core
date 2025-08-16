@@ -123,6 +123,36 @@ class YamlTranslator:
             )
         return str(anchor)
 
+    def get_see_also_config(self, entity_name: str) -> dict[str, Any] | None:
+        """Get the see_also configuration for the given entity type from YAML schema.
+
+        Returns:
+            Dict with keys: enabled, threshold, limit, target_types
+            None if see_also is not configured for this entity
+        """
+        if not entity_name:
+            raise YamlTranslatorError("Empty entity name")
+        name_l = entity_name.lower()
+        emap = self._entities_map()
+        spec_raw = emap.get(name_l)
+        if not spec_raw:
+            raise YamlTranslatorError(f"Entity '{entity_name}' not found in YAML schema")
+
+        see_also = spec_raw.get("see_also")
+        if not see_also or not isinstance(see_also, dict):
+            return None
+
+        # Validate required fields
+        if not see_also.get("enabled", False):
+            return None
+
+        return {
+            "enabled": see_also.get("enabled", False),
+            "threshold": float(see_also.get("threshold", 0.7)),
+            "limit": int(see_also.get("limit", 3)),
+            "target_types": list(see_also.get("target_types", [])),
+        }
+
     def build_anchor_text(self, memory) -> str:
         """
         Builds anchor text for embedding from YAML-defined anchor field.
@@ -256,3 +286,8 @@ def create_memory_from_yaml(memory_type: str, payload: dict[str, Any], user_id: 
 def get_entity_model(entity_name: str):
     """Module-level helper that uses the cached global translator."""
     return get_yaml_translator().get_entity_model(entity_name)
+
+
+def get_see_also_config(entity_name: str) -> dict[str, Any] | None:
+    """Module-level helper that uses the cached global translator."""
+    return get_yaml_translator().get_see_also_config(entity_name)
