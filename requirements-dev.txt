@@ -24,4 +24,4 @@ fastmcp>=2.10.6
 uvicorn>=0.30.6
 starlette>=0.38.2
 
-fastapi
+

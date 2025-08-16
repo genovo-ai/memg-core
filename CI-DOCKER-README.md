@@ -11,11 +11,7 @@ Run the complete GitHub Actions CI pipeline locally using Docker. This provides 
 # Interactive development shell for debugging
 ./dev-ci-shell.sh
 
-# Start FastAPI server for local testing
-./start-api-server.sh
 
-# Test API endpoints
-./test-api-endpoints.sh
 
 # Clean up Docker resources
 ./clean-ci-docker.sh
@@ -57,20 +53,7 @@ colima start
 ```
 This runs all checks and tests. If it passes, your code will pass GitHub CI!
 
-### Start Local API Server
-```bash
-./start-api-server.sh
-```
-Starts FastAPI server at http://localhost:8000 with:
-- API documentation: http://localhost:8000/docs
-- Health check: http://localhost:8000/health
-- All API endpoints for testing
 
-### Test API Endpoints
-```bash
-./test-api-endpoints.sh
-```
-Automated testing of all API endpoints (requires server to be running)
 
 ### Debug Test Failures Interactively
 ```bash

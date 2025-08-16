@@ -55,7 +55,7 @@ These files are purely internal dev artifacts with no user-facing impact. Moving
 ### Scripts Directory - Development/Testing Scripts
 - `scripts/test_server.py` - Internal test server script
 - `scripts/fastai_example.py` - Internal FastAI example (development-specific)
-- `scripts/fastapi_server.py` - Internal FastAPI server script
+
 - `scripts/README.md` - Internal scripts documentation
 
 ### MCP Directory
