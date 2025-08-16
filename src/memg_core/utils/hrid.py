@@ -114,8 +114,12 @@ def _initialize_counter_from_storage(
                     highest_num = num
                     highest_hrid = hrid
 
-            except ValueError:
-                # Skip invalid HRIDs
+            except ValueError as e:
+                # Skip invalid HRIDs but log for transparency
+                from ..core.logging import get_logger
+
+                logger = get_logger()
+                logger.debug(f"Skipping invalid HRID format '{hrid}': {e}")
                 continue
 
         if highest_hrid is None:
@@ -129,8 +133,12 @@ def _initialize_counter_from_storage(
 
         return (highest_alpha_idx, next_num - 1)  # -1 because generate_hrid will increment
 
-    except Exception:
-        # If storage query fails, fall back to fresh start
+    except Exception as e:
+        # If storage query fails, fall back to fresh start but log the issue
+        from ..core.logging import get_logger
+
+        logger = get_logger()
+        logger.warning(f"HRID storage query failed, falling back to fresh start: {e}")
         return (0, -1)
 
 

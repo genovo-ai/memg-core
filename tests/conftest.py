@@ -405,6 +405,23 @@ class FakeKuzu(KuzuInterface):
             out.append(neighbor_data)
         return out[:limit]
 
+    def delete_node(self, table: str, node_id: str) -> bool:
+        """Delete a single node by ID from fake storage."""
+        if table in self.nodes and node_id in self.nodes[table]:
+            # Remove all relationships involving this node
+            self.relationships = [
+                rel
+                for rel in self.relationships
+                if not (
+                    (rel["from_table"] == table and rel["from_id"] == node_id)
+                    or (rel["to_table"] == table and rel["to_id"] == node_id)
+                )
+            ]
+            # Remove the node
+            del self.nodes[table][node_id]
+            return True
+        return False
+
 
 @pytest.fixture
 def embedder() -> DummyEmbedder:

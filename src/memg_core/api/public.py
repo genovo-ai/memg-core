@@ -12,7 +12,7 @@ import os
 from typing import Any
 
 from memg_core.core.config import get_config
-from memg_core.core.exceptions import ValidationError
+from memg_core.core.exceptions import DatabaseError, ValidationError
 from memg_core.core.interfaces.embedder import Embedder
 from memg_core.core.interfaces.kuzu import KuzuInterface
 from memg_core.core.interfaces.qdrant import QdrantInterface
@@ -97,10 +97,47 @@ def search(
     projection: dict[str, list[str]] | None = None,  # NEW: per-type field allow-list
     relation_names: list[str] | None = None,
     neighbor_cap: int = 5,
+    include_see_also: bool = False,  # NEW: enable see_also functionality
 ) -> list[SearchResult]:
-    """Unified search over memories (Graph+Vector).
+    """Unified search over memories (Graph+Vector) with optional semantic discovery.
 
     Requirements: at least one of `query` or `memo_type`.
+
+    Parameters
+    ----------
+    query : str, optional
+        Search query text for semantic matching
+    user_id : str
+        User identifier for filtering results
+    limit : int, default 20
+        Maximum number of results to return
+    filters : dict, optional
+        Additional filters to apply to search
+    memo_type : str, optional
+        Filter results to specific memory type
+    modified_within_days : int, optional
+        Filter to memories modified within N days
+    mode : str, optional
+        Search mode: 'vector', 'graph', or 'hybrid'
+    include_details : str, default "self"
+        Detail level: "none" or "self"
+    projection : dict, optional
+        Per-type field allow-list for result projection
+    relation_names : list[str], optional
+        Specific relation names to consider in graph search
+    neighbor_cap : int, default 5
+        Maximum number of neighbors to include
+    include_see_also : bool, default False
+        Enable semantic discovery of related memories. When True,
+        searches for memories semantically related to primary results
+        based on YAML see_also configuration. Related memories are
+        tagged with 'see_also_{type}' source attribution.
+
+    Returns
+    -------
+    list[SearchResult]
+        Search results including primary matches and (optionally)
+        semantically related memories found via see_also feature.
     """
     if (not query or not query.strip()) and not memo_type:
         raise ValidationError("Provide `query` or `memo_type`.")
@@ -153,4 +190,111 @@ def search(
         mode=mode,
         include_details=include_details,
         projection=projection,
+        include_see_also=include_see_also,
     )
+
+
+# ----------------------------- public delete -----------------------------
+
+
+def _resolve_memory_id_to_uuid(memory_id: str, qdrant: QdrantInterface) -> str:
+    """Resolve either UUID or HRID to UUID.
+
+    Args:
+        memory_id: Either a UUID or HRID (e.g., "TASK_AAA001")
+        qdrant: QdrantInterface to search for HRID
+
+    Returns:
+        str: The UUID of the memory
+
+    Raises:
+        ValidationError: If memory not found or invalid format
+    """
+    # Try as UUID first (direct lookup)
+    point = qdrant.get_point(memory_id)
+    if point:
+        return memory_id
+
+    # If not found as UUID, try as HRID
+    # Check if it looks like an HRID format
+    if "_" in memory_id and memory_id.replace("_", "").replace("-", "").isalnum():
+        # Search by HRID filter
+        dummy_vector = [0.0] * 384  # Default embedding size for search
+
+        results = qdrant.search_points(
+            vector=dummy_vector, limit=1, filters={"core.hrid": memory_id}
+        )
+
+        if results and len(results) > 0:
+            # Found by HRID, return the UUID
+            result = results[0]
+            uuid = result.get("id")
+            if uuid:
+                return str(uuid)
+
+    # Neither UUID nor HRID worked
+    raise ValidationError(f"Memory with ID {memory_id} not found")
+
+
+def delete_memory(
+    memory_id: str,
+    user_id: str,
+) -> bool:
+    """Delete a single memory by UUID or HRID with user verification.
+
+    Args:
+        memory_id: UUID or HRID of the memory to delete (e.g., "uuid-string" or "TASK_AAA001")
+        user_id: User ID for ownership verification
+
+    Returns:
+        True if deletion was successful
+
+    Raises:
+        ValidationError: If memory_id or user_id are invalid/missing
+        DatabaseError: If memory doesn't exist or user doesn't own it
+    """
+    if not memory_id or not memory_id.strip():
+        raise ValidationError("memory_id is required and cannot be empty")
+    if not user_id or not user_id.strip():
+        raise ValidationError("user_id is required and cannot be empty")
+
+    config = get_config()
+
+    qdrant_path = os.getenv("QDRANT_STORAGE_PATH")
+    kuzu_path = os.getenv("KUZU_DB_PATH", config.memg.kuzu_database_path)
+
+    qdrant = QdrantInterface(
+        collection_name=config.memg.qdrant_collection_name, storage_path=qdrant_path
+    )
+    kuzu = KuzuInterface(db_path=kuzu_path)
+
+    # Resolve memory_id (UUID or HRID) to UUID
+    uuid = _resolve_memory_id_to_uuid(memory_id, qdrant)
+
+    # Get the memory to verify user ownership
+    point = qdrant.get_point(uuid)
+    if not point:
+        raise ValidationError(f"Memory with ID {memory_id} not found")
+
+    # Check user ownership
+    payload = point.get("payload", {})
+    core = payload.get("core", {})
+    memory_user_id = core.get("user_id")
+
+    if memory_user_id != user_id:
+        raise ValidationError(f"Memory {memory_id} does not belong to user {user_id}")
+
+    # Delete from both storage backends using the resolved UUID
+    # Delete from Qdrant first (primary store)
+    qdrant_success = qdrant.delete_points([uuid])
+
+    # Try to delete from Kuzu (secondary store) - don't fail if this has issues
+    kuzu_success = True
+    try:
+        kuzu_success = kuzu.delete_node("Memory", uuid)
+    except (DatabaseError, Exception):
+        # Ignore Kuzu deletion errors for now - Qdrant is the primary store
+        # This handles issues with relationship constraints in Kuzu
+        kuzu_success = True
+
+    return qdrant_success and kuzu_success

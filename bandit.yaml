@@ -1,0 +1,16 @@
+# Bandit security scanner configuration for MEMG Core
+# Minimal configuration to avoid test conflicts
+
+# Skip specific tests that are not relevant for our codebase
+skips:
+  - B101  # assert_used - acceptable in our codebase
+  - B603  # subprocess_without_shell_equals_true - we don't use subprocess
+
+# Exclude test and development directories
+exclude_dirs:
+  - tests
+  - _stash
+  - temp_data
+  - local_development
+  - build
+  - dist
