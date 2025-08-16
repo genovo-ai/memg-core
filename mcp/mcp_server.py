@@ -286,15 +286,73 @@ def setup_health_endpoints(app: FastMCP) -> None:
 def register_tools(app: FastMCP) -> None:
     """Register MCP tools."""
 
-    # Generate dynamic docstring first
-    dynamic_docstring = get_dynamic_tool_docstring()
-
     @app.tool("mcp_gmem_add_memory")
     def add_memory_tool(
         memory_type: str,
         user_id: str,
         payload: dict
     ):
+        """Add a memory using YAML-driven schema validation.
+
+        Parameters
+        ----------
+        memory_type : str
+            Entity type defined in YAML schema. Must exactly match an entity key.
+            Available types: memo, document, task, note, bug, solution
+        user_id : str
+            Owner/namespace for the memory. Required by core.
+        payload : dict
+            Fields conforming to the YAML entity schema. System fields are auto-managed.
+
+        Entity Schema Details
+        --------------------
+        memo:
+          anchor_field: statement (embedded for search)
+          required: statement
+          example: {"statement": "Example memo statement"}
+
+        document:
+          anchor_field: statement (embedded for search)
+          required: statement, details
+          optional: url
+          example: {"statement": "Example document statement", "details": "example_details_value"}
+
+        task:
+          anchor_field: statement (embedded for search)
+          required: statement
+          optional: assignee, details, due_date, epic, priority, status, story_points
+          example: {"statement": "Example task statement"}
+
+        note:
+          anchor_field: statement (embedded for search)
+          required: statement, details
+          example: {"statement": "Example note statement", "details": "example_details_value"}
+
+        bug:
+          anchor_field: statement (embedded for search)
+          required: statement, details
+          optional: environment, file_path, line_number, reproduction, severity, status
+          example: {"statement": "Example bug statement", "details": "example_details_value"}
+
+        solution:
+          anchor_field: statement (embedded for search)
+          required: statement, details
+          optional: approach, code_snippet, file_path, test_status
+          example: {"statement": "Example solution statement", "details": "example_details_value"}
+
+        Behavior
+        --------
+        - Validates memory_type exists and payload matches entity schema
+        - System fields (id, timestamps, vector) are auto-managed
+        - Returns memory_id and hrid on success
+        - Use mcp_gmem_get_system_info for complete schema inspection
+
+        Returns
+        -------
+        dict
+            {"result": "✅ [Type] added successfully", "memory_id": "uuid", "hrid": "TYPE_XXX001"}
+            or {"result": "❌ Failed to add [type]", "error": "error_message"}
+        """
         logger.info(f"🔧 MCP Tool called: add_memory_tool(type={memory_type}, user={user_id}, payload={payload})")
 
         if not bridge:
@@ -339,8 +397,7 @@ def register_tools(app: FastMCP) -> None:
                 "error": result.get("error", "Unknown error")
             }
 
-    # Set the dynamic docstring
-    add_memory_tool.__doc__ = dynamic_docstring
+    # Dynamic docstring system disabled - using hardcoded comprehensive docstring instead
 
 
     @app.tool("mcp_gmem_search_memories")
