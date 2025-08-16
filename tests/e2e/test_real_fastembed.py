@@ -43,40 +43,43 @@ def test_real_fastembed_workflow(temp_storage):
     user_id = "test_user"
 
     # Add memories using the real API (which now uses FastEmbed)
-    note = add_memory(
-        memory_type="note",
+    memo1 = add_memory(
+        memory_type="memo",
         payload={
             "statement": "PostgreSQL database configuration and optimization",
-            "details": "This is a note about PostgreSQL.",
         },
         user_id=user_id,
         # No hardcoded tags - removed as part of audit
     )
 
-    doc = add_memory(
-        memory_type="document",
+    memo2 = add_memory(
+        memory_type="memo_test",
         payload={
             "statement": "Performance optimization for PostgreSQL databases",
             "details": "Complete guide to PostgreSQL performance tuning with indexing strategies",
+            "status": "todo",
+            "priority": "high",
         },
         user_id=user_id,
         # No hardcoded tags - removed as part of audit
     )
 
-    task = add_memory(
-        memory_type="task",
+    memo3 = add_memory(
+        memory_type="memo_test",
         payload={
             "statement": "Implement caching layer for database queries",
             "details": "This is a task to implement caching.",
+            "status": "in_progress",
+            "priority": "medium",
         },
         user_id=user_id,
         # No hardcoded tags - removed as part of audit
     )
 
     # Verify memories were created
-    assert note.id
-    assert doc.id
-    assert task.id
+    assert memo1.id
+    assert memo2.id
+    assert memo3.id
 
     # Test search with real FastEmbed embeddings
     results = search("postgresql performance", user_id=user_id, limit=10)
@@ -106,7 +109,7 @@ def test_user_isolation_real_fastembed(temp_storage):
 
     # Add content for each user
     add_memory(
-        memory_type="note",
+        memory_type="memo_test",
         payload={
             "statement": "User 1 secret content",
             "details": "This is a secret note for user 1.",
@@ -114,7 +117,7 @@ def test_user_isolation_real_fastembed(temp_storage):
         user_id=user1,
     )
     add_memory(
-        memory_type="note",
+        memory_type="memo_test",
         payload={
             "statement": "User 2 secret content",
             "details": "This is a secret note for user 2.",
@@ -137,15 +140,14 @@ def test_user_isolation_real_fastembed(temp_storage):
 def test_fastembed_model_configuration(temp_storage):
     """Test that EMBEDDER_MODEL environment variable works"""
     # Test with default model (should work)
-    note = add_memory(
-        memory_type="note",
+    memo = add_memory(
+        memory_type="memo",
         payload={
             "statement": "Test content",
-            "details": "This is a test note.",
         },
         user_id="test",
     )
-    assert note.id
+    assert memo.id
 
     # This test confirms the model configuration is working
     # We're using Snowflake/snowflake-arctic-embed-xs by default

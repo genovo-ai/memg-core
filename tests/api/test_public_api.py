@@ -27,7 +27,7 @@ def mock_graph_rag_search():
         memory = Memory(
             id="test-memory-id",
             user_id="test-user",
-            memory_type="note",
+            memory_type="memo_test",
             payload={"statement": "Test content", "details": "Test details"},
         )
         result = SearchResult(
@@ -41,14 +41,14 @@ def mock_graph_rag_search():
         yield mock
 
 
-def test_add_memory_note_returns_memory_and_persists(mock_index_memory):
-    """Test that add_memory for note type returns a Memory and persists it."""
-    # Call add_memory with note type
+def test_add_memory_memo_test_returns_memory_and_persists(mock_index_memory):
+    """Test that add_memory for memo_test type returns a Memory and persists it."""
+    # Call add_memory with memo_test type
     memory = add_memory(
-        memory_type="note",
+        memory_type="memo_test",
         payload={
-            "statement": "This is a test note",
-            "details": "This is the detail for the test note.",
+            "statement": "This is a test memo_test",
+            "details": "This is the detail for the test memo_test.",
         },
         user_id="test-user",
         # No hardcoded tags - removed as part of audit
@@ -57,9 +57,9 @@ def test_add_memory_note_returns_memory_and_persists(mock_index_memory):
     # Check that the memory was created correctly
     assert memory.id == "test-memory-id"
     assert memory.user_id == "test-user"
-    assert memory.statement == "This is a test note"
-    assert memory.memory_type == "note"
-    assert memory.payload.get("details") == "This is the detail for the test note."
+    assert memory.statement == "This is a test memo_test"
+    assert memory.memory_type == "memo_test"
+    assert memory.payload.get("details") == "This is the detail for the test memo_test."
     # No hardcoded tags - removed as part of audit
 
     # Check that _index_memory_with_yaml was called
@@ -68,18 +68,17 @@ def test_add_memory_note_returns_memory_and_persists(mock_index_memory):
     # Check the memory passed to _index_memory_with_yaml
     indexed_memory = mock_index_memory.call_args[0][0]
     assert indexed_memory.user_id == "test-user"
-    assert indexed_memory.statement == "This is a test note"
-    assert indexed_memory.memory_type == "note"
+    assert indexed_memory.statement == "This is a test memo_test"
+    assert indexed_memory.memory_type == "memo_test"
 
 
-def test_add_memory_document_summary_used_in_index_text(mock_index_memory):
-    """Test that add_memory for document type uses summary in index text."""
-    # Call add_memory with document type
+def test_add_memory_memo_summary_used_in_index_text(mock_index_memory):
+    """Test that add_memory for memo type uses summary in index text."""
+    # Call add_memory with memo type
     memory = add_memory(
-        memory_type="document",
+        memory_type="memo",
         payload={
-            "statement": "This is a document summary",
-            "details": "This is a long document content",
+            "statement": "This is a memo summary",
         },
         user_id="test-user",
         # No hardcoded tags - removed as part of audit
@@ -88,25 +87,24 @@ def test_add_memory_document_summary_used_in_index_text(mock_index_memory):
     # Check that the memory was created correctly
     assert memory.id == "test-memory-id"
     assert memory.user_id == "test-user"
-    assert memory.statement == "This is a document summary"
-    assert memory.memory_type == "document"
-    assert memory.payload.get("details") == "This is a long document content"
+    assert memory.statement == "This is a memo summary"
+    assert memory.memory_type == "memo"
     # No hardcoded tags - removed as part of audit
 
     # Check that _index_memory_with_yaml was called
     mock_index_memory.assert_called_once()
 
 
-def test_add_memory_task_due_date_serialized(mock_index_memory):
-    """Test that add_memory for task type serializes dates correctly."""
+def test_add_memory_memo_test_due_date_serialized(mock_index_memory):
+    """Test that add_memory for memo_test type serializes dates correctly."""
     # Create a due date
     due_date = datetime.now(UTC) + timedelta(days=1)
 
-    # Call add_memory with task type
+    # Call add_memory with memo_test type
     memory = add_memory(
-        memory_type="task",
+        memory_type="memo_test",
         payload={
-            "statement": "This is a test task",
+            "statement": "This is a test memo_test",
             "due_date": due_date.isoformat(),
         },
         user_id="test-user",
@@ -116,8 +114,8 @@ def test_add_memory_task_due_date_serialized(mock_index_memory):
     # Check that the memory was created correctly
     assert memory.id == "test-memory-id"
     assert memory.user_id == "test-user"
-    assert memory.statement == "This is a test task"
-    assert memory.memory_type == "task"
+    assert memory.statement == "This is a test memo_test"
+    assert memory.memory_type == "memo_test"
     assert memory.payload.get("due_date") == due_date.isoformat()
     # No hardcoded tags - removed as part of audit
 
@@ -163,7 +161,7 @@ def test_search_plugin_absent_does_not_crash():
         memory = Memory(
             id="test-memory-id",
             user_id="test-user",
-            memory_type="note",
+            memory_type="memo_test",
             payload={"statement": "Test content", "details": "Test details"},
         )
         result = SearchResult(
@@ -212,7 +210,7 @@ def test_api_reads_neighbor_cap_env_and_passes_to_pipeline(monkeypatch):
         memory = Memory(
             id="test-memory-id",
             user_id="test-user",
-            memory_type="note",
+            memory_type="memo_test",
             payload={"statement": "Test content", "details": "Test details"},
         )
         result = SearchResult(

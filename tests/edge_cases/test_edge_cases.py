@@ -12,7 +12,7 @@ def test_unknown_memory_type_rejected_by_yaml_validation(
     mem_factory, embedder, qdrant_fake, kuzu_fake
 ):
     """YAML-driven core properly rejects unknown memory types."""
-    memory = mem_factory(id="memory-1", user_id="test-user", memory_type="note")
+    memory = mem_factory(id="memory-1", user_id="test-user", memory_type="memo_test")
     unknown_payload = memory.to_qdrant_payload()
     unknown_payload["core"]["memory_type"] = "invalid_type"  # invalid type
 
@@ -73,12 +73,12 @@ def test_empty_search_returns_empty_list_not_exception(embedder, qdrant_fake, ku
 def test_large_content_truncation_in_kuzu_node_does_not_break_payload(
     mem_factory, embedder, qdrant_fake, kuzu_fake
 ):
-    """Full content stays in Qdrant payload under entity.details (large content for notes)."""
+    """Full content stays in Qdrant payload under entity.details (large content for memo_test)."""
     large = "x" * 2000
     memory = mem_factory(
         id="memory-1",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         payload={"statement": "This is a test with large details", "details": large},
     )
     add_memory_index(memory, qdrant_fake, kuzu_fake, embedder)

@@ -25,38 +25,36 @@ def test_memory_type_required():
     assert "type" in str(exc_info.value)
 
     # Valid type should not raise
-    memory = Memory(user_id="test-user", memory_type="note", payload={"statement": "test"})
-    assert memory.memory_type == "note"
+    memory = Memory(user_id="test-user", memory_type="memo", payload={"statement": "test"})
+    assert memory.memory_type == "memo"
 
 
 def test_memory_to_qdrant_payload_shapes_by_type():
     """Test that Memory.to_qdrant_payload() returns correct nested structure."""
-    # Test NOTE type
-    note_memory = Memory(
+    # Test MEMO type
+    memo_memory = Memory(
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo",
         payload={
-            "statement": "Test content",
-            "details": "This is the detail for the test note.",
+            "statement": "Test memo content",
         },
         created_at=datetime(2023, 1, 1, tzinfo=UTC),
     )
-    note_payload = note_memory.to_qdrant_payload()
+    memo_payload = memo_memory.to_qdrant_payload()
 
-    assert "core" in note_payload
-    assert "entity" in note_payload
-    assert note_payload["core"]["memory_type"] == "note"
-    assert note_payload["core"]["user_id"] == "test-user"
+    assert "core" in memo_payload
+    assert "entity" in memo_payload
+    assert memo_payload["core"]["memory_type"] == "memo"
+    assert memo_payload["core"]["user_id"] == "test-user"
     # No hardcoded tags field - removed as part of audit
-    assert note_payload["core"]["created_at"] == "2023-01-01T00:00:00+00:00"
-    assert note_payload["entity"]["statement"] == "Test content"
-    assert note_payload["entity"]["details"] == "This is the detail for the test note."
+    assert memo_payload["core"]["created_at"] == "2023-01-01T00:00:00+00:00"
+    assert memo_payload["entity"]["statement"] == "Test memo content"
 
-    # Test TASK type with task fields
+    # Test MEMO_TEST type with all fields
     due_date = datetime.now(UTC) + timedelta(days=1)
-    task_memory = Memory(
+    memo_test_memory = Memory(
         user_id="test-user",
-        memory_type="task",
+        memory_type="memo_test",
         payload={
             "statement": "Fix bug",
             "details": "Detailed description",
@@ -65,15 +63,15 @@ def test_memory_to_qdrant_payload_shapes_by_type():
             "assignee": "test-user",
             "due_date": due_date,
         },
-        tags=["task"],
+        tags=["test"],
     )
-    task_payload = task_memory.to_qdrant_payload()
+    memo_test_payload = memo_test_memory.to_qdrant_payload()
 
-    assert task_payload["core"]["memory_type"] == "task"
-    assert task_payload["entity"]["statement"] == "Fix bug"
-    assert task_payload["entity"]["status"] == "todo"
-    assert task_payload["entity"]["priority"] == "high"
-    assert task_payload["entity"]["assignee"] == "test-user"
+    assert memo_test_payload["core"]["memory_type"] == "memo_test"
+    assert memo_test_payload["entity"]["statement"] == "Fix bug"
+    assert memo_test_payload["entity"]["status"] == "todo"
+    assert memo_test_payload["entity"]["priority"] == "high"
+    assert memo_test_payload["entity"]["assignee"] == "test-user"
 
 
 def test_memory_to_kuzu_node_core_fields_only():
@@ -81,9 +79,9 @@ def test_memory_to_kuzu_node_core_fields_only():
     # Create a memory with detailed payload
     memory = Memory(
         user_id="test-user",
-        memory_type="task",
+        memory_type="memo_test",
         payload={
-            "statement": "Test task",
+            "statement": "Test memo_test",
             "details": "x" * 1000,  # Long content should NOT be in Kuzu
             "status": "in_progress",
             "assignee": "developer",
@@ -94,7 +92,7 @@ def test_memory_to_kuzu_node_core_fields_only():
 
     # Core fields should be present
     assert kuzu_node["user_id"] == "test-user"
-    assert kuzu_node["memory_type"] == "task"
+    assert kuzu_node["memory_type"] == "memo_test"
     # No hardcoded tags field - removed as part of audit
 
     # YAML-defined payload fields should NOT be in Kuzu (only core fields stored)
@@ -104,41 +102,41 @@ def test_memory_to_kuzu_node_core_fields_only():
     assert "details" not in kuzu_node
 
 
-def test_task_due_date_handling():
-    """Test that task due date handling works correctly with UTC dates."""
+def test_memo_test_due_date_handling():
+    """Test that memo_test due date handling works correctly with UTC dates."""
     now = datetime.now(UTC)
     yesterday = now - timedelta(days=1)
     tomorrow = now + timedelta(days=1)
 
-    # Create tasks with different due dates
-    overdue_task = Memory(
+    # Create memo_test instances with different due dates
+    overdue_memo = Memory(
         user_id="test-user",
-        memory_type="task",
+        memory_type="memo_test",
         payload={
-            "statement": "Overdue task",
+            "statement": "Overdue memo_test",
             "due_date": yesterday,
         },
     )
 
-    future_task = Memory(
+    future_memo = Memory(
         user_id="test-user",
-        memory_type="task",
+        memory_type="memo_test",
         payload={
-            "statement": "Future task",
+            "statement": "Future memo_test",
             "due_date": tomorrow,
         },
     )
 
-    no_due_date_task = Memory(
+    no_due_date_memo = Memory(
         user_id="test-user",
-        memory_type="task",
-        payload={"statement": "No due date task"},
+        memory_type="memo_test",
+        payload={"statement": "No due date memo_test"},
     )
 
     # Test serialization to Qdrant payload
-    overdue_payload = overdue_task.to_qdrant_payload()
-    future_payload = future_task.to_qdrant_payload()
-    no_due_date_payload = no_due_date_task.to_qdrant_payload()
+    overdue_payload = overdue_memo.to_qdrant_payload()
+    future_payload = future_memo.to_qdrant_payload()
+    no_due_date_payload = no_due_date_memo.to_qdrant_payload()
 
     assert overdue_payload["entity"]["due_date"] == yesterday
     assert future_payload["entity"]["due_date"] == tomorrow

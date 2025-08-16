@@ -15,7 +15,7 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
     memory = mem_factory(
         id="test-memory-1",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo_test",
         statement="This is a test memory",
         payload={
             "details": "This is the detail for the test memory.",
@@ -32,14 +32,14 @@ def test_add_memory_index_stores_in_both_stores(embedder, qdrant_fake, kuzu_fake
     assert qdrant_point is not None
     assert qdrant_point["payload"]["core"]["user_id"] == "test-user"
     assert qdrant_point["payload"]["entity"]["statement"] == "This is a test memory"
-    assert qdrant_point["payload"]["core"]["memory_type"] == "note"
+    assert qdrant_point["payload"]["core"]["memory_type"] == "memo_test"
     assert qdrant_point["payload"]["entity"]["details"] == "This is the detail for the test memory."
 
     # Check that it's in Kuzu
     assert "test-memory-1" in kuzu_fake.nodes["Memory"]
     kuzu_node = kuzu_fake.nodes["Memory"]["test-memory-1"]
     assert kuzu_node["user_id"] == "test-user"
-    assert kuzu_node["memory_type"] == "note"
+    assert kuzu_node["memory_type"] == "memo_test"
     # Kuzu only stores core fields, not payload fields like statement
 
 
@@ -51,11 +51,8 @@ def test_add_memory_index_uses_override_when_provided(
     memory = mem_factory(
         id="test-memory-1",
         user_id="test-user",
-        memory_type="note",
+        memory_type="memo",
         statement="This is a test memory",
-        payload={
-            "details": "This is the detail for the test memory.",
-        },
     )
 
     # Add to index with override
@@ -102,7 +99,12 @@ def test_add_memory_index_qdrant_succeeds_kuzu_fails_logs_and_raises(
 def test_add_memory_index_with_collection_name(embedder, qdrant_fake, kuzu_fake, mem_factory):
     """Test that add_memory_index respects collection name."""
     # Create a memory
-    memory = mem_factory(id="test-memory-1", user_id="test-user", statement="This is a test memory")
+    memory = mem_factory(
+        id="test-memory-1",
+        user_id="test-user",
+        memory_type="memo",
+        statement="This is a test memory",
+    )
 
     # Add to index with custom collection
     custom_collection = "custom_memories"
