@@ -3,7 +3,7 @@ name: MEMG Core – Main
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev-v040 ]  # temporary: testing dev-v040 branch
     tags: [ 'v*' ]    # release on tags
   workflow_dispatch:
 
@@ -47,7 +47,7 @@ jobs:
   build:
     needs: quality
     # Build wheel for download (PyPI publishing temporarily disabled)
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev-v040'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
