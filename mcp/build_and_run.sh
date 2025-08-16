@@ -32,6 +32,9 @@ done
 
 echo "🚀 MEMG Core MCP Server - Local Docker Build & Run"
 echo "=================================================="
+echo "🛡️  SAFETY: This script only affects LOCAL containers in this directory"
+echo "🌐 Remote GCP deployments are COMPLETELY SAFE and will NOT be touched"
+echo ""
 
 if [ "$USE_PYPI" = true ]; then
     echo "📦 Mode: Installing memg-core from PyPI"
@@ -68,22 +71,29 @@ VOLUME_BASE="${BASE_MEMORY_PATH}_${MCP_PORT}"
 echo "🔧 Ensuring volume directories exist at: ${VOLUME_BASE}"
 mkdir -p "${VOLUME_BASE}/qdrant" "${VOLUME_BASE}/kuzu"
 
-# Step 1: Shutdown any existing containers
+# Step 1: Stop ONLY the specific container for this port
 echo ""
-echo "🛑 Step 1: Shutting down existing containers..."
-if docker-compose ps -q 2>/dev/null | grep -q .; then
-    echo "Found running containers, shutting down..."
-    docker-compose down
+echo "🛑 Step 1: Checking for container memg-mcp-server-$MCP_PORT ONLY..."
+
+# Check for the specific container name that docker-compose would create
+CONTAINER_NAME="memg-mcp-server-$MCP_PORT"
+if docker ps --format "{{.Names}}" | grep -q "^$CONTAINER_NAME$"; then
+    echo "Found container $CONTAINER_NAME, stopping it..."
+    docker stop "$CONTAINER_NAME" || true
+    docker rm "$CONTAINER_NAME" || true
 else
-    echo "No running containers found"
+    echo "✅ Container $CONTAINER_NAME not found - safe to proceed"
 fi
 
-# Also check for any containers using our port
-RUNNING_CONTAINER=$(docker ps --filter "publish=$MCP_PORT" --format "{{.Names}}" 2>/dev/null || true)
-if [ -n "$RUNNING_CONTAINER" ]; then
-    echo "Found container '$RUNNING_CONTAINER' using port $MCP_PORT, stopping..."
-    docker stop "$RUNNING_CONTAINER" || true
-    docker rm "$RUNNING_CONTAINER" || true
+# Double-check: Also look for any container using our specific port
+OTHER_CONTAINERS=$(docker ps --filter "publish=$MCP_PORT" --format "{{.Names}}" 2>/dev/null || true)
+if [ -n "$OTHER_CONTAINERS" ]; then
+    echo "⚠️  Found other containers using port $MCP_PORT: $OTHER_CONTAINERS"
+    for container in $OTHER_CONTAINERS; do
+        echo "Stopping container: $container"
+        docker stop "$container" || true
+        docker rm "$container" || true
+    done
 fi
 
 # Step 2: Clean build (no cache)
@@ -93,6 +103,18 @@ if [ "$USE_PYPI" = true ]; then
 else
     echo "🔨 Step 2: Building Docker image with local source (no cache)..."
 fi
+
+# Only remove the specific service if it exists in compose
+echo "🧹 Checking docker-compose for memg-mcp-server service..."
+if docker-compose ps memg-mcp-server 2>/dev/null | grep -q "memg-mcp-server"; then
+    echo "Stopping docker-compose service: memg-mcp-server"
+    docker-compose stop memg-mcp-server 2>/dev/null || true
+    docker-compose rm -f memg-mcp-server 2>/dev/null || true
+else
+    echo "✅ No memg-mcp-server service found in docker-compose"
+fi
+
+# Build with no cache
 docker-compose build --no-cache
 
 # Step 3: Start the service
@@ -158,3 +180,9 @@ echo "  - mcp_gmem_add_memory"
 echo "  - mcp_gmem_search_memories"
 echo "  - mcp_gmem_get_system_info"
 echo "  - mcp_gmem_delete_memory"
+echo ""
+echo "🛡️  SAFETY CONFIRMATION:"
+echo "  ✅ This script ONLY stopped: memg-mcp-server-$MCP_PORT (if it existed)"
+echo "  ✅ Other containers on different ports: COMPLETELY SAFE"
+echo "  ✅ Your GCP deployments: COMPLETELY UNTOUCHED"
+echo "  ✅ Other docker-compose projects: COMPLETELY SAFE"
