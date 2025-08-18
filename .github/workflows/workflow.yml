@@ -131,7 +131,7 @@ jobs:
       - name: Test ECR access
         run: |
           echo "Testing login to AWS ECR..."
-          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/z8i1z7l3
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/z8i1z7l3
 
       - name: build docker image and push it gcr
         run: |
