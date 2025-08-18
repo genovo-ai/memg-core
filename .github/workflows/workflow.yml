@@ -121,17 +121,23 @@ jobs:
       - name: checkout the code
         uses: actions/checkout@v4
 
-      - name: Login to GitHub Container Registry
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ vars.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ vars.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      - name: Test ECR access
+        run: |
+          echo "Testing login to AWS ECR..."
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/z8i1z7l3
 
       - name: build docker image and push it gcr
         run: |
-          ls -ll
-          docker build -t public.ecr.aws/z8i1z7l3/memg-core:${{env.branch_name}}-${{env.full_sha}} .
-          docker push public.ecr.aws/z8i1z7l3/memg-core:${{env.branch_name}}-${{env.full_sha}}
+          docker build -t public.ecr.aws/z8i1z7l3/memg-core:test .
+          docker push public.ecr.aws/z8i1z7l3/memg-core:test
 
+#ls -ll
+#docker build -t public.ecr.aws/z8i1z7l3/memg-core:${{env.branch_name}}-${{env.full_sha}} .
+#docker push public.ecr.aws/z8i1z7l3/memg-core:${{env.branch_name}}-${{env.full_sha}}
