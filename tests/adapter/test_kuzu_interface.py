@@ -134,26 +134,6 @@ def test_query_empty_returns_list(kuzu_fake):
     assert len(results) == 0
 
 
-def test_neighbors_validates_node_label_not_uuid(kuzu_fake):
-    """Test that neighbors() rejects UUID as node_label parameter."""
-    with pytest.raises(ValueError, match="node_label must be a node type"):
-        kuzu_fake.neighbors(
-            node_label="550e8400-e29b-41d4-a716-446655440000",  # UUID - should fail
-            node_id="another-uuid",
-            direction="any",
-        )
-
-
-def test_neighbors_validates_node_id_is_uuid(kuzu_fake):
-    """Test that neighbors() validates node_id looks like UUID."""
-    with pytest.raises(ValueError, match="node_id must be a UUID"):
-        kuzu_fake.neighbors(
-            node_label="Memory",
-            node_id="not-a-uuid",  # Invalid UUID format - should fail
-            direction="any",
-        )
-
-
 def test_init_raises_databaseerror_when_db_path_missing():
     """Test that init raises DatabaseError when db_path is missing."""
     # Patch os.environ to remove KUZU_DB_PATH

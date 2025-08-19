@@ -226,22 +226,14 @@ class KuzuInterface:
         """Fetch neighbors of a node
 
         Args:
-            node_label: Node type/table name (e.g., "Memory", "bug") - NOT a UUID
-            node_id: UUID of the specific node to find neighbors for
+            node_label: Node type/table name (e.g., "Memory", "bug")
+            node_id: ID of the specific node to find neighbors for
             rel_types: List of relationship types to filter by
             direction: "in", "out", or "any" for relationship direction
             limit: Maximum number of neighbors to return
             neighbor_label: Type of neighbor nodes to return
         """
         try:
-            # Validate parameters to prevent common bugs
-            if self._is_uuid_like(node_label):
-                raise ValueError(
-                    f"node_label must be a node type (e.g., 'Memory', 'bug'), not UUID: {node_label}"
-                )
-
-            if not self._is_uuid_like(node_id):
-                raise ValueError(f"node_id must be a UUID, got: {node_id}")
             rel_filter = "|".join([r.upper() for r in rel_types]) if rel_types else ""
             neighbor = f":{neighbor_label}" if neighbor_label else ""
 
@@ -327,11 +319,3 @@ class KuzuInterface:
         if isinstance(value, bool):
             return "BOOLEAN"
         return "STRING"
-
-    def _is_uuid_like(self, value: str) -> bool:
-        """Check if string looks like a UUID"""
-        import re
-
-        # UUID pattern: 8-4-4-4-12 hexadecimal characters
-        uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-        return bool(re.match(uuid_pattern, value, re.IGNORECASE))
