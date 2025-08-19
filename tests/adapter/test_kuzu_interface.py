@@ -119,7 +119,7 @@ def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
 
 
 def test_neighbors_supports_hrid_search(kuzu_fake):
-    """Test that neighbors() can find nodes by HRID when allow_hrid=True."""
+    """Test that neighbors() can find nodes by HRID when id_type='HRID'."""
     # Add nodes with HRIDs
     node1_properties = {
         "id": "uuid-node-1",
@@ -181,7 +181,7 @@ def test_neighbors_supports_hrid_search(kuzu_fake):
         direction="out",
         limit=10,
         neighbor_label="Memory",
-        allow_hrid=True,  # Enable HRID search
+        id_type="HRID",  # Specify HRID search
     )
 
     assert len(neighbors) == 1
@@ -191,7 +191,7 @@ def test_neighbors_supports_hrid_search(kuzu_fake):
 
 
 def test_neighbors_uuid_only_mode(kuzu_fake):
-    """Test that neighbors() only searches by UUID when allow_hrid=False."""
+    """Test that neighbors() only searches by UUID when id_type='UUID'."""
     # Same setup as above
     node1_properties = {
         "id": "uuid-node-1",
@@ -211,7 +211,7 @@ def test_neighbors_uuid_only_mode(kuzu_fake):
 
     kuzu_fake.add_node("Memory", node1_properties)
 
-    # Test: Search by HRID with allow_hrid=False should find nothing
+    # Test: Search by HRID with id_type='UUID' should find nothing
     neighbors = kuzu_fake.neighbors(
         node_label="Memory",
         node_id="TASK_AAA001",  # Using HRID
@@ -219,10 +219,10 @@ def test_neighbors_uuid_only_mode(kuzu_fake):
         direction="out",
         limit=10,
         neighbor_label="Memory",
-        allow_hrid=False,  # Disable HRID search
+        id_type="UUID",  # Search by UUID field only
     )
 
-    assert len(neighbors) == 0  # Should not find by HRID when disabled
+    assert len(neighbors) == 0  # Should not find by HRID when using UUID mode
 
 
 def test_query_empty_returns_list(kuzu_fake):

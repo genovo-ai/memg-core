@@ -365,15 +365,17 @@ class FakeKuzu(KuzuInterface):
         direction: str = "any",
         limit: int = 10,
         neighbor_label: str | None = None,
-        allow_hrid: bool = True,
+        id_type: str = "UUID",
     ) -> list[dict[str, Any]]:
         """Return neighbor Memory nodes — anchors-only (statement) to match v1 policy."""
         out: list[dict[str, Any]] = []
 
         # Find the actual node ID to use for relationship matching
         actual_node_id = node_id
-        if allow_hrid and node_label in self.nodes:
-            # Check if node_id is an HRID - if so, find the actual UUID
+        id_type_upper = id_type.upper()
+
+        if id_type_upper == "HRID" and node_label in self.nodes:
+            # Search for node by HRID and get its UUID for relationship matching
             for uuid, node in self.nodes[node_label].items():
                 if node.get("hrid") == node_id:
                     actual_node_id = uuid
