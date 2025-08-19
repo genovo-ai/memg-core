@@ -222,16 +222,18 @@ class KuzuInterface:
         direction: str = "any",
         limit: int = 10,
         neighbor_label: str | None = None,
+        allow_hrid: bool = True,
     ) -> list[dict[str, Any]]:
         """Fetch neighbors of a node
 
         Args:
             node_label: Node type/table name (e.g., "Memory", "bug")
-            node_id: ID of the specific node to find neighbors for
+            node_id: ID of the specific node to find neighbors for (UUID or HRID)
             rel_types: List of relationship types to filter by
             direction: "in", "out", or "any" for relationship direction
             limit: Maximum number of neighbors to return
             neighbor_label: Type of neighbor nodes to return
+            allow_hrid: If True, search by both UUID (id field) and HRID (hrid field)
         """
         try:
             rel_filter = "|".join([r.upper() for r in rel_types]) if rel_types else ""
@@ -240,12 +242,20 @@ class KuzuInterface:
             # Format relationship pattern properly - don't include ':' if no filter
             rel_part = f":{rel_filter}" if rel_filter else ""
 
-            if direction == "out":
-                pattern = f"(a:{node_label} {{id: $id}})-[r{rel_part}]->(n{neighbor})"
-            elif direction == "in":
-                pattern = f"(a:{node_label} {{id: $id}})<-[r{rel_part}]-(n{neighbor})"
+            # Build node matching condition - support both UUID and HRID
+            if allow_hrid:
+                # Search by either id (UUID) OR hrid (Human-Readable ID)
+                node_condition = f"a:{node_label} WHERE (a.id = $node_id OR a.hrid = $node_id)"
             else:
-                pattern = f"(a:{node_label} {{id: $id}})-[r{rel_part}]-(n{neighbor})"
+                # Search by id (UUID) only
+                node_condition = f"a:{node_label} {{id: $node_id}}"
+
+            if direction == "out":
+                pattern = f"({node_condition})-[r{rel_part}]->(n{neighbor})"
+            elif direction == "in":
+                pattern = f"({node_condition})<-[r{rel_part}]-(n{neighbor})"
+            else:
+                pattern = f"({node_condition})-[r{rel_part}]-(n{neighbor})"
 
             if neighbor_label == "Memory":
                 # Type-agnostic query - return core fields + individual payload fields
@@ -266,7 +276,7 @@ class KuzuInterface:
                 RETURN DISTINCT n as node, label(r) as rel_type
                 LIMIT $limit
                 """
-            params = {"id": node_id, "limit": limit}
+            params = {"node_id": node_id, "limit": limit}
             return self.query(cypher, params)
         except Exception as e:
             raise DatabaseError(

@@ -118,6 +118,113 @@ def test_add_relationship_and_neighbors_roundtrip(kuzu_fake):
     assert neighbors[0]["rel_type"] == "RELATED_TO"
 
 
+def test_neighbors_supports_hrid_search(kuzu_fake):
+    """Test that neighbors() can find nodes by HRID when allow_hrid=True."""
+    # Add nodes with HRIDs
+    node1_properties = {
+        "id": "uuid-node-1",
+        "hrid": "TASK_AAA001",
+        "user_id": "test-user",
+        "content": "Node 1 content",
+        "memory_type": "memo_test",
+        "summary": "",
+        "source": "user",
+        "confidence": 0.8,
+        "is_valid": True,
+        "created_at": "2023-01-01T00:00:00+00:00",
+        "expires_at": "",
+        "supersedes": "",
+        "superseded_by": "",
+    }
+
+    node2_properties = {
+        "id": "uuid-node-2",
+        "hrid": "TASK_AAA002",
+        "user_id": "test-user",
+        "content": "Node 2 content",
+        "memory_type": "memo_test",
+        "summary": "",
+        "source": "user",
+        "confidence": 0.8,
+        "is_valid": True,
+        "created_at": "2023-01-01T00:00:00+00:00",
+        "expires_at": "",
+        "supersedes": "",
+        "superseded_by": "",
+    }
+
+    kuzu_fake.add_node("Memory", node1_properties)
+    kuzu_fake.add_node("Memory", node2_properties)
+
+    # Add relationship
+    relationship_props = {
+        "user_id": "test-user",
+        "confidence": 0.9,
+        "created_at": "2023-01-01T00:00:00+00:00",
+        "is_valid": True,
+    }
+
+    kuzu_fake.add_relationship(
+        from_table="Memory",
+        to_table="Memory",
+        rel_type="RELATED_TO",
+        from_id="uuid-node-1",
+        to_id="uuid-node-2",
+        props=relationship_props,
+    )
+
+    # Test: Search by HRID should find neighbors
+    neighbors = kuzu_fake.neighbors(
+        node_label="Memory",
+        node_id="TASK_AAA001",  # Using HRID instead of UUID
+        rel_types=["RELATED_TO"],
+        direction="out",
+        limit=10,
+        neighbor_label="Memory",
+        allow_hrid=True,  # Enable HRID search
+    )
+
+    assert len(neighbors) == 1
+    assert neighbors[0]["id"] == "uuid-node-2"
+    assert neighbors[0]["hrid"] == "TASK_AAA002"
+    assert neighbors[0]["rel_type"] == "RELATED_TO"
+
+
+def test_neighbors_uuid_only_mode(kuzu_fake):
+    """Test that neighbors() only searches by UUID when allow_hrid=False."""
+    # Same setup as above
+    node1_properties = {
+        "id": "uuid-node-1",
+        "hrid": "TASK_AAA001",
+        "user_id": "test-user",
+        "content": "Node 1 content",
+        "memory_type": "memo_test",
+        "summary": "",
+        "source": "user",
+        "confidence": 0.8,
+        "is_valid": True,
+        "created_at": "2023-01-01T00:00:00+00:00",
+        "expires_at": "",
+        "supersedes": "",
+        "superseded_by": "",
+    }
+
+    kuzu_fake.add_node("Memory", node1_properties)
+
+    # Test: Search by HRID with allow_hrid=False should find nothing
+    neighbors = kuzu_fake.neighbors(
+        node_label="Memory",
+        node_id="TASK_AAA001",  # Using HRID
+        rel_types=["RELATED_TO"],
+        direction="out",
+        limit=10,
+        neighbor_label="Memory",
+        allow_hrid=False,  # Disable HRID search
+    )
+
+    assert len(neighbors) == 0  # Should not find by HRID when disabled
+
+
 def test_query_empty_returns_list(kuzu_fake):
     """Test that query returns an empty list for no results."""
     # Query for non-existent node
