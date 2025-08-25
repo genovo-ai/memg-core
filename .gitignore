@@ -246,3 +246,5 @@ src/memg_core/version.py
 
 # Temporarily commented out to allow documentation
 docs/*
+tests/*tmp*
+tmp/
