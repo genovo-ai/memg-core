@@ -164,7 +164,7 @@ cython_debug/
 .idea/
 
 # Local development and experimental code
-local_development/
+local_*
 temp_tests/
 
 # Local maintenance docs (keep out of repo)
@@ -237,8 +237,9 @@ integration/*
 !integration/mcp/
 !integration/sync_wrapper.py
 
-_stash/
+_stash*
 artifacts/
+local_*
 
 temp_data
 src/memg_core/version.py
