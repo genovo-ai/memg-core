@@ -75,7 +75,14 @@ class TypeRegistry:
         """Build EntityType enum dynamically from YAML entities."""
         if self._yaml_schema is None:
             raise RuntimeError("YAML schema not loaded")
-        entities = self._yaml_schema["entities"]
+        schema = self._yaml_schema
+        if not isinstance(schema, dict):
+            raise RuntimeError("YAML schema must be a dict")
+        schema_dict: dict[str, Any] = schema
+        entities_obj = schema_dict.get("entities")
+        if not isinstance(entities_obj, list):
+            raise ValueError("YAML 'entities' section must be a list")
+        entities = entities_obj
 
         # Extract entity names - crash if any entity missing 'name'
         entity_names = []
@@ -94,7 +101,14 @@ class TypeRegistry:
         """Build RelationPredicate enum dynamically from YAML relations."""
         if self._yaml_schema is None:
             raise RuntimeError("YAML schema not loaded")
-        entities = self._yaml_schema["entities"]
+        schema = self._yaml_schema
+        if not isinstance(schema, dict):
+            raise RuntimeError("YAML schema must be a dict")
+        schema_dict: dict[str, Any] = schema
+        entities_obj = schema_dict.get("entities")
+        if not isinstance(entities_obj, list):
+            raise ValueError("YAML 'entities' section must be a list")
+        entities = entities_obj
         predicates = set()
 
         # Extract all predicates from all entity relations
@@ -127,7 +141,14 @@ class TypeRegistry:
         """Build Pydantic models dynamically from YAML entities."""
         if self._yaml_schema is None:
             raise RuntimeError("YAML schema not loaded")
-        entities = self._yaml_schema["entities"]
+        schema = self._yaml_schema
+        if not isinstance(schema, dict):
+            raise RuntimeError("YAML schema must be a dict")
+        schema_dict: dict[str, Any] = schema
+        entities_obj = schema_dict.get("entities")
+        if not isinstance(entities_obj, list):
+            raise ValueError("YAML 'entities' section must be a list")
+        entities = entities_obj
 
         for entity in entities:
             entity_name = entity["name"]

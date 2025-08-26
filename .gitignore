@@ -248,3 +248,7 @@ src/memg_core/version.py
 docs/*
 tests/*tmp*
 tmp/
+temp*
+*.ipynb*
+
+*.zip

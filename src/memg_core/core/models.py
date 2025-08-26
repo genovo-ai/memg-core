@@ -6,6 +6,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+_MAX_SCORE_TOLERANCE = 1.001
+
 
 class Memory(BaseModel):
     """Core memory model with YAML-driven payload validation."""
@@ -35,7 +37,19 @@ class Memory(BaseModel):
     # (properties removed – dynamic __getattr__ handles field access)
 
     def to_qdrant_payload(self) -> dict[str, Any]:
-        """Serializes to a strict {'core': ..., 'entity': ...} structure."""
+        """DEPRECATED: Serializes to a strict {'core': ..., 'entity': ...} structure.
+
+        This method is deprecated and will be removed in a future version.
+        The current implementation uses flat payload structure directly in MemoryStore.
+        """
+        import warnings
+
+        warnings.warn(
+            "Memory.to_qdrant_payload() is deprecated. Use flat payload structure directly.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         core = {
             "id": self.id,
             "user_id": self.user_id,
@@ -129,16 +143,38 @@ class SearchResult(BaseModel):
     """Search result from vector/graph search"""
 
     memory: Memory
-    score: float = Field(..., ge=0.0, le=1.0, description="Similarity score")
+    score: float = Field(..., ge=0.0, le=1.0 + _MAX_SCORE_TOLERANCE, description="Similarity score")
     distance: float | None = Field(None, description="Vector distance")
     source: str = Field(..., description="Search source (qdrant/kuzu/hybrid)")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    @field_validator("score")
+    @classmethod
+    def normalize_score(cls, v: float) -> float:
+        """Normalize similarity scores to handle floating-point precision errors.
+
+        Cosine similarity should be in [0, 1] range, but floating-point arithmetic
+        can produce values slightly above 1.0 (e.g., 1.0000000025725408).
+
+        This validator:
+        - Caps scores > 1.0 to exactly 1.0 (for small floating-point errors)
+        - Raises error for scores significantly > 1.0 (indicates real problems)
+        - Ensures scores >= 0.0
+        """
+        if v < 0.0:
+            raise ValueError(f"Similarity score cannot be negative: {v}")
+
+        if v > 1.001:  # Allow small floating-point errors, but catch real issues
+            raise ValueError(f"Similarity score too high (indicates calculation error): {v}")
+
+        # Cap to 1.0 for small floating-point precision errors
+        return min(v, 1.0)
+
 
 class ProcessingResult(BaseModel):
-    """Result from memory processing pipeline - type-agnostic"""
+    """Result from memory processing pipelines - type-agnostic"""
 
     success: bool
     memories_created: list[Memory] = Field(default_factory=list)

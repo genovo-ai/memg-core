@@ -9,7 +9,6 @@ All type building and validation delegated to TypeRegistry - zero redundancy.
 
 from __future__ import annotations
 
-from functools import lru_cache
 import os
 from pathlib import Path
 from typing import Any
@@ -24,10 +23,6 @@ class YamlTranslatorError(MemorySystemError):
     """Error in YAML schema translation or validation."""
 
     pass
-
-
-# EntitySpec REMOVED - TypeRegistry handles all entity specifications
-# NO REDUNDANCY - all type definitions centralized in TypeRegistry
 
 
 class YamlTranslator:
@@ -161,7 +156,8 @@ class YamlTranslator:
         mem_type = getattr(memory, "memory_type", None)
         if not mem_type:
             raise YamlTranslatorError(
-                "Memory object missing 'memory_type' field", operation="build_anchor_text"
+                "Memory object missing 'memory_type' field",
+                operation="build_anchor_text",
             )
 
         # Get anchor field from YAML schema
@@ -221,14 +217,18 @@ class YamlTranslator:
         if not spec:
             raise YamlTranslatorError(
                 f"Unknown entity type '{memory_type}'. All types must be defined in YAML schema.",
-                context={"memory_type": memory_type, "available_types": list(emap.keys())},
+                context={
+                    "memory_type": memory_type,
+                    "available_types": list(emap.keys()),
+                },
             )
 
         req, _opt = self._fields_contract(spec)
         missing = [k for k in req if not payload.get(k)]
         if missing:
             raise YamlTranslatorError(
-                f"Missing required fields: {missing}", context={"memory_type": memory_type}
+                f"Missing required fields: {missing}",
+                context={"memory_type": memory_type},
             )
 
         # Strip system-reserved fields if present
@@ -265,29 +265,3 @@ class YamlTranslator:
         from .types import get_entity_model
 
         return get_entity_model(entity_name)
-
-
-@lru_cache(maxsize=1)
-def get_yaml_translator() -> YamlTranslator:
-    return YamlTranslator()
-
-
-def build_anchor_text(memory) -> str:
-    return get_yaml_translator().build_anchor_text(memory)
-
-
-def create_memory_from_yaml(memory_type: str, payload: dict[str, Any], user_id: str):
-    return get_yaml_translator().create_memory_from_yaml(memory_type, payload, user_id)
-
-
-# Convenience shim
-
-
-def get_entity_model(entity_name: str):
-    """Module-level helper that uses the cached global translator."""
-    return get_yaml_translator().get_entity_model(entity_name)
-
-
-def get_see_also_config(entity_name: str) -> dict[str, Any] | None:
-    """Module-level helper that uses the cached global translator."""
-    return get_yaml_translator().get_see_also_config(entity_name)

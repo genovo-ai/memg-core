@@ -1,94 +1,33 @@
-"""Simple Qdrant interface wrapper - pure I/O operations only"""
+"""Pure CRUD Qdrant interface wrapper - NO DDL operations"""
 
-import os
 from typing import Any
 import uuid
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
-    Distance,
     FieldCondition,
     Filter,
     MatchAny,
     MatchValue,
     PointStruct,
     Range,
-    VectorParams,
 )
 
-from memg_core.core.config import get_config
 from memg_core.core.exceptions import DatabaseError
 
 
 class QdrantInterface:
-    """Simple wrapper around QdrantClient - CRUD and search only"""
+    """Pure CRUD wrapper around QdrantClient - NO DDL operations"""
 
-    def __init__(self, collection_name: str = "memories", storage_path: str | None = None):
-        # Use provided storage path or read from env
-        if storage_path is None:
-            storage_path = os.getenv("QDRANT_STORAGE_PATH")
-            if not storage_path:
-                raise DatabaseError(
-                    "QDRANT_STORAGE_PATH environment variable must be set! No defaults allowed.",
-                    operation="__init__",
-                )
+    def __init__(self, client: QdrantClient, collection_name: str):
+        """Initialize with pre-created client and collection.
 
-        # Expand $HOME and ensure directory exists
-        storage_path = os.path.expandvars(storage_path)
-        os.makedirs(storage_path, exist_ok=True)
-
-        self.client = QdrantClient(path=storage_path)
+        Args:
+            client: Pre-initialized QdrantClient from DatabaseClients
+            collection_name: Name of pre-created collection
+        """
+        self.client = client
         self.collection_name = collection_name
-
-        # Get vector dimension from config instead of hardcoding
-        config = get_config()
-        self.vector_dimension = config.memg.vector_dimension
-
-    def collection_exists(self, collection: str | None = None) -> bool:
-        """Check if collection exists"""
-        try:
-            collection = collection or self.collection_name
-            collections = self.client.get_collections()
-            return any(col.name == collection for col in collections.collections)
-
-        except Exception as e:
-            raise DatabaseError(
-                "Qdrant collection_exists error",
-                operation="collection_exists",
-                original_error=e,
-            )
-
-    def create_collection(
-        self, collection: str | None = None, vector_size: int | None = None
-    ) -> bool:
-        """Create a new collection"""
-        try:
-            collection = collection or self.collection_name
-            vector_size = vector_size or self.vector_dimension
-            if self.collection_exists(collection):
-                return True  # Already exists
-
-            self.client.create_collection(
-                collection_name=collection,
-                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
-            )
-            return True
-
-        except Exception as e:
-            raise DatabaseError(
-                "Qdrant create_collection error",
-                operation="create_collection",
-                original_error=e,
-            )
-
-    def ensure_collection(
-        self, collection: str | None = None, vector_size: int | None = None
-    ) -> bool:
-        """Ensure collection exists, create if it doesn't"""
-        collection = collection or self.collection_name
-        if not self.collection_exists(collection):
-            return self.create_collection(collection, vector_size)
-        return True
 
     def add_point(
         self,
@@ -97,18 +36,18 @@ class QdrantInterface:
         point_id: str | None = None,
         collection: str | None = None,
     ) -> tuple[bool, str]:
-        """Add a single point to collection"""
+        """Add a single point to collection - pure CRUD operation"""
         try:
             collection = collection or self.collection_name
-            self.ensure_collection(collection, len(vector))
 
             if point_id is None:
                 point_id = str(uuid.uuid4())
-            elif not isinstance(point_id, str):
-                point_id = str(point_id)
 
+            # Create PointStruct with VectorStruct
             point = PointStruct(id=point_id, vector=vector, payload=payload)
             result = self.client.upsert(collection_name=collection, points=[point])
+
+            # print("Qdrant result", result)
 
             # Determine success from returned UpdateResult status
             success = True
@@ -137,22 +76,20 @@ class QdrantInterface:
         user_id: str | None = None,
         filters: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """Search for similar points with optional filtering"""
+        """Search for similar points with optional filtering - pure CRUD operation"""
         try:
             collection = collection or self.collection_name
-
-            if not self.collection_exists(collection):
-                self.ensure_collection(collection)
 
             # Build query filter
             query_filter = None
             filter_conditions = []
 
             if user_id or filters:
-                # Add user_id filter - no hardcoded path assumptions
+                # Add user_id filter - flat payload structure
+                # TODO: Consider making this field path configurable
                 if user_id:
                     filter_conditions.append(
-                        FieldCondition(key="core.user_id", match=MatchValue(value=user_id))
+                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
                     )
 
                 # Add additional filters
@@ -195,6 +132,8 @@ class QdrantInterface:
                 query_filter=query_filter,
             ).points
 
+            # print("Qdrant results", results)
+
             # Convert to simplified results
             return [
                 {
@@ -213,12 +152,9 @@ class QdrantInterface:
             )
 
     def get_point(self, point_id: str, collection: str | None = None) -> dict[str, Any] | None:
-        """Get a single point by ID"""
+        """Get a single point by ID - pure CRUD operation"""
         try:
             collection = collection or self.collection_name
-
-            if not self.collection_exists(collection):
-                return None
 
             result = self.client.retrieve(
                 collection_name=collection,
@@ -241,12 +177,9 @@ class QdrantInterface:
             )
 
     def delete_points(self, point_ids: list[str], collection: str | None = None) -> bool:
-        """Delete points by IDs"""
+        """Delete points by IDs - pure CRUD operation"""
         try:
             collection = collection or self.collection_name
-
-            if not self.collection_exists(collection):
-                return True  # Nothing to delete
 
             from qdrant_client.models import PointIdsList
 
@@ -263,12 +196,9 @@ class QdrantInterface:
             )
 
     def get_collection_info(self, collection: str | None = None) -> dict[str, Any]:
-        """Get collection information"""
+        """Get collection information - pure read operation"""
         try:
             collection = collection or self.collection_name
-
-            if not self.collection_exists(collection):
-                return {"exists": False}
 
             info = self.client.get_collection(collection_name=collection)
             # Handle different types of vector params

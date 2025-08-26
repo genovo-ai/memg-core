@@ -92,7 +92,7 @@ entities:
     anchor: statement
     fields:
       project: { type: string }  # Optional project namespace for filtering
-      details: { type: string, required: true }
+      # details: { type: string, required: true } # not needed anymore, document has details
     relations:
       - name: note_document
         description: "Note providing context to a document"
@@ -156,45 +156,3 @@ entities:
         predicates: [IMPLEMENTS]
         source: solution
         target: task
-
-  # - name: code_review
-  #   parent: memo
-  #   description: "Code review feedback or observation"
-  #   anchor: statement
-  #   fields:
-  #     details:     { type: string, required: true }
-  #     review_type: { type: enum, choices: [suggestion, issue, praise, question] }
-  #     file_path:   { type: string }
-  #     line_range:  { type: string }  # e.g., "45-52"
-  #     reviewer:    { type: string }
-  #     status:      { type: enum, choices: [pending, addressed, dismissed] }
-  #   relations:
-  #     - name: review_solution
-  #       description: "Code review leading to a solution"
-  #       directed: true
-  #       predicates: [SUGGESTS]
-  #       source: code_review
-  #       target: solution
-
-  # - name: learning
-  #   parent: memo
-  #   description: "Learning note, insight, or knowledge gained"
-  #   anchor: statement
-  #   fields:
-  #     details:    { type: string, required: true }
-  #     category:   { type: enum, choices: [concept, pattern, tool, framework, best_practice, gotcha] }
-  #     difficulty: { type: enum, choices: [beginner, intermediate, advanced] }
-  #     source:     { type: string }  # Where learned (docs, tutorial, experience, etc.)
-  #   relations:
-  #     - name: learning_solution
-  #       description: "Learning that influenced a solution"
-  #       directed: true
-  #       predicates: [INFLUENCES]
-  #       source: learning
-  #       target: solution
-  #     - name: learning_related
-  #       description: "Related learning topics"
-  #       directed: true
-  #       predicates: [RELATES_TO]
-  #       source: learning
-  #       target: learning

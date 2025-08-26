@@ -46,6 +46,11 @@ entities:
       created_at: { type: datetime, required: true, system: true }
       updated_at: { type: datetime, system: true }
       vector:     { type: vector, derived_from: statement, system: true }
+    see_also:
+      enabled: true
+      threshold: 0.90
+      limit: 3
+      target_types: [memo]
     relations:
       - name: memo_test_related
         description: "Generic relation between test memos"
