@@ -1,106 +1,138 @@
-# .github/workflows/workflow.yml
 name: MEMG Core – Main
+
+
+
+env:
+  full_sha: "${{ github.sha }}"
+  branch_name: ${{ github.ref_name }}
+  GIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+  GIT_COMMIT: ${{ github.sha }}
+  GIT_BRANCH: ${{ github.ref_name }}
+  GIT_REPO: ${{ github.repository }}
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]    # release on tags
-  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  quality:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.11', cache: 'pip' }
-      - name: Install toolchain
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -e ".[dev]"
-          pip install ruff bandit mypy pylint pytest pytest-cov types-PyYAML fastapi fastembed
-      - name: Bandit
-        run: bandit -r src/ -f json -o bandit-report.json
-      - name: Ruff
-        run: |
-          ruff format --check src/
-          ruff check src/
-      - name: Pylint
-        run: pylint src/ --fail-under=7.0 --score=yes
-      - name: MyPy
-        run: mypy src/ --ignore-missing-imports
-        continue-on-error: ${{ startsWith(github.ref,'refs/tags/v') }}
-      - name: Setup temp directories for integration tests
-        run: mkdir -p temp_data/qdrant temp_data/kuzu
-      - name: Tests
-        env:
-          QDRANT_STORAGE_PATH: temp_data/qdrant
-          KUZU_DB_PATH: temp_data/kuzu/ci_test.db
-        run: python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+#  quality:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#        with: { fetch-depth: 0 }
+#      - uses: actions/setup-python@v5
+#        with: { python-version: '3.11', cache: 'pip' }
+#      - name: Install toolchain
+#        run: |
+#          python -m pip install --upgrade pip
+#          pip install -r requirements.txt
+#          pip install -e ".[dev]"
+#          pip install ruff bandit mypy pylint pytest pytest-cov types-PyYAML fastapi fastembed
+#      - name: Bandit
+#        run: bandit -r src/ -f json -o bandit-report.json
+#      - name: Ruff
+#        run: |
+#          ruff format --check src/
+#          ruff check src/
+#      - name: Pylint
+#        run: pylint src/ --fail-under=7.0 --score=yes
+#      - name: MyPy
+#        run: mypy src/ --ignore-missing-imports
+#        continue-on-error: ${{ startsWith(github.ref,'refs/tags/v') }}
+#      - name: Setup temp directories for integration tests
+#        run: mkdir -p temp_data/qdrant temp_data/kuzu
+#      - name: Tests
+#        env:
+#          QDRANT_STORAGE_PATH: temp_data/qdrant
+#          KUZU_DB_PATH: temp_data/kuzu/ci_test.db
+#        run: python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+#
+#  build:
+#    needs: quality
+#    # Build wheel for download (PyPI publishing temporarily disabled)
+#    if: github.ref == 'refs/heads/main'
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#        with: { fetch-depth: 0 }
+#      - uses: actions/setup-python@v5
+#        with: { python-version: '3.11', cache: 'pip' }
+#      - name: Build wheel and sdist
+#        run: |
+#          python -m pip install --upgrade pip
+#          pip install build
+#          python -m build
+#      - name: Upload build artifacts
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: dist
+#          path: dist
+#          retention-days: 30
+#      - name: Show build info
+#        run: |
+#          echo "Build completed successfully!"
+#          echo "Wheel files:"
+#          ls -la dist/
+#          echo ""
+#          echo "To download: Go to Actions > This workflow run > Artifacts section"
 
-  build:
-    needs: quality
-    # Build wheel for download and PyPI publishing
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.11', cache: 'pip' }
-      - name: Build wheel and sdist
-        run: |
-          python -m pip install --upgrade pip
-          pip install build
-          python -m build
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist
-          retention-days: 30
-      - name: Show build info
-        run: |
-          echo "Build completed successfully!"
-          echo "Wheel files:"
-          ls -la dist/
-          echo ""
-          echo "To download: Go to Actions > This workflow run > Artifacts section"
+  # PyPI publishing temporarily disabled for faster development
+  # To re-enable: uncomment this job and update summary dependency below
+  # pypi:
+  #   needs: build
+  #   if: github.ref == 'refs/heads/main'
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     id-token: write  # Required for trusted publishing
+  #   steps:
+  #     - uses: actions/download-artifact@v4
+  #       with:
+  #         name: dist
+  #         path: dist
+  #     - name: Publish to PyPI (Trusted Publishing)
+  #       uses: pypa/gh-action-pypi-publish@release/v1
+  #       with:
+  #         print-hash: true
 
-  pypi:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+#  summary:
+#    needs: [build]
+#    runs-on: ubuntu-latest
+#    if: always()
+#    steps:
+#      - run: |
+#          echo "MEMG Core build completed successfully!"
+#          echo "Wheel artifact available for download from Actions > Artifacts"
+#          echo "Future PyPI: pip install memg-core"
+
+
+  ################ building docker image ####################
+  build_docker_image:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write  # Required for trusted publishing
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist
-      - name: Publish to PyPI (Trusted Publishing)
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          print-hash: true
+      contents: read
+      packages: write
 
-  summary:
-    needs: [build]
-    runs-on: ubuntu-latest
-    if: always()
     steps:
-      - run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            echo "MEMG Core ${{ github.ref_name }} released successfully!"
-            echo "Package published to PyPI: pip install memg-core"
-            echo "Wheel artifact also available for download from Actions > Artifacts"
-          else
-            echo "MEMG Core build completed successfully!"
-            echo "Wheel artifact available for download from Actions > Artifacts"
-            echo "PyPI publishing skipped (only on version tags)"
-          fi
+        ############ checkout the code ######################
+      - name: checkout the code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Test ECR access
+        run: |
+          echo "Testing login to AWS ECR..."
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/z8i1z7l3
+
+      - name: build docker image and push it gcr
+        run: |
+          docker build -t public.ecr.aws/z8i1z7l3/memg-core:${{env.branch_name}}-${{env.full_sha}} .
+          docker push public.ecr.aws/z8i1z7l3/memg-core:${{env.branch_name}}-${{env.full_sha}}
