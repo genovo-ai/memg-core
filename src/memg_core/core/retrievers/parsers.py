@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import re
 from typing import Any
 
 from ...utils.hrid import hrid_to_index
@@ -74,7 +75,21 @@ def _sort_key(result: SearchResult) -> tuple:
     """Stable ordering: score DESC, then hrid index ASC, then id ASC."""
     memory = result.memory
     hrid = getattr(memory, "hrid", None) or "ZZZ_ZZZ999"
-    idx = hrid_to_index(hrid)
+
+    # Handle case where hrid is actually a UUID (fallback for compatibility)
+    uuid_pattern = re.compile(
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+    )
+    if uuid_pattern.match(hrid):
+        # Use a high index for UUIDs to sort them after proper HRIDs
+        idx = 999999999
+    else:
+        try:
+            idx = hrid_to_index(hrid)
+        except ValueError:
+            # If HRID parsing fails, use high index as fallback
+            idx = 999999999
+
     return (-float(result.score), idx, memory.id)
 
 

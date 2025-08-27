@@ -16,7 +16,7 @@ from typing import Any, Protocol
 _HRID_RE = re.compile(r"^(?P<type>[A-Z0-9_]+)_(?P<alpha>[A-Z]{3})(?P<num>\d{3})$")
 
 # Monotonic counters per type (in-memory; persistent store should be used in production)
-_COUNTERS: dict[str, tuple[int, int]] = {}  # {type: (alpha_idx, num)}
+_COUNTERS: dict[tuple[str, str], tuple[int, int]] = {}  # {(type, user_id): (alpha_idx, num)}
 
 
 class StorageQueryInterface(Protocol):
@@ -52,12 +52,13 @@ def _idx_to_alpha(idx: int) -> str:
 
 
 def _initialize_counter_from_storage(
-    type_name: str, storage: StorageQueryInterface | None = None
+    type_name: str, user_id: str, storage: StorageQueryInterface | None = None
 ) -> tuple[int, int]:
     """Initialize counter by querying storage for highest existing HRID of this type.
 
     Args:
         type_name: The memory type to check (e.g., 'note', 'task')
+        user_id: User ID for scoped HRID lookup
         storage: Storage interface to query for existing HRIDs
 
     Returns:
@@ -145,18 +146,19 @@ def _initialize_counter_from_storage(
         return (0, -1)
 
 
-def _initialize_counter_from_tracker(type_name: str, hrid_tracker) -> tuple[int, int]:
+def _initialize_counter_from_tracker(type_name: str, user_id: str, hrid_tracker) -> tuple[int, int]:
     """Initialize counter by querying HridTracker for highest existing HRID.
 
     Args:
         type_name: The memory type to check (e.g., 'note', 'task')
+        user_id: User ID for scoped HRID lookup
         hrid_tracker: HridTracker instance to query
 
     Returns:
         tuple[int, int]: (alpha_idx, num) representing the next available counter position
     """
     try:
-        highest = hrid_tracker.get_highest_hrid(type_name)
+        highest = hrid_tracker.get_highest_hrid(type_name, user_id)
 
         if highest is None:
             return (0, -1)  # No existing HRIDs for this type
@@ -188,11 +190,12 @@ def _initialize_counter_from_tracker(type_name: str, hrid_tracker) -> tuple[int,
         )
 
 
-def generate_hrid(type_name: str, hrid_tracker=None) -> str:
+def generate_hrid(type_name: str, user_id: str, hrid_tracker=None) -> str:
     """Generate the next HRID for the given type.
 
     Args:
         type_name: The memory type (e.g., 'note', 'task')
+        user_id: User ID for scoped HRID generation
         hrid_tracker: Optional HridTracker instance for querying existing HRIDs
 
     Returns:
@@ -205,19 +208,20 @@ def generate_hrid(type_name: str, hrid_tracker=None) -> str:
     """
     t = type_name.strip().upper()
 
-    # Initialize counter from HridTracker on first use of this type
-    if t not in _COUNTERS and hrid_tracker is not None:
-        _COUNTERS[t] = _initialize_counter_from_tracker(t, hrid_tracker)
+    # Initialize counter from HridTracker on first use of this type+user combination
+    counter_key = (t, user_id)
+    if counter_key not in _COUNTERS and hrid_tracker is not None:
+        _COUNTERS[counter_key] = _initialize_counter_from_tracker(t, user_id, hrid_tracker)
 
     # Get current counter or default to fresh start
-    alpha_idx, num = _COUNTERS.get(t, (0, -1))
+    alpha_idx, num = _COUNTERS.get(counter_key, (0, -1))
     num += 1
     if num > 999:
         num = 0
         alpha_idx += 1
         if alpha_idx > 26**3 - 1:
             raise ValueError(f"HRID space exhausted for type {t}")
-    _COUNTERS[t] = (alpha_idx, num)
+    _COUNTERS[counter_key] = (alpha_idx, num)
     return f"{t}_{_idx_to_alpha(alpha_idx)}{num:03d}"
 
 

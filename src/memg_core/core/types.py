@@ -51,10 +51,10 @@ class TypeRegistry:
 
         # Load and validate YAML structure
         try:
-            with open(yaml_path) as f:
+            with open(yaml_path, encoding="utf-8") as f:
                 raw_yaml = yaml.safe_load(f)
         except Exception as e:
-            raise RuntimeError(f"Failed to load YAML from {yaml_path}: {e}")
+            raise RuntimeError(f"Failed to load YAML from {yaml_path}: {e}") from e
 
         # Validate required top-level structure - crash if missing
         if "entities" not in raw_yaml:
@@ -117,7 +117,8 @@ class TypeRegistry:
             for relation in relations:
                 if "predicates" not in relation:
                     raise ValueError(
-                        f"Relation missing 'predicates' field in entity {entity['name']}: {relation}"
+                        f"Relation missing 'predicates' field in entity "
+                        f"{entity['name']}: {relation}"
                     )
 
                 relation_predicates = relation["predicates"]
@@ -130,7 +131,8 @@ class TypeRegistry:
 
         if not predicates:
             raise ValueError(
-                "YAML schema must define at least one relation with predicates. No defaults allowed."
+                "YAML schema must define at least one relation with predicates. "
+                "No defaults allowed."
             )
 
         # Create dynamic enum
@@ -138,7 +140,7 @@ class TypeRegistry:
         self._relation_predicates = Enum("RelationPredicate", predicate_items)
 
     def _build_pydantic_models(self):
-        """Build Pydantic models dynamically from YAML entities."""
+        """Build Pydantic models dynamically from YAML entities with inheritance support."""
         if self._yaml_schema is None:
             raise RuntimeError("YAML schema not loaded")
         schema = self._yaml_schema
@@ -150,6 +152,9 @@ class TypeRegistry:
             raise ValueError("YAML 'entities' section must be a list")
         entities = entities_obj
 
+        # Build entity lookup for inheritance resolution
+        entity_lookup = {entity["name"]: entity for entity in entities}
+
         for entity in entities:
             entity_name = entity["name"]
 
@@ -157,37 +162,63 @@ class TypeRegistry:
             if "fields" not in entity:
                 raise ValueError(f"Entity '{entity_name}' missing required 'fields' section")
 
-            if "anchor" not in entity:
-                raise ValueError(f"Entity '{entity_name}' missing required 'anchor' field")
-
-            # Build Pydantic model fields
-            model_fields = {}
-
-            for field_name, field_def in entity["fields"].items():
-                if "type" not in field_def:
-                    raise ValueError(
-                        f"Field '{field_name}' in entity '{entity_name}' missing 'type'"
-                    )
-
-                field_type = field_def["type"]
-                required = field_def.get("required", False)
-
-                # NO DEFAULTS ALLOWED - if required=True and no value provided, it MUST crash
-                if required:
-                    model_fields[field_name] = (
-                        self._get_python_type(field_type, field_def),
-                        Field(...),
-                    )
-                else:
-                    model_fields[field_name] = (
-                        self._get_python_type(field_type, field_def),
-                        Field(default=None),
-                    )
+            # Build Pydantic model fields with inheritance
+            model_fields = self._resolve_entity_fields(entity, entity_lookup)
 
             # Create dynamic Pydantic model
             model_name = f"{entity_name.capitalize()}Entity"
             model = create_model(model_name, **model_fields)
             self._pydantic_models[entity_name] = model
+
+    def _resolve_entity_fields(
+        self, entity: dict[str, Any], entity_lookup: dict[str, dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Resolve entity fields with inheritance - parent fields first, then child fields."""
+        model_fields = {}
+
+        # If entity has a parent, resolve parent fields first
+        parent_name = entity.get("parent")
+        if parent_name:
+            if parent_name not in entity_lookup:
+                raise ValueError(
+                    f"Entity '{entity['name']}' references unknown parent '{parent_name}'"
+                )
+            parent_entity = entity_lookup[parent_name]
+            # Recursively resolve parent fields (supports multi-level inheritance)
+            parent_fields = self._resolve_entity_fields(parent_entity, entity_lookup)
+            model_fields.update(parent_fields)
+
+        # Add/override with current entity's fields
+        for field_name, field_def in entity["fields"].items():
+            if "type" not in field_def:
+                raise ValueError(
+                    f"Field '{field_name}' in entity '{entity['name']}' missing 'type'"
+                )
+
+            field_type = field_def["type"]
+            required = field_def.get("required", False)
+            default_value = field_def.get("default")
+
+            # Handle field requirements and defaults
+            if required:
+                model_fields[field_name] = (
+                    self._get_python_type(field_type, field_def),
+                    Field(...),
+                )
+            elif default_value is not None:
+                # Use YAML-defined default
+                model_fields[field_name] = (
+                    self._get_python_type(field_type, field_def),
+                    Field(default=default_value),
+                )
+            else:
+                # Optional field with None default
+                model_fields[field_name] = (
+                    self._get_python_type(field_type, field_def),
+                    Field(default=None),
+                )
+
+        return model_fields
 
     def _get_python_type(self, yaml_type: str, field_def: dict[str, Any]) -> Any:
         """Convert YAML type to Python type - crash on unknown types."""

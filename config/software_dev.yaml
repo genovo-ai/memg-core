@@ -13,17 +13,15 @@ defaults:
     auto_update: true
 
 entities:
-  - name: memo
+  - name: memo # base entity - all other entities are derived from this
     description: "Base memory unit"
-    anchor: statement
     fields:
-      id:          { type: string, required: true, system: true }
-      user_id:     { type: string, required: true, system: true }
-      project:     { type: string }  # Optional project namespace for filtering
+      id:          { type: string, required: true, system: true } # uuid
+      user_id:     { type: string, required: true, system: true } # any string
       statement:   { type: string, required: true, max_length: 8000 }
       created_at:  { type: datetime, required: true, system: true }
       updated_at:  { type: datetime, system: true }
-      vector:      { type: vector, derived_from: statement, system: true }
+      vector:      { type: vector, anchored_to: statement, system: true }
     relations:
       - name: memo_related
         description: "Generic relation between memos"
@@ -32,10 +30,23 @@ entities:
         source: memo
         target: memo
 
+  - name: note
+    parent: memo
+    description: "General note or observation to memorize"
+    fields:
+      project: { type: string }  # Optional project namespace for filtering
+      origin: { type: enum, choices: [system, user], default: system } # source of the note - optional
+    relations:
+      - name: note_document
+        description: "Note providing context to a document"
+        directed: true
+        predicates: [ANNOTATES]
+        source: note
+        target: document
+
   - name: document
     parent: memo
     description: "Document-like memo with extended content"
-    anchor: statement
     fields:
       project: { type: string }  # Optional project namespace for filtering
       details: { type: string, required: true }
@@ -57,21 +68,12 @@ entities:
   - name: task
     parent: memo
     description: "Development task or work item"
-    anchor: statement
     fields:
       project:     { type: string }  # Optional project namespace for filtering
       details:     { type: string }
-      status:      { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled] }
-      priority:    { type: enum, choices: [low, medium, high, critical] }
-      assignee:    { type: string }
+      status:      { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled], default: backlog }
+      priority:    { type: enum, choices: [low, medium, high, critical], default: medium }
       due_date:    { type: datetime }
-      story_points: { type: string }  # Estimation (e.g., "3", "5", "8")
-      epic:        { type: string }   # Epic or feature reference
-    see_also:
-      enabled: true
-      threshold: 0.90
-      limit: 3
-      target_types: [bug, solution, note]
     relations:
       - name: task_note
         description: "Note associated with a task"
@@ -86,39 +88,16 @@ entities:
         source: task
         target: task
 
-  - name: note
-    parent: memo
-    description: "General note or observation"
-    anchor: statement
-    fields:
-      project: { type: string }  # Optional project namespace for filtering
-      # details: { type: string, required: true } # not needed anymore, document has details
-    relations:
-      - name: note_document
-        description: "Note providing context to a document"
-        directed: true
-        predicates: [ANNOTATES]
-        source: note
-        target: document
-
   - name: bug
     parent: memo
     description: "Bug report or issue"
-    anchor: statement
     fields:
       project:      { type: string }  # Optional project namespace for filtering
       details:      { type: string, required: true }
-      severity:     { type: enum, choices: [low, medium, high, critical] }
-      status:       { type: enum, choices: [open, investigating, in_progress, resolved, closed, wont_fix] }
-      reproduction: { type: string }  # Steps to reproduce
-      environment:  { type: string }  # Environment details
+      severity:     { type: enum, choices: [low, medium, high, critical], default: medium }
+      status:       { type: enum, choices: [open, in_progress, resolved], default: open }
       file_path:    { type: string }  # File where bug occurs
-      line_number:  { type: string }  # Line number reference
-    see_also:
-      enabled: true
-      threshold: 0.90
-      limit: 2
-      target_types: [solution, task]
+      reference:    { type: string }  # main reference where bug occurs, such as function or class name
     relations:
       - name: bug_task
         description: "Task created to fix a bug"
@@ -130,19 +109,11 @@ entities:
   - name: solution
     parent: memo
     description: "Solution, fix, or implementation approach"
-    anchor: statement
     fields:
       project:      { type: string }  # Optional project namespace for filtering
-      details:      { type: string, required: true }
-      approach:     { type: enum, choices: [workaround, hotfix, proper_fix, refactor] }
-      code_snippet: { type: string }  # Code example or snippet
+      details:      { type: string }
       file_path:    { type: string }  # File being modified
-      test_status:  { type: enum, choices: [untested, manual_test, unit_test, integration_test] }
-    see_also:
-      enabled: true
-      threshold: 0.90
-      limit: 3
-      target_types: [bug, task, note]
+      test_status:  { type: enum, choices: [untested, manual_test, unit_test, integration_test], default: untested }
     relations:
       - name: solution_bug
         description: "Solution addressing a bug"

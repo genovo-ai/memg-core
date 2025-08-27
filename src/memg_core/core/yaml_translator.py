@@ -100,23 +100,58 @@ class YamlTranslator:
                 out[key] = item
         return out
 
+    def get_entity_types(self) -> list[str]:
+        """Get list of available entity types from YAML schema."""
+        return list(self._entities_map().keys())
+
     def get_anchor_field(self, entity_name: str) -> str:
-        """Get the anchor field name for the given entity type from YAML schema."""
+        """Get the anchor field name for the given entity type from YAML schema.
+
+        Now reads from vector.anchored_to instead of separate anchor field.
+        """
         if not entity_name:
             raise YamlTranslatorError("Empty entity name")
+
+        # Get entity spec with inheritance resolution
+        entity_spec = self._resolve_entity_with_inheritance(entity_name)
+
+        # Look for vector field with anchored_to
+        fields = entity_spec.get("fields", {})
+        for _field_name, field_def in fields.items():
+            if isinstance(field_def, dict) and field_def.get("type") == "vector":
+                anchored_to = field_def.get("anchored_to")
+                if anchored_to:
+                    return str(anchored_to)
+
+        raise YamlTranslatorError(
+            f"Entity '{entity_name}' has no vector field with 'anchored_to' property"
+        )
+
+    def _resolve_entity_with_inheritance(self, entity_name: str) -> dict[str, Any]:
+        """Resolve entity specification with full inheritance chain."""
         name_l = entity_name.lower()
         emap = self._entities_map()
         spec_raw = emap.get(name_l)
         if not spec_raw:
             raise YamlTranslatorError(f"Entity '{entity_name}' not found in YAML schema")
 
-        # Read anchor field from YAML schema - NO hardcoding
-        anchor = spec_raw.get("anchor")
-        if not anchor:
-            raise YamlTranslatorError(
-                f"Entity '{entity_name}' missing required 'anchor' field in YAML schema"
-            )
-        return str(anchor)
+        # If no parent, return as-is
+        parent_name = spec_raw.get("parent")
+        if not parent_name:
+            return spec_raw
+
+        # Recursively resolve parent and merge fields
+        parent_spec = self._resolve_entity_with_inheritance(parent_name)
+
+        # Merge parent fields with child fields (child overrides parent)
+        merged_fields = parent_spec.get("fields", {}).copy()
+        merged_fields.update(spec_raw.get("fields", {}))
+
+        # Create merged spec
+        merged_spec = spec_raw.copy()
+        merged_spec["fields"] = merged_fields
+
+        return merged_spec
 
     def get_see_also_config(self, entity_name: str) -> dict[str, Any] | None:
         """Get the see_also configuration for the given entity type from YAML schema.
@@ -180,7 +215,8 @@ class YamlTranslator:
 
         # Anchor field missing, empty, or invalid
         raise YamlTranslatorError(
-            f"Anchor field '{anchor_field}' is missing, empty, or invalid for memory type '{mem_type}'",
+            f"Anchor field '{anchor_field}' is missing, empty, or invalid "
+            f"for memory type '{mem_type}'",
             operation="build_anchor_text",
             context={
                 "memory_type": mem_type,
@@ -247,7 +283,8 @@ class YamlTranslator:
         anchor_text = payload.get(anchor_field)
         if not anchor_text or not isinstance(anchor_text, str):
             raise YamlTranslatorError(
-                f"Missing or invalid anchor field '{anchor_field}' in payload for memory type '{memory_type}'"
+                f"Missing or invalid anchor field '{anchor_field}' in payload "
+                f"for memory type '{memory_type}'"
             )
 
         # Validate full payload against YAML schema

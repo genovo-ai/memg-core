@@ -30,7 +30,7 @@ class KuzuInterface:
                 operation="add_node",
                 context={"table": table, "properties": properties},
                 original_error=e,
-            )
+            ) from e
 
     def add_relationship(
         self,
@@ -39,6 +39,7 @@ class KuzuInterface:
         rel_type: str,
         from_id: str,
         to_id: str,
+        user_id: str,
         props: dict[str, Any] | None = None,
     ) -> None:
         """Add relationship between nodes"""
@@ -46,30 +47,42 @@ class KuzuInterface:
             props = props or {}
 
             # VALIDATE RELATIONSHIP AGAINST YAML SCHEMA - crash if invalid
-            try:
-                from ..types import validate_relation_predicate
+            from ..types import validate_relation_predicate
 
-                if not validate_relation_predicate(rel_type):
-                    raise ValueError(
-                        f"Invalid relationship predicate: {rel_type}. Must be defined in YAML schema."
-                    )
-            except RuntimeError:
-                # TypeRegistry not initialized - skip validation for now
-                pass
+            if not validate_relation_predicate(rel_type):
+                raise ValueError(
+                    f"Invalid relationship predicate: {rel_type}. Must be defined in YAML schema."
+                )
 
             # Use relationship type as-is (predicates from YAML) - no sanitization
             # rel_type should already be a valid predicate (e.g., "REFERENCED_BY", "ANNOTATES")
 
-            # Add the relationship
+            # CRITICAL: Verify both nodes belong to the user before creating relationship
+            # First check if both nodes exist and belong to the user
+            check_query = (
+                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}}), "
+                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
+                f"RETURN a.id, b.id"
+            )
+            check_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id}
+            check_result = self.query(check_query, check_params)
+
+            if not check_result:
+                raise ValueError(
+                    f"Cannot create relationship: one or both memories not found "
+                    f"or don't belong to user {user_id}"
+                )
+
+            # Now create the relationship
             prop_str = ", ".join([f"{k}: ${k}" for k in props.keys()]) if props else ""
             rel_props = f" {{{prop_str}}}" if prop_str else ""
-            query = (
-                f"MATCH (a:{from_table} {{id: $from_id}}), "
-                f"(b:{to_table} {{id: $to_id}}) "
+            create_query = (
+                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}}), "
+                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
                 f"CREATE (a)-[:{rel_type}{rel_props}]->(b)"
             )
-            params = {"from_id": from_id, "to_id": to_id, **props}
-            self.conn.execute(query, parameters=params)
+            create_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id, **props}
+            self.conn.execute(create_query, parameters=create_params)
         except Exception as e:
             raise DatabaseError(
                 f"Failed to add relationship {rel_type}",
@@ -82,7 +95,7 @@ class KuzuInterface:
                     "to_id": to_id,
                 },
                 original_error=e,
-            )
+            ) from e
 
     def _extract_query_results(self, query_result) -> list[dict[str, Any]]:
         """Extract results from Kuzu QueryResult using raw iteration"""
@@ -110,12 +123,13 @@ class KuzuInterface:
                 operation="query",
                 context={"cypher": cypher, "params": params},
                 original_error=e,
-            )
+            ) from e
 
     def neighbors(
         self,
         node_label: str,
         node_uuid: str,
+        user_id: str,
         rel_types: list[str] | None = None,
         direction: str = "any",
         limit: int = 10,
@@ -126,6 +140,7 @@ class KuzuInterface:
         Args:
             node_label: Node type/table name (e.g., "Memory", "bug") - NOT a UUID
             node_uuid: UUID of the specific node to find neighbors for
+            user_id: User ID for isolation - only return neighbors belonging to this user
             rel_types: List of relationship types to filter by
             direction: "in", "out", or "any" for relationship direction
             limit: Maximum number of neighbors to return
@@ -151,17 +166,18 @@ class KuzuInterface:
             # Format relationship pattern properly - don't include ':' if no filter
             rel_part = f":{rel_filter}" if rel_filter else ""
 
-            # Simple UUID-only node matching
-            node_condition = f"a:{node_label} {{id: $node_uuid}}"
+            # CRITICAL: User isolation - both source node and neighbors must belong to user
+            node_condition = f"a:{node_label} {{id: $node_uuid, user_id: $user_id}}"
+            neighbor_condition = f"n{neighbor} {{user_id: $user_id}}"
 
             if direction == "out":
-                pattern = f"({node_condition})-[r{rel_part}]->(n{neighbor})"
+                pattern = f"({node_condition})-[r{rel_part}]->({neighbor_condition})"
             elif direction == "in":
-                pattern = f"({node_condition})<-[r{rel_part}]-(n{neighbor})"
+                pattern = f"({node_condition})<-[r{rel_part}]-({neighbor_condition})"
             else:
-                pattern = f"({node_condition})-[r{rel_part}]-(n{neighbor})"
+                pattern = f"({node_condition})-[r{rel_part}]-({neighbor_condition})"
 
-            # Single Memory table - always return structured fields
+            # Return neighbors only if they belong to the same user
             cypher = f"""
             MATCH {pattern}
             RETURN DISTINCT n.id as id,
@@ -172,7 +188,7 @@ class KuzuInterface:
                             n as node
             LIMIT $limit
             """
-            params = {"node_uuid": node_uuid, "limit": limit}
+            params = {"node_uuid": node_uuid, "user_id": user_id, "limit": limit}
             return self.query(cypher, params)
         except Exception as e:
             raise DatabaseError(
@@ -181,27 +197,29 @@ class KuzuInterface:
                 context={
                     "node_label": node_label,
                     "node_uuid": node_uuid,
+                    "user_id": user_id,
                     "rel_types": rel_types,
                     "direction": direction,
                 },
                 original_error=e,
-            )
+            ) from e
 
-    def delete_node(self, table: str, node_uuid: str) -> bool:
+    def delete_node(self, table: str, node_uuid: str, user_id: str) -> bool:
         """Delete a single node by UUID"""
         try:
-            # Check if node exists first
-            cypher_check = f"MATCH (n:{table} {{id: $uuid}}) RETURN n.id as id"
-            check_result = self.query(cypher_check, {"uuid": node_uuid})
+            # CRITICAL: Check if node exists AND belongs to user
+            cypher_check = f"MATCH (n:{table} {{id: $uuid, user_id: $user_id}}) RETURN n.id as id"
+            check_result = self.query(cypher_check, {"uuid": node_uuid, "user_id": user_id})
 
             if not check_result:
-                # Node doesn't exist, consider it successfully "deleted"
+                # Node doesn't exist for this user, consider it successfully "deleted"
                 return True
 
-            # Try to delete the node directly - ignore relationship issues for now
-            # Kuzu will handle orphaned relationships
-            cypher_delete_node = f"MATCH (n:{table} {{id: $uuid}}) DELETE n"
-            self.conn.execute(cypher_delete_node, parameters={"uuid": node_uuid})
+            # Delete the node - only if it belongs to the user
+            cypher_delete_node = f"MATCH (n:{table} {{id: $uuid, user_id: $user_id}}) DELETE n"
+            self.conn.execute(
+                cypher_delete_node, parameters={"uuid": node_uuid, "user_id": user_id}
+            )
             return True
 
         except Exception as e:
@@ -219,14 +237,14 @@ class KuzuInterface:
                         "constraint_error": str(e),
                     },
                     original_error=e,
-                )
+                ) from e
             # Other database error
             raise DatabaseError(
                 f"Failed to delete node from {table}",
                 operation="delete_node",
-                context={"table": table, "node_uuid": node_uuid},
+                context={"table": table, "node_uuid": node_uuid, "user_id": user_id},
                 original_error=e,
-            )
+            ) from e
 
     def _get_kuzu_type(self, key: str, value: Any) -> str:
         """Map Python types to Kuzu types with proper validation"""

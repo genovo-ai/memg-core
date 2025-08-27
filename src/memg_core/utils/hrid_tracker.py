@@ -23,11 +23,12 @@ class HridTracker:
         """
         self.kuzu = kuzu_interface
 
-    def get_uuid(self, hrid: str) -> str:
+    def get_uuid(self, hrid: str, user_id: str) -> str:
         """Translate HRID to UUID
 
         Args:
             hrid: Human-readable ID (e.g., 'TASK_AAA001')
+            user_id: User ID for scoped lookup
 
         Returns:
             UUID string for internal operations
@@ -37,11 +38,11 @@ class HridTracker:
         """
         try:
             query = """
-            MATCH (m:HridMapping {hrid: $hrid})
+            MATCH (m:HridMapping {hrid: $hrid, user_id: $user_id})
             WHERE m.deleted_at IS NULL
             RETURN m.uuid as uuid
             """
-            results = self.kuzu.query(query, {"hrid": hrid})
+            results = self.kuzu.query(query, {"hrid": hrid, "user_id": user_id})
 
             if not results:
                 raise DatabaseError(
@@ -101,13 +102,14 @@ class HridTracker:
                 original_error=e,
             )
 
-    def create_mapping(self, hrid: str, uuid: str, memory_type: str) -> None:
+    def create_mapping(self, hrid: str, uuid: str, memory_type: str, user_id: str) -> None:
         """Create new HRID ↔ UUID mapping
 
         Args:
             hrid: Human-readable ID
             uuid: Internal UUID
             memory_type: Entity type (e.g., 'task', 'note')
+            user_id: User ID for scoped mapping
 
         Raises:
             DatabaseError: If mapping creation fails
@@ -116,9 +118,11 @@ class HridTracker:
             now = datetime.now(UTC).isoformat()
 
             mapping_data = {
+                "hrid_user_key": f"{hrid}#{user_id}",  # Composite key
                 "hrid": hrid,
                 "uuid": uuid,
                 "memory_type": memory_type,
+                "user_id": user_id,
                 "created_at": now,
                 "deleted_at": None,  # NULL for active mappings
             }
@@ -170,27 +174,28 @@ class HridTracker:
                 original_error=e,
             )
 
-    def get_highest_hrid(self, memory_type: str) -> tuple[str, int, int] | None:
+    def get_highest_hrid(self, memory_type: str, user_id: str) -> tuple[str, int, int] | None:
         """Get highest HRID for a memory type (for generation)
 
         Args:
             memory_type: Entity type to check (case insensitive)
+            user_id: User ID for scoped HRID lookup
 
         Returns:
-            Tuple of (hrid, alpha_idx, num) or None if no HRIDs exist
+            Tuple of (hrid, alpha_idx, num) or None if no HRIDs exist for this user
         """
         try:
             # Normalize to lowercase for database query (YAML types are lowercase)
             normalized_type = memory_type.lower()
 
             query = """
-            MATCH (m:HridMapping {memory_type: $memory_type})
+            MATCH (m:HridMapping {memory_type: $memory_type, user_id: $user_id})
             RETURN m.hrid as hrid
             ORDER BY m.created_at DESC
             LIMIT 1000
             """
 
-            results = self.kuzu.query(query, {"memory_type": normalized_type})
+            results = self.kuzu.query(query, {"memory_type": normalized_type, "user_id": user_id})
 
             if not results:
                 return None
@@ -225,9 +230,9 @@ class HridTracker:
 
         except Exception as e:
             raise DatabaseError(
-                f"Failed to get highest HRID for type '{memory_type}'",
+                f"Failed to get highest HRID for type '{memory_type}' and user '{user_id}'",
                 operation="get_highest_hrid",
-                context={"memory_type": memory_type},
+                context={"memory_type": memory_type, "user_id": user_id},
                 original_error=e,
             )
 

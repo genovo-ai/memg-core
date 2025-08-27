@@ -76,7 +76,7 @@ class MemoryService:
             memory.updated_at = now
 
             # Generate HRID using tracker
-            hrid = generate_hrid(memory_type, self.hrid_tracker)
+            hrid = generate_hrid(memory_type, user_id, self.hrid_tracker)
 
             # Get anchor text from YAML-defined anchor field using our instance
             anchor_text = self.yaml_translator.build_anchor_text(memory)
@@ -127,7 +127,7 @@ class MemoryService:
             self.kuzu.add_node(memory_type, kuzu_data)
 
             # Create HRID mapping after successful storage
-            self.hrid_tracker.create_mapping(hrid, memory.id, memory_type)
+            self.hrid_tracker.create_mapping(hrid, memory.id, memory_type, user_id)
 
             return hrid  # Return HRID, not UUID
 
@@ -148,6 +148,7 @@ class MemoryService:
         relation_type: str,
         from_memory_type: str,
         to_memory_type: str,
+        user_id: str,
         properties: dict[str, Any] | None = None,
     ) -> None:
         """Add a relationship between two memories using HRIDs.
@@ -158,6 +159,7 @@ class MemoryService:
             relation_type: Relationship type from YAML schema (e.g., 'ANNOTATES')
             from_memory_type: Source memory entity type
             to_memory_type: Target memory entity type
+            user_id: User ID for ownership verification
             properties: Optional relationship properties
 
         Raises:
@@ -165,8 +167,8 @@ class MemoryService:
         """
         try:
             # Translate HRIDs to UUIDs
-            from_uuid = self.hrid_tracker.get_uuid(from_memory_hrid)
-            to_uuid = self.hrid_tracker.get_uuid(to_memory_hrid)
+            from_uuid = self.hrid_tracker.get_uuid(from_memory_hrid, user_id)
+            to_uuid = self.hrid_tracker.get_uuid(to_memory_hrid, user_id)
 
             self.kuzu.add_relationship(
                 from_table=from_memory_type,
@@ -174,6 +176,7 @@ class MemoryService:
                 rel_type=relation_type,
                 from_id=from_uuid,
                 to_id=to_uuid,
+                user_id=user_id,
                 props=properties or {},
             )
         except Exception as e:
@@ -238,6 +241,7 @@ class MemoryService:
         self,
         memory_id: str,
         memory_type: str,
+        user_id: str,
         relation_types: list[str] | None = None,
         direction: str = "any",
         limit: int = 10,
@@ -247,6 +251,7 @@ class MemoryService:
         Args:
             memory_id: Memory ID to find neighbors for
             memory_type: Memory entity type
+            user_id: User ID for isolation
             relation_types: Filter by specific relationship types
             direction: "in", "out", or "any"
             limit: Maximum number of neighbors
@@ -258,6 +263,7 @@ class MemoryService:
             return self.kuzu.neighbors(
                 node_label=memory_type,
                 node_uuid=memory_id,
+                user_id=user_id,
                 rel_types=relation_types,
                 direction=direction,
                 limit=limit,
@@ -270,25 +276,26 @@ class MemoryService:
                 original_error=e,
             )
 
-    def delete_memory(self, memory_hrid: str, memory_type: str) -> bool:
+    def delete_memory(self, memory_hrid: str, memory_type: str, user_id: str) -> bool:
         """Delete a memory from both storages using HRID.
 
         Args:
             memory_hrid: Memory HRID to delete
             memory_type: Memory entity type
+            user_id: User ID for ownership verification
 
         Returns:
             True if deletion succeeded
         """
         try:
             # Translate HRID to UUID
-            uuid = self.hrid_tracker.get_uuid(memory_hrid)
+            uuid = self.hrid_tracker.get_uuid(memory_hrid, user_id)
 
             # Delete from Qdrant
             qdrant_success = self.qdrant.delete_points([uuid])
 
-            # Delete from Kuzu
-            kuzu_success = self.kuzu.delete_node(memory_type, uuid)
+            # Delete from Kuzu (with user_id verification)
+            kuzu_success = self.kuzu.delete_node(memory_type, uuid, user_id)
 
             # Mark HRID as deleted (soft delete in mapping)
             if qdrant_success and kuzu_success:

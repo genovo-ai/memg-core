@@ -133,6 +133,7 @@ def _find_semantic_expansion(
 def _append_neighbors(
     seeds: list[SearchResult],
     kuzu: KuzuInterface,
+    user_id: str,
     relation_names: list[str] | None,
     neighbor_limit: int,
     hops: int = 1,
@@ -145,6 +146,7 @@ def _append_neighbors(
     Args:
         seeds: Initial seed results from vector search
         kuzu: Kuzu graph interface
+        user_id: User ID for isolation
         relation_names: Specific relation types to expand (None = all relations)
         neighbor_limit: Max neighbors per seed
         hops: Number of hops to expand (progressive score decay)
@@ -178,7 +180,7 @@ def _append_neighbors(
                     memory_uuid = memory.id
                 else:
                     # Assume HRID format, translate to UUID
-                    memory_uuid = hrid_tracker.get_uuid(memory.id)
+                    memory_uuid = hrid_tracker.get_uuid(memory.id, user_id)
                     if not memory_uuid:
                         raise DatabaseError(
                             f"Failed to resolve HRID {memory.id} to UUID for graph traversal",
@@ -189,6 +191,7 @@ def _append_neighbors(
             neighbor_rows = kuzu.neighbors(
                 node_label=memory.memory_type,  # Use entity-specific table (bug, task, etc.)
                 node_uuid=memory_uuid,  # Use UUID, not HRID
+                user_id=user_id,  # CRITICAL: User isolation
                 rel_types=relation_names,  # None means all relations
                 direction="any",
                 limit=neighbor_limit,

@@ -145,6 +145,7 @@ class SearchService:
         results = _append_neighbors(
             seeds=seeds,
             kuzu=self.kuzu,
+            user_id=user_id,
             relation_names=relation_names,
             neighbor_limit=neighbor_limit,
             hops=hops,
