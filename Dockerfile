@@ -37,14 +37,14 @@ RUN if [ "$USE_PYPI" != "true" ]; then \
     fi
 
 # Copy and install MCP server dependencies
-COPY mcp/requirements_mcp.txt /app/requirements_mcp.txt
+COPY mcpp/requirements_mcp.txt /app/requirements_mcp.txt
 RUN pip install --no-cache-dir -r requirements_mcp.txt
 
 # Create directories for persistent storage and config
 RUN mkdir -p /qdrant /kuzu /app/config
 
 # Copy the MCP server file
-COPY mcp/mcp_server.py /app/
+COPY mcpp/mcp_server.py /app/
 
 # Copy the YAML schema specified in .env (build arg from compose)
 ARG MEMG_YAML_SCHEMA

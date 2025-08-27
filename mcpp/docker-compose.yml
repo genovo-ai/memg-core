@@ -6,7 +6,7 @@ services:
       args:
         MEMG_YAML_SCHEMA: ${MEMG_YAML_SCHEMA:-config/software_dev.yaml}
         USE_PYPI: ${USE_PYPI:-false}
-    container_name: memg-mcp-server-${MEMORY_SYSTEM_MCP_PORT:-8787}
+    container_name: memg-mcpp-server-${MEMORY_SYSTEM_MCP_PORT:-8787}
     ports:
       - "${MEMORY_SYSTEM_MCP_PORT:-8787}:${MEMORY_SYSTEM_MCP_PORT:-8787}"
     volumes:

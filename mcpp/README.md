@@ -8,7 +8,7 @@
 
 1. **Setup environment:**
    ```bash
-   cd mcp/
+   cd mcpp/
    cp ../env.example .env
    # IMPORTANT: Edit .env to use the enhanced schema - based on your yaml policy
    # Change: MEMG_YAML_SCHEMA=config/core.minimal.yaml
@@ -41,7 +41,7 @@
 
 1. **Setup environment:**
    ```bash
-   cd mcp/
+   cd mcpp/
    cp ../env.example .env
    # IMPORTANT: Edit .env to change YAML schema:
    # MEMG_YAML_SCHEMA=config/software_dev.yaml

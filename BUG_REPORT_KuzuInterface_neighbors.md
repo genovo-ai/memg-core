@@ -204,7 +204,7 @@ grep -r "\.neighbors(" src/ tests/
 grep -r "neighbors.*[a-f0-9-]{36}" src/
 
 # Check MCP server relationship handling
-grep -r "node_label" mcp/
+grep -r "node_label" mcpp/
 ```
 
 ---

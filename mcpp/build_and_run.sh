@@ -106,10 +106,10 @@ fi
 
 # Only remove the specific service if it exists in compose
 echo "🧹 Checking docker-compose for memg-mcp-server service..."
-if docker-compose ps memg-mcp-server 2>/dev/null | grep -q "memg-mcp-server"; then
+if docker-compose ps memg-mcpp-server 2>/dev/null | grep -q "memg-mcp-server"; then
     echo "Stopping docker-compose service: memg-mcp-server"
-    docker-compose stop memg-mcp-server 2>/dev/null || true
-    docker-compose rm -f memg-mcp-server 2>/dev/null || true
+    docker-compose stop memg-mcpp-server 2>/dev/null || true
+    docker-compose rm -f memg-mcpp-server 2>/dev/null || true
 else
     echo "✅ No memg-mcp-server service found in docker-compose"
 fi
