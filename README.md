@@ -169,10 +169,10 @@ memg-core provides a deterministic, YAML-driven memory layer with dual storage:
 - ✅ Memory CRUD operations with dual storage
 - ✅ Semantic search with memory type filtering
 - ✅ Public Python API with HRID-based interface
-- ⚠️ User isolation (known limitation - HRID collision exists)
+- ✅ User isolation with per-user HRID scoping
 
 ### Coming in Full MEMG System
-- 🔄 User isolation fixes (HRID collision resolution)
+
 - 🔄 Schema contracts and multi-agent coordination
 - 🔄 Async job processing and bulk operations
 - 🔄 Advanced memory policies and retention

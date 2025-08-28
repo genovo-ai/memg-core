@@ -105,16 +105,24 @@ class TestSystemReadiness:
 
         print(f"✅ Found {len(auth_results)} authentication results")
 
-        # 3. Test user isolation (KNOWN LIMITATION: HRID collision exists)
-        # TODO: Fix HRID generation to be properly user-scoped
+        # 3. Test user isolation (HRID collision is CORRECT behavior)
         user2_results = search(query="authentication", user_id="developer_002", limit=10)
 
-        # For now, just verify that search returns results
-        # User isolation will be fixed in a future iteration
-        print("⚠️  User isolation test skipped - known HRID collision issue")
-        print(f"   User 2 found {len(user2_results)} results")
+        user2_hrids = [r.memory.hrid for r in user2_results]
+        user1_hrids = [added_hrids[0], added_hrids[1]]  # First two belong to user 1
 
-        print("⚠️  User isolation needs fixing (documented limitation)")
+        # Users should NOT see each other's memories (even with same HRIDs)
+        cross_contamination = False
+        for user1_hrid in user1_hrids:
+            if user1_hrid in user2_hrids:
+                # Check if it's actually the same memory by checking content
+                for r in user2_results:
+                    if r.memory.hrid == user1_hrid and "developer_001" in str(r.memory.payload):
+                        cross_contamination = True
+                        break
+
+        assert not cross_contamination, "User 2 should not see user 1's memories"
+        print("✅ User isolation verified (same HRIDs across users is correct)")
 
         # 4. Test memory type filtering
         note_results = search(
@@ -150,20 +158,22 @@ class TestSystemReadiness:
 
         print("✅ Memory deletion verified")
 
-        # 6. Test cross-user deletion protection (SKIP due to HRID collision)
-        # TODO: Fix after HRID isolation is implemented
-        print("⚠️  Cross-user deletion test skipped - HRID collision prevents proper testing")
+        # 6. Test cross-user deletion protection
+        user2_delete_success = delete_memory(hrid=added_hrids[1], user_id="developer_002")
+
+        assert not user2_delete_success, "User 2 should not be able to delete user 1's memory"
+        print("✅ Cross-user deletion protection verified")
 
         print("\n🎉 SYSTEM READY: All core functionality validated!")
         print("✅ YAML schema loading")
         print("✅ Memory creation and storage")
         print("✅ HRID generation and format")
         print("✅ Search functionality")
-        print("⚠️  User isolation (needs fixing - HRID collision)")
+        print("✅ User isolation (HRID collision is correct behavior)")
         print("✅ Memory type filtering")
         print("✅ HRID-only public API (no UUID exposure)")
         print("✅ Memory deletion")
-        print("⚠️  Security (needs fixing after HRID isolation)")
+        print("✅ Security (cross-user protection)")
 
     def test_performance_baseline(self):
         """Establish performance baseline for key operations."""
