@@ -30,7 +30,8 @@ pip install memg-core
 
 # Set up environment variables for storage paths
 export QDRANT_STORAGE_PATH="/path/to/qdrant"
-export KUZU_DB_PATH="/path/to/kuzu.db"
+export KUZU_DB_PATH="/path/to/kuzu/database"
+export YAML_PATH="config/core.memo.yaml"
 
 # Use the core library in your app
 # Example usage shown below in the Usage section
@@ -46,9 +47,9 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 
 # 3) Run tests
-export MEMG_TEMPLATE="software_development"
+export YAML_PATH="config/core.test.yaml"
 export QDRANT_STORAGE_PATH="$HOME/.local/share/qdrant"
-export KUZU_DB_PATH="$HOME/.local/share/kuzu/memg.db"
+export KUZU_DB_PATH="$HOME/.local/share/kuzu/memg"
 mkdir -p "$QDRANT_STORAGE_PATH" "$HOME/.local/share/kuzu"
 PYTHONPATH=$(pwd)/src pytest -q
 ```
@@ -56,26 +57,50 @@ PYTHONPATH=$(pwd)/src pytest -q
 ## Usage
 
 ```python
-from memg_core.api.public import add_note, add_document, add_task, search
+from memg_core.api.public import add_memory, search, delete_memory
 
 # Add a note
-note = add_note(
-    text="Set up Postgres with Docker for local development",
-    user_id="demo_user",
-    title="Docker Postgres Setup",
-    tags=["docker", "postgres", "dev"],
+note_hrid = add_memory(
+    memory_type="note",
+    payload={
+        "statement": "Set up Postgres with Docker for local development",
+        "project": "backend-setup"
+    },
+    user_id="demo_user"
+)
+print(f"Created note: {note_hrid}")  # Returns HRID like "NOTE_AAA001"
+
+# Add a document with more details
+doc_hrid = add_memory(
+    memory_type="document",
+    payload={
+        "statement": "Docker Postgres Configuration Guide",
+        "details": "Complete setup guide for running PostgreSQL in Docker containers for local development",
+        "project": "backend-setup"
+    },
+    user_id="demo_user"
 )
 
-# Search (GraphRAG-first pipeline)
-results = search("postgres performance", user_id="demo_user", limit=5)
+# Search for memories
+results = search(
+    query="postgres docker setup",
+    user_id="demo_user",
+    limit=5
+)
 for r in results:
-    print(f"[{r.memory.memory_type.value}] {r.memory.title} - Score: {r.score:.2f}")
+    print(f"[{r.memory.memory_type}] {r.memory.hrid}: {r.memory.payload['statement']} - Score: {r.score:.2f}")
 
-# Search with "See Also" discovery (finds semantically related memories)
-results = search("postgres setup", user_id="demo_user", limit=10, include_see_also=True)
-for r in results:
-    source = r.source  # 'qdrant' for primary, 'see_also_bug' for related
-    print(f"[{source}] {r.memory.memory_type.value}: {r.memory.title} - Score: {r.score:.2f}")
+# Search with memory type filtering
+note_results = search(
+    query="postgres",
+    user_id="demo_user",
+    memory_type="note",
+    limit=10
+)
+
+# Delete a memory using HRID
+success = delete_memory(hrid=note_hrid, user_id="demo_user")
+print(f"Deletion successful: {success}")
 ```
 
 ### YAML Schema Examples
@@ -86,11 +111,14 @@ Core ships with example schemas under `config/`:
 - `software_dev.yaml`: Enhanced schema with `bug` and `solution` types for development workflows
 - `core.test.yaml`: Test configuration for development
 
-Enable:
+Configure the schema:
 
 ```bash
-export MEMG_ENABLE_YAML_SCHEMA=true
-export MEMG_YAML_SCHEMA=$(pwd)/config/core.memo.yaml
+export YAML_PATH="config/core.memo.yaml"  # Basic schema
+# or
+export YAML_PATH="config/software_dev.yaml"  # Enhanced with bug/solution types
+# or
+export YAML_PATH="config/core.test.yaml"  # For testing
 ```
 
 ## Embedding Configuration
@@ -107,20 +135,19 @@ export EMBEDDER_MODEL="Snowflake/snowflake-arctic-embed-xs"  # Default
 
 ## Configuration
 
-Configure via `.env` file (copy from `env.example`):
+Configure via environment variables:
 
 ```bash
-# Core settings
-MEMORY_SYSTEM_MCP_PORT=8787  # Change for multiple instances
-MEMG_TEMPLATE=software_development
+# Required: Storage paths
+export QDRANT_STORAGE_PATH="$HOME/.local/share/qdrant"
+export KUZU_DB_PATH="$HOME/.local/share/kuzu/memg"
+export YAML_PATH="config/core.memo.yaml"
 
-# Embeddings (optional)
-EMBEDDER_MODEL=Snowflake/snowflake-arctic-embed-xs
+# Optional: Embeddings
+export EMBEDDER_MODEL="Snowflake/snowflake-arctic-embed-xs"  # Default
 
-# Storage
-BASE_MEMORY_PATH=$HOME/.local/share/memory_system
-QDRANT_COLLECTION=memories
-EMBEDDING_DIMENSION_LEN=384
+# Optional: For MCP server (if using)
+export MEMORY_SYSTEM_MCP_PORT=8787
 ```
 
 ## Requirements
@@ -140,10 +167,12 @@ memg-core provides a deterministic, YAML-driven memory layer with dual storage:
 ### In Scope
 - ✅ YAML schema definition and validation
 - ✅ Memory CRUD operations with dual storage
-- ✅ Semantic search and "see also" discovery
-- ✅ Public Python API with full functionality
+- ✅ Semantic search with memory type filtering
+- ✅ Public Python API with HRID-based interface
+- ⚠️ User isolation (known limitation - HRID collision exists)
 
 ### Coming in Full MEMG System
+- 🔄 User isolation fixes (HRID collision resolution)
 - 🔄 Schema contracts and multi-agent coordination
 - 🔄 Async job processing and bulk operations
 - 🔄 Advanced memory policies and retention
