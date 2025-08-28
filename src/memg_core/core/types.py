@@ -23,7 +23,7 @@ class TypeRegistry:
     _instance: Optional["TypeRegistry"] = None
     _initialized: bool = False
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._entity_types: type[Enum] | None = None
         self._relation_predicates: type[Enum] | None = None
         self._pydantic_models: dict[str, type[BaseModel]] = {}
@@ -71,7 +71,7 @@ class TypeRegistry:
         cls._initialized = True
         return instance
 
-    def _build_entity_types(self):
+    def _build_entity_types(self) -> None:
         """Build EntityType enum dynamically from YAML entities."""
         if self._yaml_schema is None:
             raise RuntimeError("YAML schema not loaded")
@@ -94,10 +94,10 @@ class TypeRegistry:
         if not entity_names:
             raise ValueError("No valid entity names found in YAML")
 
-        # Create dynamic enum
-        self._entity_types = Enum("EntityType", entity_names)
+        # Create dynamic enum - use type ignore for mypy since this is runtime dynamic
+        self._entity_types = Enum("EntityType", entity_names)  # type: ignore[misc]
 
-    def _build_relation_predicates(self):
+    def _build_relation_predicates(self) -> None:
         """Build RelationPredicate enum dynamically from YAML relations."""
         if self._yaml_schema is None:
             raise RuntimeError("YAML schema not loaded")
@@ -135,11 +135,11 @@ class TypeRegistry:
                 "No defaults allowed."
             )
 
-        # Create dynamic enum
+        # Create dynamic enum - use type ignore for mypy since this is runtime dynamic
         predicate_items = [(p, p) for p in sorted(predicates)]
-        self._relation_predicates = Enum("RelationPredicate", predicate_items)
+        self._relation_predicates = Enum("RelationPredicate", predicate_items)  # type: ignore[misc]
 
-    def _build_pydantic_models(self):
+    def _build_pydantic_models(self) -> None:
         """Build Pydantic models dynamically from YAML entities with inheritance support."""
         if self._yaml_schema is None:
             raise RuntimeError("YAML schema not loaded")

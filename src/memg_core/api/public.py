@@ -56,11 +56,11 @@ class MemgServices:
         self.db_clients = DatabaseClients(yaml_path=yaml_path)
         self.db_clients.init_dbs(db_path=db_path, db_name=db_name)
 
-        # Create services
-        self.memory_service = create_memory_service(self.db_clients)
-        self.search_service = create_search_service(self.db_clients)
-        self.yaml_translator = YamlTranslator(yaml_path=yaml_path)
-        self.hrid_tracker = HridTracker(self.db_clients.get_kuzu_interface())
+        # Create services with proper typing
+        self.memory_service: MemoryService | None = create_memory_service(self.db_clients)
+        self.search_service: SearchService | None = create_search_service(self.db_clients)
+        self.yaml_translator: YamlTranslator | None = YamlTranslator(yaml_path=yaml_path)
+        self.hrid_tracker: HridTracker | None = HridTracker(self.db_clients.get_kuzu_interface())
 
     def close(self):
         """Close database connections and cleanup resources."""
