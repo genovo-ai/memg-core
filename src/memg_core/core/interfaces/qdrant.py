@@ -13,7 +13,7 @@ from qdrant_client.models import (
     Range,
 )
 
-from memg_core.core.exceptions import DatabaseError
+from ..exceptions import DatabaseError
 
 
 class QdrantInterface:

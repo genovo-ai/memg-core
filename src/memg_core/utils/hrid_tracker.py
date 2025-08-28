@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from memg_core.core.exceptions import DatabaseError
-from memg_core.core.interfaces.kuzu import KuzuInterface
+from ..core.exceptions import DatabaseError
+from ..core.interfaces.kuzu import KuzuInterface
 
 
 class HridTracker:

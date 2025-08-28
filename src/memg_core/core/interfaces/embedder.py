@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastembed import TextEmbedding
 
-from memg_core.core.config import get_config
+from ..config import get_config
 
 
 class Embedder:

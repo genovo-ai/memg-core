@@ -9,13 +9,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from memg_core.core.exceptions import ProcessingError
-from memg_core.core.interfaces.embedder import Embedder
-from memg_core.core.interfaces.kuzu import KuzuInterface
-from memg_core.core.interfaces.qdrant import QdrantInterface
-from memg_core.core.yaml_translator import YamlTranslator
-from memg_core.utils import generate_hrid
-from memg_core.utils.hrid_tracker import HridTracker
+from ...utils import generate_hrid
+from ...utils.hrid_tracker import HridTracker
+from ..exceptions import ProcessingError
+from ..interfaces.embedder import Embedder
+from ..interfaces.kuzu import KuzuInterface
+from ..interfaces.qdrant import QdrantInterface
+from ..yaml_translator import YamlTranslator
 
 
 class MemoryService:
