@@ -216,7 +216,7 @@ class MemoryService:
             query_vector = self.embedder.get_embedding(query_text)
 
             # Build filters
-            filters = {}
+            filters: dict[str, Any] = {}
             if user_id:
                 filters["user_id"] = user_id
             if memory_types:

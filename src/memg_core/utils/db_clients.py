@@ -35,8 +35,8 @@ class DatabaseClients:
         Args:
             yaml_path: Path to YAML schema file. User must provide - no defaults.
         """
-        self.qdrant_client = None
-        self.kuzu_connection = None
+        self.qdrant_client: QdrantClient | None = None
+        self.kuzu_connection: kuzu.Connection | None = None
         self.db_name = "memg"
         self.qdrant_path = "qdrant"
         self.kuzu_path = "kuzu"

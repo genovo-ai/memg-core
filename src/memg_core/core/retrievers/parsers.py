@@ -158,11 +158,15 @@ def build_memory_from_flat_payload(
     # Build Memory object directly from flat payload
     return Memory(
         id=memory_id,  # HRID if tracker available, UUID otherwise
-        user_id=payload.get("user_id"),
-        memory_type=payload.get("memory_type"),
+        user_id=payload.get("user_id") or "",  # Ensure string type
+        memory_type=payload.get("memory_type") or "",  # Ensure string type
         payload=entity_fields,
-        created_at=(_parse_datetime(payload["created_at"]) if payload.get("created_at") else None),
-        updated_at=(_parse_datetime(payload["updated_at"]) if payload.get("updated_at") else None),
+        created_at=(
+            _parse_datetime(payload["created_at"]) if payload.get("created_at") else datetime.now()
+        ),
+        updated_at=(
+            _parse_datetime(payload["updated_at"]) if payload.get("updated_at") else datetime.now()
+        ),
         hrid=memory_id if hrid_tracker else None,
     )
 
@@ -209,10 +213,10 @@ def build_memory_from_kuzu_row(row: dict[str, Any], hrid_tracker=None) -> Memory
     # Build Memory object
     return Memory(
         id=memory_id,  # HRID if tracker available, UUID otherwise
-        user_id=user_id,
-        memory_type=memory_type,
+        user_id=user_id or "",  # Ensure string type
+        memory_type=memory_type or "",  # Ensure string type
         payload=entity_payload,
-        created_at=_parse_datetime(created_at_str) if created_at_str else None,
-        updated_at=_parse_datetime(updated_at_str) if updated_at_str else None,
+        created_at=_parse_datetime(created_at_str) if created_at_str else datetime.now(),
+        updated_at=_parse_datetime(updated_at_str) if updated_at_str else datetime.now(),
         hrid=memory_id if hrid_tracker else None,
     )
