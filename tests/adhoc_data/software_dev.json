@@ -1,0 +1,166 @@
+{
+  "description": "Rich test dataset for memg-core software development project",
+  "project": "memg-core",
+  "user_id": "cursor",
+  "memories": [
+    {
+      "type": "note",
+      "payload": {
+        "statement": "MEMG-Core uses a dual-storage architecture with Qdrant for vector search and Kuzu for graph relationships",
+        "project": "memg-core",
+        "origin": "system"
+      },
+      "hrid_key": "architecture_note"
+    },
+    {
+      "type": "note",
+      "payload": {
+        "statement": "The YAML schema defines entities with inheritance - memo is the base class for all other entities",
+        "project": "memg-core",
+        "origin": "system"
+      },
+      "hrid_key": "yaml_inheritance_note"
+    },
+    {
+      "type": "note",
+      "payload": {
+        "statement": "HRIDs provide human-readable identifiers while UUIDs handle internal database operations",
+        "project": "memg-core",
+        "origin": "user"
+      },
+      "hrid_key": "hrid_explanation_note"
+    },
+    {
+      "type": "note",
+      "payload": {
+        "statement": "Vector embeddings are anchored to the statement field for semantic search capabilities",
+        "project": "memg-core",
+        "origin": "system"
+      },
+      "hrid_key": "vector_anchoring_note"
+    },
+    {
+      "type": "note",
+      "payload": {
+        "statement": "The TypeRegistry dynamically generates Pydantic models from YAML entity definitions",
+        "project": "memg-core",
+        "origin": "system"
+      },
+      "hrid_key": "type_registry_note"
+    },
+    {
+      "type": "task",
+      "payload": {
+        "statement": "Implement comprehensive E2E testing with realistic data scenarios",
+        "details": "Create test datasets that cover all entity types and relationship patterns to validate the complete system workflow",
+        "project": "memg-core",
+        "status": "in_progress",
+        "priority": "high"
+      },
+      "hrid_key": "e2e_testing_task"
+    },
+    {
+      "type": "task",
+      "payload": {
+        "statement": "Optimize GraphRAG retrieval performance for large datasets",
+        "details": "Profile and improve the graph expansion and semantic search pipeline for better scalability",
+        "project": "memg-core",
+        "status": "todo",
+        "priority": "medium"
+      },
+      "hrid_key": "performance_optimization_task"
+    },
+    {
+      "type": "task",
+      "payload": {
+        "statement": "Add comprehensive API documentation with usage examples",
+        "details": "Document all public API functions with clear examples and best practices for integration",
+        "project": "memg-core",
+        "status": "backlog",
+        "priority": "low",
+        "due_date": "2024-02-15T00:00:00"
+      },
+      "hrid_key": "documentation_task"
+    },
+    {
+      "type": "bug",
+      "payload": {
+        "statement": "HRID counter duplication occurs when database is not properly cleaned between test runs",
+        "details": "The HRID generation system doesn't reset counters when reusing existing databases, leading to primary key violations in Kuzu",
+        "project": "memg-core",
+        "severity": "high",
+        "status": "resolved",
+        "file_path": "src/memg_core/utils/hrid.py",
+        "reference": "_initialize_counter_from_tracker"
+      },
+      "hrid_key": "hrid_duplication_bug"
+    },
+    {
+      "type": "bug",
+      "payload": {
+        "statement": "Floating-point precision errors cause SearchResult validation failures",
+        "details": "Similarity scores slightly above 1.0 (like 1.0000000025725408) fail Pydantic validation due to floating-point arithmetic precision",
+        "project": "memg-core",
+        "severity": "medium",
+        "status": "resolved",
+        "file_path": "src/memg_core/core/models.py",
+        "reference": "SearchResult.score"
+      },
+      "hrid_key": "score_validation_bug"
+    },
+    {
+      "type": "solution",
+      "payload": {
+        "statement": "Fixed HRID duplication by removing silent fallbacks and adding proper counter initialization",
+        "details": "Replaced try-except-pass with explicit error handling and added reset_counters() method for testing scenarios",
+        "project": "memg-core",
+        "file_path": "src/memg_core/utils/hrid.py",
+        "test_status": "integration_test"
+      },
+      "hrid_key": "hrid_fix_solution"
+    },
+    {
+      "type": "document",
+      "payload": {
+        "statement": "MEMG-Core Architecture Overview",
+        "details": "Comprehensive documentation of the dual-storage architecture, YAML-driven schema system, and GraphRAG retrieval pipeline. Covers TypeRegistry, YamlTranslator, DatabaseClients, and service layer design patterns.",
+        "project": "memg-core",
+        "url": "https://github.com/memg-core/docs/architecture.md"
+      },
+      "hrid_key": "architecture_doc"
+    }
+  ],
+  "relationships": [
+    {
+      "description": "E2E testing task addresses HRID duplication bug",
+      "source_key": "e2e_testing_task",
+      "target_key": "hrid_duplication_bug",
+      "relation_type": "ADDRESSES"
+    },
+    {
+      "description": "HRID fix solution resolves the duplication bug",
+      "source_key": "hrid_fix_solution",
+      "target_key": "hrid_duplication_bug",
+      "relation_type": "FIXES"
+    },
+    {
+      "description": "Architecture note provides context for architecture document",
+      "source_key": "architecture_note",
+      "target_key": "architecture_doc",
+      "relation_type": "ANNOTATES"
+    },
+
+    {
+      "description": "Performance optimization task is supported by architecture documentation",
+      "source_key": "architecture_doc",
+      "target_key": "performance_optimization_task",
+      "relation_type": "SUPPORTS"
+    },
+    {
+      "description": "Documentation task is blocked by E2E testing completion",
+      "source_key": "e2e_testing_task",
+      "target_key": "documentation_task",
+      "relation_type": "BLOCKS"
+    }
+  ]
+}

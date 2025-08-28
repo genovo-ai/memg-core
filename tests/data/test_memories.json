@@ -1,0 +1,231 @@
+{
+  "description": "Standardized test data for MEMG Core test suite",
+  "version": "1.0",
+  "test_scenarios": {
+    "authentication_cluster": {
+      "description": "Memories related to authentication for testing true positives",
+      "memories": [
+        {
+          "type": "note",
+          "payload": {
+            "statement": "User authentication system requirements",
+            "project": "auth-service"
+          }
+        },
+        {
+          "type": "document",
+          "payload": {
+            "statement": "Authentication API documentation",
+            "details": "Complete guide for implementing OAuth2 authentication flows with JWT tokens",
+            "project": "auth-service",
+            "url": "https://example.com/auth-docs"
+          }
+        },
+        {
+          "type": "note",
+          "payload": {
+            "statement": "Login system security considerations",
+            "project": "security"
+          }
+        },
+        {
+          "type": "document",
+          "payload": {
+            "statement": "Multi-factor authentication implementation",
+            "details": "Step-by-step guide for implementing MFA with TOTP and SMS backup",
+            "project": "security"
+          }
+        }
+      ]
+    },
+    "database_cluster": {
+      "description": "Memories related to database operations for testing semantic similarity",
+      "memories": [
+        {
+          "type": "note",
+          "payload": {
+            "statement": "Database performance optimization notes",
+            "project": "database"
+          }
+        },
+        {
+          "type": "document",
+          "payload": {
+            "statement": "Database schema design principles",
+            "details": "Guidelines for designing scalable database schemas with proper indexing and normalization",
+            "project": "database"
+          }
+        },
+        {
+          "type": "note",
+          "payload": {
+            "statement": "SQL query optimization techniques",
+            "project": "database"
+          }
+        }
+      ]
+    },
+    "unrelated_cluster": {
+      "description": "Memories unrelated to tech topics for testing true negatives",
+      "memories": [
+        {
+          "type": "note",
+          "payload": {
+            "statement": "Coffee machine maintenance schedule",
+            "project": "office"
+          }
+        },
+        {
+          "type": "document",
+          "payload": {
+            "statement": "Office holiday calendar",
+            "details": "List of company holidays and important dates for the year 2024",
+            "project": "office"
+          }
+        },
+        {
+          "type": "note",
+          "payload": {
+            "statement": "Parking lot space assignments",
+            "project": "facilities"
+          }
+        },
+        {
+          "type": "document",
+          "payload": {
+            "statement": "Lunch catering menu options",
+            "details": "Weekly rotating menu for office catering with dietary restrictions noted",
+            "project": "facilities"
+          }
+        }
+      ]
+    },
+    "edge_cases": {
+      "description": "Memories with special content for testing edge cases",
+      "memories": [
+        {
+          "type": "note",
+          "payload": {
+            "statement": "API endpoint: /auth/login?redirect=true&token=abc123",
+            "project": "api"
+          }
+        },
+        {
+          "type": "document",
+          "payload": {
+            "statement": "Unicode content test: 用户认证系统 🔐",
+            "details": "Testing unicode handling in search: français, español, 日本語",
+            "project": "i18n"
+          }
+        },
+        {
+          "type": "note",
+          "payload": {
+            "statement": "Empty and whitespace handling test:     ",
+            "project": "testing"
+          }
+        },
+        {
+          "type": "memo",
+          "payload": {
+            "statement": "Very long content for testing authentication system implementation details with extensive documentation and comprehensive examples covering various use cases and edge scenarios that might occur in production environments when dealing with user management and access control mechanisms including but not limited to OAuth2 flows JWT token validation multi factor authentication session management password policies account lockout procedures security audit logging and compliance requirements for enterprise applications"
+          }
+        }
+      ]
+    }
+  },
+  "search_test_cases": {
+    "true_positives": {
+      "query": "authentication",
+      "expected_clusters": ["authentication_cluster"],
+      "min_results": 2
+    },
+    "semantic_similarity": {
+      "query": "login security",
+      "expected_clusters": ["authentication_cluster"],
+      "min_results": 1
+    },
+    "true_negatives": {
+      "query": "authentication",
+      "excluded_clusters": ["unrelated_cluster"],
+      "max_false_positives": 0
+    },
+    "type_filtering": {
+      "query": "database",
+      "memory_type": "document",
+      "expected_types": ["document"],
+      "excluded_types": ["note", "memo"]
+    },
+    "project_filtering": {
+      "query": "office",
+      "project_filter": "office",
+      "expected_projects": ["office"],
+      "excluded_projects": ["database", "auth-service"]
+    }
+  },
+  "user_isolation_test_data": {
+    "user_1": [
+      {
+        "type": "note",
+        "payload": {
+          "statement": "User 1 private authentication notes",
+          "project": "private"
+        }
+      },
+      {
+        "type": "document",
+        "payload": {
+          "statement": "User 1 confidential documentation",
+          "details": "This should only be visible to user 1",
+          "project": "private"
+        }
+      }
+    ],
+    "user_2": [
+      {
+        "type": "note",
+        "payload": {
+          "statement": "User 2 private authentication notes",
+          "project": "private"
+        }
+      },
+      {
+        "type": "document",
+        "payload": {
+          "statement": "User 2 confidential documentation",
+          "details": "This should only be visible to user 2",
+          "project": "private"
+        }
+      }
+    ]
+  },
+  "performance_test_data": {
+    "description": "Template for generating large datasets for performance testing",
+    "template": {
+      "type": "note",
+      "payload": {
+        "statement": "Performance test memory {index} about {topic}",
+        "project": "performance"
+      }
+    },
+    "topics": [
+      "authentication systems",
+      "database optimization",
+      "API design patterns",
+      "security protocols",
+      "user interface design",
+      "system architecture",
+      "performance monitoring",
+      "error handling",
+      "data validation",
+      "caching strategies"
+    ],
+    "target_memory": {
+      "type": "note",
+      "payload": {
+        "statement": "Target memory for performance testing with authentication keywords",
+        "project": "performance"
+      }
+    }
+  }
+}
