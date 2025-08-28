@@ -6,6 +6,7 @@ from collections.abc import Generator
 import os
 from pathlib import Path
 import tempfile
+from unittest.mock import Mock, patch
 import uuid
 
 import pytest
@@ -300,3 +301,14 @@ class TestHelpers:
 def test_helpers() -> TestHelpers:
     """Provide test helper methods."""
     return TestHelpers()
+
+
+@pytest.fixture(autouse=True)
+def mock_embedder():
+    """Mock the embedder to avoid external dependencies and rate limits."""
+    mock_embedder = Mock()
+    # Return a consistent fake embedding vector
+    mock_embedder.get_embedding.return_value = [0.1] * 384  # 384-dim vector like snowflake model
+
+    with patch("memg_core.core.interfaces.embedder.Embedder", return_value=mock_embedder):
+        yield mock_embedder
