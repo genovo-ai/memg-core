@@ -117,7 +117,9 @@ class TestPublicAPIErrorHandling:
 
     def test_add_memory_invalid_type(self, predictable_user_id: str):
         """Test that invalid memory types raise appropriate errors."""
-        with pytest.raises((ValueError, KeyError)):  # Should raise validation error
+        from memg_core.core.exceptions import ProcessingError
+
+        with pytest.raises(ProcessingError):  # Should raise ProcessingError for invalid types
             add_memory(
                 memory_type="invalid_type",
                 payload={"statement": "test"},
@@ -126,7 +128,11 @@ class TestPublicAPIErrorHandling:
 
     def test_add_memory_missing_required_fields(self, predictable_user_id: str):
         """Test that missing required fields raise appropriate errors."""
-        with pytest.raises((ValueError, KeyError)):  # Should raise validation error
+        from memg_core.core.exceptions import ProcessingError
+
+        with pytest.raises(
+            ProcessingError
+        ):  # Should raise ProcessingError for missing required fields
             add_memory(
                 memory_type="document",
                 payload={"statement": "test"},  # missing required 'details'

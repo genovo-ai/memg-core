@@ -233,11 +233,21 @@ class YamlTranslator:
             opt = [str(x) for x in fields.get("optional", [])]
             return req, opt
 
-        # In the flat dict case, all fields defined in YAML are considered optional
-        # because the canonical 'statement' is now a code-owned field on the Memory model.
-        # Required fields from YAML are enforced at the Pydantic model level.
-        keys = list(fields.keys())
-        return [], keys
+        # Parse individual field definitions for required flag
+        required_fields = []
+        optional_fields = []
+
+        for field_name, field_def in fields.items():
+            if isinstance(field_def, dict) and field_def.get("required", False):
+                # Skip system fields - they're handled by the system
+                if not field_def.get("system", False):
+                    required_fields.append(field_name)
+                else:
+                    optional_fields.append(field_name)
+            else:
+                optional_fields.append(field_name)
+
+        return required_fields, optional_fields
 
     def validate_memory_against_yaml(
         self, memory_type: str, payload: dict[str, Any]
