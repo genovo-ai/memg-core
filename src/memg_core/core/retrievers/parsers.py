@@ -109,11 +109,12 @@ SYSTEM_FIELD_NAMES = {
 }
 
 
-def translate_hrid(uuid: str, hrid_tracker) -> str:
+def translate_hrid(uuid: str, user_id: str, hrid_tracker) -> str:
     """Translate UUID to HRID using tracker, with fallback to UUID.
 
     Args:
         uuid: Internal UUID to translate
+        user_id: User ID for ownership verification
         hrid_tracker: HridTracker instance (can be None)
 
     Returns:
@@ -127,7 +128,7 @@ def translate_hrid(uuid: str, hrid_tracker) -> str:
         return uuid
 
     try:
-        return hrid_tracker.get_hrid(uuid)
+        return hrid_tracker.get_hrid(uuid, user_id)
     except Exception:
         # If HRID lookup fails, fall back to UUID
         # TODO: Consider logging this failure for debugging
@@ -147,8 +148,9 @@ def build_memory_from_flat_payload(
     Returns:
         Memory object with proper field separation
     """
-    # Get HRID from tracker if available
-    memory_id = translate_hrid(point_id, hrid_tracker)
+    # Get HRID from tracker if available (extract user_id from payload)
+    user_id = payload.get("user_id", "")
+    memory_id = translate_hrid(point_id, user_id, hrid_tracker)
 
     # Extract entity fields (everything except system fields)
     entity_fields = {k: v for k, v in payload.items() if k not in SYSTEM_FIELD_NAMES}
@@ -191,8 +193,9 @@ def build_memory_from_kuzu_row(row: dict[str, Any], hrid_tracker=None) -> Memory
     else:
         node_data = row
 
-    # Get HRID from tracker if available
-    memory_id = translate_hrid(neighbor_id, hrid_tracker)
+    # Get HRID from tracker if available (extract user_id from node_data)
+    user_id = node_data.get("user_id", "")
+    memory_id = translate_hrid(neighbor_id, user_id, hrid_tracker)
 
     # Extract system fields with fallback logic
     user_id = node_data.get("user_id") or row.get("user_id")

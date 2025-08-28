@@ -224,7 +224,11 @@ class MemoryService:
 
             # Search in Qdrant
             results = self.qdrant.search_points(
-                vector=query_vector, limit=limit, collection=collection, filters=filters
+                vector=query_vector,
+                limit=limit,
+                collection=collection,
+                user_id=user_id,  # CRITICAL: Pass user_id for filtering
+                filters=filters,
             )
 
             return results
@@ -291,8 +295,8 @@ class MemoryService:
             # Translate HRID to UUID
             uuid = self.hrid_tracker.get_uuid(memory_hrid, user_id)
 
-            # Delete from Qdrant
-            qdrant_success = self.qdrant.delete_points([uuid])
+            # Delete from Qdrant (with user ownership verification)
+            qdrant_success = self.qdrant.delete_points([uuid], user_id)
 
             # Delete from Kuzu (with user_id verification)
             kuzu_success = self.kuzu.delete_node(memory_type, uuid, user_id)

@@ -176,13 +176,30 @@ class QdrantInterface:
                 original_error=e,
             )
 
-    def delete_points(self, point_ids: list[str], collection: str | None = None) -> bool:
-        """Delete points by IDs - pure CRUD operation"""
+    def delete_points(
+        self, point_ids: list[str], user_id: str, collection: str | None = None
+    ) -> bool:
+        """Delete points by IDs with user ownership verification"""
         try:
             collection = collection or self.collection_name
 
+            # CRITICAL: Verify user ownership before deletion
             from qdrant_client.models import PointIdsList
 
+            # First, verify all points belong to the user
+            for point_id in point_ids:
+                points = self.client.retrieve(
+                    collection_name=collection, ids=[point_id], with_payload=True
+                )
+
+                if not points or not points[0].payload.get("user_id") == user_id:
+                    raise DatabaseError(
+                        f"Point {point_id} not found or doesn't belong to user {user_id}",
+                        operation="delete_points",
+                        context={"point_id": point_id, "user_id": user_id},
+                    )
+
+            # If all points belong to user, proceed with deletion
             self.client.delete(
                 collection_name=collection,
                 points_selector=PointIdsList(points=[str(pid) for pid in point_ids]),

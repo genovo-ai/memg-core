@@ -63,25 +63,26 @@ class HridTracker:
                 original_error=e,
             )
 
-    def get_hrid(self, uuid: str) -> str:
-        """Translate UUID to HRID
+    def get_hrid(self, uuid: str, user_id: str) -> str:
+        """Translate UUID to HRID with user verification
 
         Args:
             uuid: Internal UUID
+            user_id: User ID for ownership verification
 
         Returns:
             Human-readable ID string
 
         Raises:
-            DatabaseError: If UUID not found or is deleted
+            DatabaseError: If UUID not found, deleted, or doesn't belong to user
         """
         try:
             query = """
-            MATCH (m:HridMapping {uuid: $uuid})
+            MATCH (m:HridMapping {uuid: $uuid, user_id: $user_id})
             WHERE m.deleted_at IS NULL
             RETURN m.hrid as hrid
             """
-            results = self.kuzu.query(query, {"uuid": uuid})
+            results = self.kuzu.query(query, {"uuid": uuid, "user_id": user_id})
 
             if not results:
                 raise DatabaseError(
