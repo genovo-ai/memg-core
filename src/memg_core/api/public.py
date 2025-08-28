@@ -13,9 +13,10 @@ NO database initialization happens here - services must be pre-initialized!
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
-from ..core.models import Memory, SearchResult
+from ..core.models import SearchResult
 from ..core.pipelines.indexer import MemoryService, create_memory_service
 from ..core.pipelines.retrieval import SearchService, create_search_service
 from ..core.yaml_translator import YamlTranslator
@@ -81,162 +82,95 @@ class MemgServices:
         self.close()
 
 
-# ----------------------------- THIN API LAYER -----------------------------
+# ----------------------------- ENVIRONMENT-BASED API -----------------------------
+
+
+def get_services() -> tuple[MemoryService, SearchService, YamlTranslator]:
+    """Get services from environment variables - eliminates redundancy."""
+    yaml_path = os.environ.get("YAML_PATH", "config/core.memo.yaml")
+    kuzu_path = os.environ.get("KUZU_DB_PATH", "tmp/memg")
+
+    # Extract db_name and db_path from kuzu_path
+    kuzu_path_obj = Path(kuzu_path)
+    db_name = kuzu_path_obj.stem
+    db_path = str(kuzu_path_obj.parent)
+
+    # Create services
+    db_clients = DatabaseClients(yaml_path=yaml_path)
+    db_clients.init_dbs(db_path=db_path, db_name=db_name)
+
+    memory_service = create_memory_service(db_clients)
+    search_service = create_search_service(db_clients)
+    yaml_translator = YamlTranslator(yaml_path=yaml_path)
+
+    return memory_service, search_service, yaml_translator
 
 
 def add_memory(
-    memory_service: MemoryService,
-    yaml_translator: YamlTranslator,
     memory_type: str,
     payload: dict[str, Any],
     user_id: str,
-) -> Memory:
-    """Add a memory using pre-initialized services.
+) -> str:
+    """Add a memory and return HRID.
 
     Args:
-        memory_service: Pre-initialized MemoryService instance
-        yaml_translator: Pre-initialized YamlTranslator instance
-        memory_type: Type of memory to create
-        payload: Memory data
+        memory_type: Type of memory to create (note, document, memo)
+        payload: Memory data conforming to YAML schema
         user_id: Owner of the memory
 
     Returns:
-        Memory: Created memory with HRID assigned
+        str: HRID of created memory (never exposes UUID)
     """
-    # Create and validate memory using YAML translator
-    memory = yaml_translator.create_memory_from_yaml(
-        memory_type=memory_type, payload=payload, user_id=user_id
-    )
+    memory_service, _, _ = get_services()
 
-    # Index memory and get HRID
-    hrid = memory_service.add_memory(
-        memory_type=memory.memory_type, payload=memory.payload, user_id=memory.user_id
-    )
+    # Add memory and return HRID directly
+    hrid = memory_service.add_memory(memory_type=memory_type, payload=payload, user_id=user_id)
 
-    # Get the correct UUID from HRID tracker
-    uuid = memory_service.hrid_tracker.get_uuid(hrid, user_id)
-
-    # Update memory with correct UUID and HRID
-    memory.id = uuid
-    memory.hrid = hrid
-    return memory
+    return hrid
 
 
 def search(
-    search_service: SearchService, query: str | None, user_id: str, **kwargs
+    query: str, user_id: str, memory_type: str | None = None, limit: int = 10, **kwargs
 ) -> list[SearchResult]:
-    """Search memories using pre-initialized SearchService.
+    """Search memories and return results.
 
     Args:
-        search_service: Pre-initialized SearchService instance
         query: Search query text
         user_id: User identifier
-        **kwargs: All other search parameters passed directly to SearchService
+        memory_type: Optional memory type filter
+        limit: Maximum number of results
+        **kwargs: Additional search parameters
 
     Returns:
-        List of search results
+        List of search results with HRIDs (no UUIDs exposed)
     """
-    # Apply environment overrides
-    if "neighbor_limit" not in kwargs:
-        neighbor_limit_env = os.getenv("MEMG_GRAPH_NEIGHBORS_LIMIT")
-        if neighbor_limit_env is not None:
-            kwargs["neighbor_limit"] = int(neighbor_limit_env)
+    _, search_service, _ = get_services()
 
-    return search_service.search(query=(query.strip() if query else ""), user_id=user_id, **kwargs)
+    # Clean query and add common parameters
+    clean_query = query.strip() if query else ""
+    search_params = {"memory_type": memory_type, "limit": limit, **kwargs}
+
+    return search_service.search(query=clean_query, user_id=user_id, **search_params)
 
 
 def delete_memory(
-    memory_service: MemoryService,
-    hrid_tracker: HridTracker,
-    memory_id: str,
+    hrid: str,
     user_id: str,
 ) -> bool:
-    """Delete a memory using HRID (MCP consumers should only use HRIDs).
+    """Delete a memory using HRID.
 
     Args:
-        memory_service: Pre-initialized MemoryService instance
-        hrid_tracker: Pre-initialized HridTracker instance
-        memory_id: Memory HRID (e.g., 'NOTE_AAA001')
+        hrid: Memory HRID (e.g., 'NOTE_AAA001')
         user_id: User ID for ownership verification
 
     Returns:
-        True if deletion successful
-
-    Note:
-        MCP consumers should only use HRIDs, never UUIDs.
-        UUIDs are internal implementation details.
+        True if deletion successful, False otherwise
     """
+    memory_service, _, _ = get_services()
+
     try:
-        # memory_id should be an HRID
-        hrid = memory_id
-
-        # Get UUID for database operations
-        uuid = hrid_tracker.get_uuid(hrid, user_id)
-
-        # Extract memory type from HRID
+        # Extract memory type from HRID (e.g., "NOTE_AAA001" -> "note")
         memory_type = hrid.split("_")[0].lower()
-
-        # Verify ownership
-        kuzu_interface = memory_service.kuzu
-        query = f"MATCH (m:{memory_type.title()}) WHERE m.id = $uuid RETURN m.user_id"
-        result = kuzu_interface.conn.execute(query, parameters={"uuid": uuid})
-
-        if not result.has_next():
-            return False  # Memory not found
-
-        memory_user_id = result.get_next()[0]
-
-        if memory_user_id != user_id:
-            return False  # User doesn't own this memory
-
-        # Delete the memory using MemoryService
-        success = memory_service.delete_memory(
-            memory_hrid=hrid, memory_type=memory_type, user_id=user_id
-        )
-
-        return success
-
+        return memory_service.delete_memory(hrid, memory_type, user_id)
     except Exception:
-        # Any error means deletion failed
         return False
-
-
-def add_relationship(
-    memory_service: MemoryService,
-    from_memory_id: str,
-    to_memory_id: str,
-    relation_type: str,
-    user_id: str,
-) -> bool:
-    """Add a relationship between two memories (thin wrapper).
-
-    Args:
-        memory_service: Pre-initialized MemoryService instance
-        from_memory_id: Source memory HRID (e.g., 'TASK_AAA001')
-        to_memory_id: Target memory HRID (e.g., 'NOTE_AAA002')
-        relation_type: Type of relationship
-        user_id: User ID for ownership verification
-
-    Returns:
-        True if relationship created successfully
-    """
-    # Extract memory types from HRIDs (e.g., "TASK_AAA001" -> "task")
-    from_type = from_memory_id.split("_")[0].lower()
-    to_type = to_memory_id.split("_")[0].lower()
-
-    # Use MemoryService to handle the relationship creation
-    memory_service.add_relationship(
-        from_memory_hrid=from_memory_id,
-        to_memory_hrid=to_memory_id,
-        relation_type=relation_type,
-        from_memory_type=from_type,
-        to_memory_type=to_type,
-        user_id=user_id,
-        properties={},
-    )
-
-    return True
-
-
-# ----------------------------- USAGE EXAMPLE -----------------------------
-# See tests/test_thin_api.py for usage examples
