@@ -115,6 +115,7 @@ class TestPublicAPIErrorHandling:
         os.environ["KUZU_DB_PATH"] = str(Path(temp_db_path) / "kuzu")
         os.environ["YAML_PATH"] = test_yaml_path
 
+    @pytest.mark.unit
     def test_add_memory_invalid_type(self, predictable_user_id: str):
         """Test that invalid memory types raise appropriate errors."""
         from memg_core.core.exceptions import ProcessingError
@@ -126,6 +127,7 @@ class TestPublicAPIErrorHandling:
                 user_id=predictable_user_id,
             )
 
+    @pytest.mark.unit
     def test_add_memory_missing_required_fields(self, predictable_user_id: str):
         """Test that missing required fields raise appropriate errors."""
         from memg_core.core.exceptions import ProcessingError
@@ -139,6 +141,7 @@ class TestPublicAPIErrorHandling:
                 user_id=predictable_user_id,
             )
 
+    @pytest.mark.unit
     def test_delete_nonexistent_memory(self, predictable_user_id: str):
         """Test deleting non-existent memory returns False."""
         success = delete_memory(

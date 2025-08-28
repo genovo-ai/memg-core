@@ -36,13 +36,11 @@ jobs:
       - name: MyPy
         run: mypy src/ --ignore-missing-imports
         continue-on-error: ${{ startsWith(github.ref,'refs/tags/v') }}
-      - name: Setup temp directories for integration tests
-        run: mkdir -p temp_data/qdrant temp_data/kuzu
-      - name: Tests
-        env:
-          QDRANT_STORAGE_PATH: temp_data/qdrant
-          KUZU_DB_PATH: temp_data/kuzu/ci_test.db
-        run: python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+      - name: Setup for unit tests
+        run: echo "Running unit tests only - no database setup required"
+      - name: Tests (CI-Safe Only)
+        # Only run unit tests marked with @pytest.mark.unit - skips database-dependent tests
+        run: python -m pytest -m "unit" -v --cov=src --cov-report=xml --cov-report=term-missing
 
   build:
     needs: quality

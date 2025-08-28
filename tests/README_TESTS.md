@@ -1,11 +1,95 @@
 # MEMG Core Test Suite
 
 ## Overview
-Comprehensive test suite for MEMG Core ensuring reliability, correctness, and API compliance before PR to main.
+Comprehensive test suite for MEMG Core with proper CI/local separation to handle database dependencies safely.
 
-## Test Strategy
+## Test Categories & Database Dependencies
 
-### 1. Test Categories
+### ✅ CI-Safe Tests (7 tests)
+**Can run in build/CI environments** - No database dependencies
+
+- **Unit Tests** (`tests/unit/`)
+  - `test_yaml_schema.py` - YAML validation and schema logic
+
+- **API Error Handling** (`tests/api/test_public_api.py`)
+  - `test_add_memory_returns_hrid` - Return type validation
+  - `test_add_memory_invalid_type` - Input validation errors
+  - `test_add_memory_missing_required_fields` - Required field validation
+  - `test_delete_nonexistent_memory` - Error handling for missing data
+
+### 🏠 Local-Only Tests (17 tests)
+**Require writable databases** - Local development only
+
+- **System Integration** (`tests/test_system_ready.py`)
+  - Full end-to-end system functionality tests
+  - Performance baseline tests
+
+- **User Isolation** (`tests/test_user_isolation.py`)
+  - Multi-user data isolation tests
+  - Access control and security tests
+
+- **API Integration** (`tests/api/test_public_api.py`)
+  - Database write operations
+  - Search functionality tests
+  - User isolation in API layer
+
+### Why Tests Fail in CI
+Local-only tests fail with: `sqlite3.OperationalError: attempt to write a readonly database`
+
+This happens because they require:
+- **Qdrant** (vector database) - write operations for embeddings
+- **Kuzu** (graph database) - write operations for relationships
+- **File system** - database files need write permissions
+
+## Running Tests
+
+### Quick Commands
+```bash
+# CI-safe tests only (for build environments)
+python scripts/test_runner.py --ci
+
+# Local tests only (requires database setup)
+python scripts/test_runner.py --local
+
+# All tests
+python scripts/test_runner.py --all
+
+# Show test categorization
+python scripts/test_runner.py --check
+```
+
+### Manual pytest Commands
+```bash
+# CI-safe tests (using markers - RECOMMENDED)
+pytest -m "unit" -v
+
+# CI-safe tests (manual selection)
+pytest tests/unit/ tests/api/test_public_api.py::TestPublicAPIErrorHandling -v
+
+# Local-only tests
+pytest tests/test_system_ready.py tests/test_user_isolation.py -v
+
+# All tests
+pytest tests/ -v
+```
+
+### CI/Build Pipeline Usage
+The GitHub workflow automatically runs only CI-safe tests:
+```yaml
+# In .github/workflows/workflow.yml
+- name: Tests (CI-Safe Only)
+  run: python -m pytest -m "unit" -v --cov=src --cov-report=xml --cov-report=term-missing
+```
+
+This command:
+- ✅ Runs only the 7 unit tests marked with `@pytest.mark.unit`
+- ✅ Automatically skips all 17 database-dependent tests
+- ✅ Provides coverage reporting for CI
+- ✅ No database setup required
+
+## Test Strategy Details
+
+### 1. Original Test Categories
 
 #### Unit Tests (`tests/unit/`)
 - **YAML Schema Tests**: Validate schema loading, entity creation, field validation

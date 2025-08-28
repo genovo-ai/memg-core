@@ -4,9 +4,12 @@ Unit tests for YAML schema loading and validation - essential use cases only.
 
 from pathlib import Path
 
+import pytest
+
 from memg_core.core.yaml_translator import YamlTranslator
 
 
+@pytest.mark.unit
 class TestYamlSchemaEssentials:
     """Test essential YAML schema functionality."""
 
