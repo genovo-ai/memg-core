@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
 from ..models import SearchResult
 from ..retrievers.expanders import _append_neighbors, _find_semantic_expansion
@@ -38,8 +39,6 @@ class SearchService:
         Args:
             db_clients: DatabaseClients instance (after init_dbs() called)
         """
-        from ...utils.db_clients import DatabaseClients
-
         if not isinstance(db_clients, DatabaseClients):
             raise TypeError("db_clients must be a DatabaseClients instance")
 
@@ -106,8 +105,7 @@ class SearchService:
         vector_points = self.qdrant.search_points(
             vector=query_vector,
             limit=limit,
-            user_id=user_id,
-            filters=qdrant_filters,
+            filters=qdrant_filters,  # user_id already included by _build_qdrant_filters
         )
 
         # Convert Qdrant points to SearchResult seeds
@@ -182,22 +180,26 @@ class SearchService:
         modified_within_days: int | None,
         extra_filters: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        """Build Qdrant filters from parameters.
+        """Build Qdrant filters from parameters with mandatory user isolation.
 
         Args:
-            user_id: User ID for filtering (passed to qdrant.search_points)
+            user_id: User ID for filtering (CRITICAL: included in filters dict)
             memory_type: Optional memory type filter
             modified_within_days: Filter by recency (days)
             extra_filters: Additional custom filters
 
         Returns:
-            Combined filters dictionary for Qdrant
+            Combined filters dictionary for Qdrant with user_id always included
 
         Note:
-            user_id is not added to filters dict because it's passed separately
-            to qdrant.search_points() as a parameter (see line 174-175)
+            user_id is now included in filters dict for security validation
         """
-        filters: dict[str, Any] = extra_filters.copy() if extra_filters else {}
+        # CRITICAL SECURITY: Always start with user_id
+        filters: dict[str, Any] = {"user_id": user_id}
+
+        # Add extra filters (user_id will be overridden if present, which is fine)
+        if extra_filters:
+            filters.update(extra_filters)
 
         # memory_type filter - use flat structure
         if memory_type:

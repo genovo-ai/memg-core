@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+import warnings
 
 from ...utils import generate_hrid
+from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
-from ..exceptions import ProcessingError
+from ..exceptions import DatabaseError, ProcessingError
 from ..interfaces.embedder import Embedder
 from ..interfaces.kuzu import KuzuInterface
 from ..interfaces.qdrant import QdrantInterface
@@ -32,8 +34,6 @@ class MemoryService:
         Args:
             db_clients: DatabaseClients instance (after init_dbs() called)
         """
-        from ...utils.db_clients import DatabaseClients
-
         if not isinstance(db_clients, DatabaseClients):
             raise TypeError("db_clients must be a DatabaseClients instance")
 
@@ -91,7 +91,6 @@ class MemoryService:
             vector = self.embedder.get_embedding(anchor_text)
 
             # Create complete flat payload for Qdrant (includes system fields for filtering)
-            # TODO: Consider moving this payload construction to a utility function
             flat_payload = {
                 "user_id": memory.user_id,  # Required for user filtering
                 "memory_type": memory.memory_type,  # Required for type filtering
@@ -102,7 +101,7 @@ class MemoryService:
             }
 
             # Add to Qdrant (vector storage) with complete payload
-            success, point_id = self.qdrant.add_point(
+            success, _point_id = self.qdrant.add_point(
                 vector=vector,
                 payload=flat_payload,  # Complete flat payload with system + entity fields
                 point_id=memory.id,
@@ -139,7 +138,7 @@ class MemoryService:
                 operation="add_memory",
                 context={"memory_type": memory_type, "user_id": user_id},
                 original_error=e,
-            )
+            ) from e
 
     def add_relationship(
         self,
@@ -189,7 +188,7 @@ class MemoryService:
                     "relation_type": relation_type,
                 },
                 original_error=e,
-            )
+            ) from e
 
     def search_memories(
         self,
@@ -215,19 +214,26 @@ class MemoryService:
             # Generate query vector
             query_vector = self.embedder.get_embedding(query_text)
 
-            # Build filters
+            # Build filters with mandatory user_id
             filters: dict[str, Any] = {}
-            if user_id:
-                filters["user_id"] = user_id
+
+            # CRITICAL SECURITY: user_id is mandatory
+            if not user_id:
+                raise DatabaseError(
+                    "user_id is required for search operations",
+                    operation="indexer_search_validation",
+                    context={"user_id": user_id},
+                )
+            filters["user_id"] = user_id
+
             if memory_types:
                 filters["memory_type"] = memory_types
 
-            # Search in Qdrant
+            # Search in Qdrant (user_id now included in filters)
             results = self.qdrant.search_points(
                 vector=query_vector,
                 limit=limit,
                 collection=collection,
-                user_id=user_id,  # CRITICAL: Pass user_id for filtering
                 filters=filters,
             )
 
@@ -239,7 +245,7 @@ class MemoryService:
                 operation="search_memories",
                 context={"query_text": query_text, "user_id": user_id},
                 original_error=e,
-            )
+            ) from e
 
     def get_memory_neighbors(
         self,
@@ -278,7 +284,7 @@ class MemoryService:
                 operation="get_memory_neighbors",
                 context={"memory_id": memory_id, "memory_type": memory_type},
                 original_error=e,
-            )
+            ) from e
 
     def delete_memory(self, memory_hrid: str, memory_type: str, user_id: str) -> bool:
         """Delete a memory from both storages using HRID.
@@ -313,7 +319,7 @@ class MemoryService:
                 operation="delete_memory",
                 context={"memory_hrid": memory_hrid, "memory_type": memory_type},
                 original_error=e,
-            )
+            ) from e
 
 
 def create_memory_service(db_clients) -> MemoryService:
@@ -339,8 +345,6 @@ def create_memory_store(
 
     This function is kept for backward compatibility but will be removed.
     """
-    import warnings
-
     warnings.warn(
         "create_memory_store() is deprecated. Use create_memory_service(db_clients) instead.",
         DeprecationWarning,
@@ -349,16 +353,22 @@ def create_memory_store(
 
     # Create a temporary wrapper for legacy compatibility
     class LegacyWrapper:
+        """Temporary wrapper for backward compatibility with legacy interface access."""
+
         def get_qdrant_interface(self):
+            """Get Qdrant interface instance."""
             return qdrant_interface
 
         def get_kuzu_interface(self):
+            """Get Kuzu interface instance."""
             return kuzu_interface
 
         def get_embedder(self):
+            """Get embedder interface instance."""
             return embedder
 
         def get_yaml_translator(self):
+            """Get YAML translator instance."""
             return yaml_translator
 
     return MemoryService(LegacyWrapper())

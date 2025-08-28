@@ -1,14 +1,18 @@
+"""Memory expansion and retrieval utilities for MEMG core system.
+
+This module provides functions for expanding search queries and retrieving
+related memories through vector similarity and graph relationships.
+"""
+
 from __future__ import annotations
 
 import re
 
 from ..exceptions import DatabaseError
-from ..interfaces.embedder import Embedder
-from ..interfaces.kuzu import KuzuInterface
-from ..interfaces.qdrant import QdrantInterface
+from ..interfaces import Embedder, KuzuInterface, QdrantInterface
 from ..models import SearchResult
 from ..yaml_translator import YamlTranslator
-from .parsers import (
+from . import (
     _project_payload,
     build_memory_from_flat_payload,
     build_memory_from_kuzu_row,
@@ -67,13 +71,14 @@ def _find_semantic_expansion(
         anchor_embedding = embedder.get_embedding(anchor_text)
 
         # Search for similar memories in target types - use flat structure
-        # TODO: Consider supporting list of memory types in QdrantInterface filters
-        filters = {"memory_type": target_types}
+        filters = {
+            "user_id": user_id,  # CRITICAL: Always include user_id for isolation
+            "memory_type": target_types,
+        }
 
         similar_points = qdrant.search_points(
             vector=anchor_embedding,
             limit=limit * len(target_types) * 2,  # Get enough candidates
-            user_id=user_id,
             filters=filters,
         )
 

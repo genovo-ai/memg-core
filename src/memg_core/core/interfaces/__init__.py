@@ -1,4 +1,6 @@
 # Interfaces module - storage adapters
-from . import embedder, kuzu, qdrant
+from .embedder import Embedder
+from .kuzu import KuzuInterface
+from .qdrant import QdrantInterface
 
-__all__ = ["embedder", "kuzu", "qdrant"]
+__all__ = ["Embedder", "KuzuInterface", "QdrantInterface"]

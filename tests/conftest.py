@@ -304,6 +304,32 @@ def test_helpers() -> TestHelpers:
 
 
 @pytest.fixture(autouse=True)
+def setup_test_environment(test_yaml_path: str, temp_db_path: str):
+    """Set up environment variables required by the refactored public API."""
+    # Store original values
+    original_yaml = os.environ.get("MEMG_YAML_PATH")
+    original_db = os.environ.get("MEMG_DB_PATH")
+
+    # Set test environment variables
+    os.environ["MEMG_YAML_PATH"] = test_yaml_path
+    os.environ["MEMG_DB_PATH"] = temp_db_path
+
+    try:
+        yield
+    finally:
+        # Restore original values
+        if original_yaml is not None:
+            os.environ["MEMG_YAML_PATH"] = original_yaml
+        else:
+            os.environ.pop("MEMG_YAML_PATH", None)
+
+        if original_db is not None:
+            os.environ["MEMG_DB_PATH"] = original_db
+        else:
+            os.environ.pop("MEMG_DB_PATH", None)
+
+
+@pytest.fixture(autouse=True)
 def mock_embedder():
     """Mock the embedder to avoid external dependencies and rate limits."""
     mock_embedder = Mock()

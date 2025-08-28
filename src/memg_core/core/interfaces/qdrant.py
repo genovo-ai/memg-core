@@ -9,6 +9,7 @@ from qdrant_client.models import (
     Filter,
     MatchAny,
     MatchValue,
+    PointIdsList,
     PointStruct,
     Range,
 )
@@ -66,63 +67,66 @@ class QdrantInterface:
                 "Qdrant add_point error",
                 operation="add_point",
                 original_error=e,
-            )
+            ) from e
 
     def search_points(
         self,
         vector: list[float],
         limit: int = 5,
         collection: str | None = None,
-        user_id: str | None = None,
         filters: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """Search for similar points with optional filtering - pure CRUD operation"""
+        """Search for similar points with mandatory user isolation - pure CRUD operation"""
         try:
+            # CRITICAL SECURITY: Validate user_id is present in filters
+            if not filters or "user_id" not in filters:
+                raise DatabaseError(
+                    "user_id is mandatory in filters for data isolation",
+                    operation="search_points_validation",
+                    context={"filters": filters},
+                )
+
+            user_id = filters["user_id"]
+            if not user_id or not isinstance(user_id, str) or not user_id.strip():
+                raise DatabaseError(
+                    "user_id must be a non-empty string",
+                    operation="search_points_validation",
+                    context={"user_id": user_id},
+                )
+
             collection = collection or self.collection_name
 
             # Build query filter
             query_filter = None
             filter_conditions = []
 
-            if user_id or filters:
-                # Add user_id filter - flat payload structure
-                # TODO: Consider making this field path configurable
-                if user_id:
-                    filter_conditions.append(
-                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
-                    )
+            # Add user_id filter - flat payload structure (always required)
+            filter_conditions.append(FieldCondition(key="user_id", match=MatchValue(value=user_id)))
 
-                # Add additional filters
-                if filters:
-                    for key, value in filters.items():
-                        if value is None:
-                            continue
-                        # Handle range filters
-                        if isinstance(value, dict):
-                            range_kwargs = {}
-                            for bound_key in ("gt", "gte", "lt", "lte"):
-                                if bound_key in value and value[bound_key] is not None:
-                                    range_kwargs[bound_key] = value[bound_key]
-                            if range_kwargs:
-                                filter_conditions.append(
-                                    FieldCondition(key=key, range=Range(**range_kwargs))
-                                )
-                                continue
-                        # Handle list values
-                        if isinstance(value, list):
-                            filter_conditions.append(
-                                FieldCondition(key=key, match=MatchAny(any=value))
-                            )
-                        elif not isinstance(
-                            value, dict
-                        ):  # Skip dict values that weren't handled as ranges
-                            filter_conditions.append(
-                                FieldCondition(key=key, match=MatchValue(value=value))
-                            )
+            # Add additional filters (skip user_id since it's already added)
+            for key, value in filters.items():
+                if key == "user_id" or value is None:
+                    continue
+                # Handle range filters
+                if isinstance(value, dict):
+                    range_kwargs = {}
+                    for bound_key in ("gt", "gte", "lt", "lte"):
+                        if bound_key in value and value[bound_key] is not None:
+                            range_kwargs[bound_key] = value[bound_key]
+                    if range_kwargs:
+                        filter_conditions.append(
+                            FieldCondition(key=key, range=Range(**range_kwargs))
+                        )
+                        continue
+                # Handle list values
+                if isinstance(value, list):
+                    filter_conditions.append(FieldCondition(key=key, match=MatchAny(any=value)))
+                elif not isinstance(value, dict):  # Skip dict values that weren't handled as ranges
+                    filter_conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
 
-                if filter_conditions:
-                    # Use type ignore for the Filter argument type mismatch
-                    query_filter = Filter(must=filter_conditions)  # type: ignore
+            if filter_conditions:
+                # Use type ignore for the Filter argument type mismatch
+                query_filter = Filter(must=filter_conditions)  # type: ignore
 
             # Search using modern API
             results = self.client.query_points(
@@ -149,7 +153,7 @@ class QdrantInterface:
                 "Qdrant search_points error",
                 operation="search_points",
                 original_error=e,
-            )
+            ) from e
 
     def get_point(self, point_id: str, collection: str | None = None) -> dict[str, Any] | None:
         """Get a single point by ID - pure CRUD operation"""
@@ -174,7 +178,7 @@ class QdrantInterface:
                 "Qdrant get_point error",
                 operation="get_point",
                 original_error=e,
-            )
+            ) from e
 
     def delete_points(
         self, point_ids: list[str], user_id: str, collection: str | None = None
@@ -184,8 +188,6 @@ class QdrantInterface:
             collection = collection or self.collection_name
 
             # CRITICAL: Verify user ownership before deletion
-            from qdrant_client.models import PointIdsList
-
             # First, verify all points belong to the user
             for point_id in point_ids:
                 points = self.client.retrieve(
@@ -212,7 +214,7 @@ class QdrantInterface:
                 "Qdrant delete_points error",
                 operation="delete_points",
                 original_error=e,
-            )
+            ) from e
 
     def get_collection_info(self, collection: str | None = None) -> dict[str, Any]:
         """Get collection information - pure read operation"""
@@ -252,4 +254,4 @@ class QdrantInterface:
                 "Qdrant get_collection_info error",
                 operation="get_collection_info",
                 original_error=e,
-            )
+            ) from e

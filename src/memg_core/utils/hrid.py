@@ -12,6 +12,9 @@ from __future__ import annotations
 import re
 from typing import Any, Protocol
 
+from ..core.exceptions import DatabaseError
+from ..core.logging import get_logger
+
 # Matches HRIDs like TASK_AAA001, NOTE_ZZZ999
 _HRID_RE = re.compile(r"^(?P<type>[A-Z0-9_]+)_(?P<alpha>[A-Z]{3})(?P<num>\d{3})$")
 
@@ -31,7 +34,7 @@ class StorageQueryInterface(Protocol):
         filters: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Search for points with optional filtering."""
-        ...
+        raise NotImplementedError("Subclasses must implement search_points method")
 
 
 def _alpha_to_idx(alpha: str) -> int:
@@ -77,11 +80,14 @@ def _initialize_counter_from_storage(
         # We use a dummy vector since we're filtering by memory_type, not doing vector search
         dummy_vector = [0.0] * 384  # Default embedding size
 
-        # Search with memory_type filter to get all memories of this type
+        # Search with memory_type and user_id filters to get all memories of this type for this user
         results = storage.search_points(
             vector=dummy_vector,
             limit=10000,  # High limit to get all existing memories of this type
-            filters={"memory_type": type_name.lower()},
+            filters={
+                "user_id": user_id,  # CRITICAL: Include user_id for proper isolation
+                "memory_type": type_name.lower(),
+            },
         )
 
         if not results:
@@ -117,8 +123,6 @@ def _initialize_counter_from_storage(
 
             except ValueError as e:
                 # Skip invalid HRIDs but log for transparency
-                from ..core.logging import get_logger
-
                 logger = get_logger("hrid")
                 logger.debug(f"Skipping invalid HRID format '{hrid}': {e}")
                 continue
@@ -137,10 +141,8 @@ def _initialize_counter_from_storage(
             next_num - 1,
         )  # -1 because generate_hrid will increment
 
-    except Exception as e:
+    except (DatabaseError, ConnectionError, TimeoutError) as e:
         # If storage query fails, fall back to fresh start but log the issue
-        from ..core.logging import get_logger
-
         logger = get_logger("hrid")
         logger.warning(f"HRID storage query failed, falling back to fresh start: {e}")
         return (0, -1)
@@ -163,7 +165,7 @@ def _initialize_counter_from_tracker(type_name: str, user_id: str, hrid_tracker)
         if highest is None:
             return (0, -1)  # No existing HRIDs for this type
 
-        highest_hrid, highest_alpha_idx, highest_num = highest
+        _highest_hrid, highest_alpha_idx, highest_num = highest
 
         # Return the next position after the highest found
         next_num = highest_num + 1
@@ -179,15 +181,13 @@ def _initialize_counter_from_tracker(type_name: str, user_id: str, hrid_tracker)
     except Exception as e:
         # DO NOT FALL BACK SILENTLY - this causes duplicate HRID bugs!
         # If we can't initialize from existing data, the system should fail fast
-        from ..core.exceptions import DatabaseError
-
         raise DatabaseError(
             f"Failed to initialize HRID counter for type '{type_name}' from existing data. "
             f"This is critical - cannot generate HRIDs without knowing existing ones.",
             operation="initialize_counter_from_tracker",
             context={"type_name": type_name},
             original_error=e,
-        )
+        ) from e
 
 
 def generate_hrid(type_name: str, user_id: str, hrid_tracker=None) -> str:
