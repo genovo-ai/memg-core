@@ -192,7 +192,9 @@ class QdrantInterface:
                     collection_name=collection, ids=[point_id], with_payload=True
                 )
 
-                if not points or not points[0].payload.get("user_id") == user_id:
+                if not points or not (
+                    points[0].payload and points[0].payload.get("user_id") == user_id
+                ):
                     raise DatabaseError(
                         f"Point {point_id} not found or doesn't belong to user {user_id}",
                         operation="delete_points",
