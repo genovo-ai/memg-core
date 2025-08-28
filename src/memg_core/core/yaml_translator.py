@@ -9,7 +9,6 @@ All type building and validation delegated to TypeRegistry - zero redundancy.
 
 from __future__ import annotations
 
-from functools import lru_cache
 import os
 from pathlib import Path
 from typing import Any
@@ -24,10 +23,6 @@ class YamlTranslatorError(MemorySystemError):
     """Error in YAML schema translation or validation."""
 
     pass
-
-
-# EntitySpec REMOVED - TypeRegistry handles all entity specifications
-# NO REDUNDANCY - all type definitions centralized in TypeRegistry
 
 
 class YamlTranslator:
@@ -105,23 +100,58 @@ class YamlTranslator:
                 out[key] = item
         return out
 
+    def get_entity_types(self) -> list[str]:
+        """Get list of available entity types from YAML schema."""
+        return list(self._entities_map().keys())
+
     def get_anchor_field(self, entity_name: str) -> str:
-        """Get the anchor field name for the given entity type from YAML schema."""
+        """Get the anchor field name for the given entity type from YAML schema.
+
+        Now reads from vector.anchored_to instead of separate anchor field.
+        """
         if not entity_name:
             raise YamlTranslatorError("Empty entity name")
+
+        # Get entity spec with inheritance resolution
+        entity_spec = self._resolve_entity_with_inheritance(entity_name)
+
+        # Look for vector field with anchored_to
+        fields = entity_spec.get("fields", {})
+        for _field_name, field_def in fields.items():
+            if isinstance(field_def, dict) and field_def.get("type") == "vector":
+                anchored_to = field_def.get("anchored_to")
+                if anchored_to:
+                    return str(anchored_to)
+
+        raise YamlTranslatorError(
+            f"Entity '{entity_name}' has no vector field with 'anchored_to' property"
+        )
+
+    def _resolve_entity_with_inheritance(self, entity_name: str) -> dict[str, Any]:
+        """Resolve entity specification with full inheritance chain."""
         name_l = entity_name.lower()
         emap = self._entities_map()
         spec_raw = emap.get(name_l)
         if not spec_raw:
             raise YamlTranslatorError(f"Entity '{entity_name}' not found in YAML schema")
 
-        # Read anchor field from YAML schema - NO hardcoding
-        anchor = spec_raw.get("anchor")
-        if not anchor:
-            raise YamlTranslatorError(
-                f"Entity '{entity_name}' missing required 'anchor' field in YAML schema"
-            )
-        return str(anchor)
+        # If no parent, return as-is
+        parent_name = spec_raw.get("parent")
+        if not parent_name:
+            return spec_raw
+
+        # Recursively resolve parent and merge fields
+        parent_spec = self._resolve_entity_with_inheritance(parent_name)
+
+        # Merge parent fields with child fields (child overrides parent)
+        merged_fields = parent_spec.get("fields", {}).copy()
+        merged_fields.update(spec_raw.get("fields", {}))
+
+        # Create merged spec
+        merged_spec = spec_raw.copy()
+        merged_spec["fields"] = merged_fields
+
+        return merged_spec
 
     def get_see_also_config(self, entity_name: str) -> dict[str, Any] | None:
         """Get the see_also configuration for the given entity type from YAML schema.
@@ -161,7 +191,8 @@ class YamlTranslator:
         mem_type = getattr(memory, "memory_type", None)
         if not mem_type:
             raise YamlTranslatorError(
-                "Memory object missing 'memory_type' field", operation="build_anchor_text"
+                "Memory object missing 'memory_type' field",
+                operation="build_anchor_text",
             )
 
         # Get anchor field from YAML schema
@@ -184,7 +215,8 @@ class YamlTranslator:
 
         # Anchor field missing, empty, or invalid
         raise YamlTranslatorError(
-            f"Anchor field '{anchor_field}' is missing, empty, or invalid for memory type '{mem_type}'",
+            f"Anchor field '{anchor_field}' is missing, empty, or invalid "
+            f"for memory type '{mem_type}'",
             operation="build_anchor_text",
             context={
                 "memory_type": mem_type,
@@ -221,14 +253,18 @@ class YamlTranslator:
         if not spec:
             raise YamlTranslatorError(
                 f"Unknown entity type '{memory_type}'. All types must be defined in YAML schema.",
-                context={"memory_type": memory_type, "available_types": list(emap.keys())},
+                context={
+                    "memory_type": memory_type,
+                    "available_types": list(emap.keys()),
+                },
             )
 
         req, _opt = self._fields_contract(spec)
         missing = [k for k in req if not payload.get(k)]
         if missing:
             raise YamlTranslatorError(
-                f"Missing required fields: {missing}", context={"memory_type": memory_type}
+                f"Missing required fields: {missing}",
+                context={"memory_type": memory_type},
             )
 
         # Strip system-reserved fields if present
@@ -247,7 +283,8 @@ class YamlTranslator:
         anchor_text = payload.get(anchor_field)
         if not anchor_text or not isinstance(anchor_text, str):
             raise YamlTranslatorError(
-                f"Missing or invalid anchor field '{anchor_field}' in payload for memory type '{memory_type}'"
+                f"Missing or invalid anchor field '{anchor_field}' in payload "
+                f"for memory type '{memory_type}'"
             )
 
         # Validate full payload against YAML schema
@@ -265,29 +302,3 @@ class YamlTranslator:
         from .types import get_entity_model
 
         return get_entity_model(entity_name)
-
-
-@lru_cache(maxsize=1)
-def get_yaml_translator() -> YamlTranslator:
-    return YamlTranslator()
-
-
-def build_anchor_text(memory) -> str:
-    return get_yaml_translator().build_anchor_text(memory)
-
-
-def create_memory_from_yaml(memory_type: str, payload: dict[str, Any], user_id: str):
-    return get_yaml_translator().create_memory_from_yaml(memory_type, payload, user_id)
-
-
-# Convenience shim
-
-
-def get_entity_model(entity_name: str):
-    """Module-level helper that uses the cached global translator."""
-    return get_yaml_translator().get_entity_model(entity_name)
-
-
-def get_see_also_config(entity_name: str) -> dict[str, Any] | None:
-    """Module-level helper that uses the cached global translator."""
-    return get_yaml_translator().get_see_also_config(entity_name)

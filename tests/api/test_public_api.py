@@ -1,230 +1,235 @@
-"""Tests for the public API contract."""
+"""
+Tests for public API interface ensuring HRID-only surface and proper functionality.
+"""
+
+import os
+from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.api
-from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, patch
-
-from memg_core.api.public import add_memory, search
-from memg_core.core.exceptions import ValidationError
-from memg_core.core.models import Memory, SearchResult
+from memg_core.api.public import add_memory, delete_memory, search
 
 
-@pytest.fixture
-def mock_index_memory():
-    """Fixture to mock the _index_memory_with_yaml function."""
-    with patch("memg_core.api.public._index_memory_with_yaml") as mock:
-        mock.return_value = "test-memory-id"
-        yield mock
+class TestPublicAPIInterface:
+    """Test public API functions with proper environment setup."""
 
+    @pytest.fixture(autouse=True)
+    def setup_environment(self, temp_db_path: str, test_yaml_path: str):
+        """Setup environment variables for each test."""
+        os.environ["QDRANT_STORAGE_PATH"] = str(Path(temp_db_path) / "qdrant")
+        os.environ["KUZU_DB_PATH"] = str(Path(temp_db_path) / "kuzu")
+        os.environ["YAML_PATH"] = test_yaml_path
 
-@pytest.fixture
-def mock_graph_rag_search():
-    """Fixture to mock the graph_rag_search function."""
-    with patch("memg_core.api.public.graph_rag_search") as mock:
-        # Create a sample search result
-        memory = Memory(
-            id="test-memory-id",
-            user_id="test-user",
-            memory_type="memo_test",
-            payload={"statement": "Test content", "details": "Test details"},
-        )
-        result = SearchResult(
-            memory=memory,
-            score=0.9,
-            distance=None,
-            source="test",
-            metadata={},
-        )
-        mock.return_value = [result]
-        yield mock
-
-
-def test_add_memory_memo_test_returns_memory_and_persists(mock_index_memory):
-    """Test that add_memory for memo_test type returns a Memory and persists it."""
-    # Call add_memory with memo_test type
-    memory = add_memory(
-        memory_type="memo_test",
-        payload={
-            "statement": "This is a test memo_test",
-            "details": "This is the detail for the test memo_test.",
-        },
-        user_id="test-user",
-        # No hardcoded tags - removed as part of audit
-    )
-
-    # Check that the memory was created correctly
-    assert memory.id == "test-memory-id"
-    assert memory.user_id == "test-user"
-    assert memory.statement == "This is a test memo_test"
-    assert memory.memory_type == "memo_test"
-    assert memory.payload.get("details") == "This is the detail for the test memo_test."
-    # No hardcoded tags - removed as part of audit
-
-    # Check that _index_memory_with_yaml was called
-    mock_index_memory.assert_called_once()
-
-    # Check the memory passed to _index_memory_with_yaml
-    indexed_memory = mock_index_memory.call_args[0][0]
-    assert indexed_memory.user_id == "test-user"
-    assert indexed_memory.statement == "This is a test memo_test"
-    assert indexed_memory.memory_type == "memo_test"
-
-
-def test_add_memory_memo_summary_used_in_index_text(mock_index_memory):
-    """Test that add_memory for memo type uses summary in index text."""
-    # Call add_memory with memo type
-    memory = add_memory(
-        memory_type="memo",
-        payload={
-            "statement": "This is a memo summary",
-        },
-        user_id="test-user",
-        # No hardcoded tags - removed as part of audit
-    )
-
-    # Check that the memory was created correctly
-    assert memory.id == "test-memory-id"
-    assert memory.user_id == "test-user"
-    assert memory.statement == "This is a memo summary"
-    assert memory.memory_type == "memo"
-    # No hardcoded tags - removed as part of audit
-
-    # Check that _index_memory_with_yaml was called
-    mock_index_memory.assert_called_once()
-
-
-def test_add_memory_memo_test_due_date_serialized(mock_index_memory):
-    """Test that add_memory for memo_test type serializes dates correctly."""
-    # Create a due date
-    due_date = datetime.now(UTC) + timedelta(days=1)
-
-    # Call add_memory with memo_test type
-    memory = add_memory(
-        memory_type="memo_test",
-        payload={
-            "statement": "This is a test memo_test",
-            "due_date": due_date.isoformat(),
-        },
-        user_id="test-user",
-        # No hardcoded tags - removed as part of audit
-    )
-
-    # Check that the memory was created correctly
-    assert memory.id == "test-memory-id"
-    assert memory.user_id == "test-user"
-    assert memory.statement == "This is a test memo_test"
-    assert memory.memory_type == "memo_test"
-    assert memory.payload.get("due_date") == due_date.isoformat()
-    # No hardcoded tags - removed as part of audit
-
-    # Check that _index_memory_with_yaml was called
-    mock_index_memory.assert_called_once()
-
-
-def test_search_requires_user_id_raises_valueerror(mock_graph_rag_search):
-    """Test that search requires user_id and raises ValueError if missing."""
-    # Call search without user_id
-    with pytest.raises(ValidationError) as exc_info:
-        search(query="test query", user_id="")
-
-    assert "User ID is required" in str(exc_info.value)
-
-    # Call search with None user_id (type: ignore for testing error case)
-    with pytest.raises(ValidationError) as exc_info:
-        search(query="test query", user_id=None)  # type: ignore
-
-    assert "User ID is required" in str(exc_info.value)
-
-
-def test_search_plugin_absent_does_not_crash():
-    """Test that search works when YAML plugin is absent."""
-    # Mock dependencies
-    with (
-        patch("memg_core.api.public.get_config") as mock_config,
-        patch("memg_core.api.public.QdrantInterface") as mock_qdrant,
-        patch("memg_core.api.public.KuzuInterface") as mock_kuzu,
-        patch("memg_core.api.public.Embedder") as mock_embedder,
-        patch("memg_core.api.public.graph_rag_search") as mock_search,
+    def test_add_memory_returns_hrid(
+        self, predictable_user_id: str, sample_note_data: dict, test_helpers
     ):
-        # Configure mocks
-        mock_config.return_value = MagicMock()
-        mock_config.return_value.memg.qdrant_collection_name = "memories"
-        mock_config.return_value.memg.kuzu_database_path = "/tmp/kuzu"
+        """Test that add_memory returns HRID, not UUID."""
+        hrid = add_memory(memory_type="note", payload=sample_note_data, user_id=predictable_user_id)
 
-        mock_qdrant.return_value = MagicMock()
-        mock_kuzu.return_value = MagicMock()
-        mock_embedder.return_value = MagicMock()
+        # Should return HRID format
+        test_helpers.assert_hrid_format(hrid, "note")
 
-        # Mock search result
-        memory = Memory(
-            id="test-memory-id",
-            user_id="test-user",
-            memory_type="memo_test",
-            payload={"statement": "Test content", "details": "Test details"},
-        )
-        result = SearchResult(
-            memory=memory,
-            score=0.9,
-            distance=None,
-            source="test",
-            metadata={},
-        )
-        mock_search.return_value = [result]
+        # Should not be a UUID
+        assert not test_helpers._looks_like_uuid(hrid)
 
-        # Call search - should not crash
-        results = search(query="test query", user_id="test-user")
+    def test_add_memory_different_types(self, predictable_user_id: str, test_helpers):
+        """Test adding different memory types returns correct HRID formats."""
+        test_cases = [
+            ("memo", {"statement": "Test memo"}),
+            ("note", {"statement": "Test note", "project": "test"}),
+            ("document", {"statement": "Test doc", "details": "Test details"}),
+        ]
 
-        # Check that search was called
-        mock_search.assert_called_once()
+        for memory_type, payload in test_cases:
+            hrid = add_memory(memory_type=memory_type, payload=payload, user_id=predictable_user_id)
 
-        # Check results
-        assert len(results) == 1
-        assert results[0].memory.id == "test-memory-id"
+            test_helpers.assert_hrid_format(hrid, memory_type)
 
-
-def test_api_reads_neighbor_cap_env_and_passes_to_pipeline(monkeypatch):
-    """Test that API reads neighbor_cap from env and passes to pipeline."""
-    # Set environment variable
-    monkeypatch.setenv("MEMG_GRAPH_NEIGHBORS_LIMIT", "10")
-
-    # Mock dependencies
-    with (
-        patch("memg_core.api.public.get_config") as mock_config,
-        patch("memg_core.api.public.QdrantInterface") as mock_qdrant,
-        patch("memg_core.api.public.KuzuInterface") as mock_kuzu,
-        patch("memg_core.api.public.Embedder") as mock_embedder,
-        patch("memg_core.api.public.graph_rag_search") as mock_search,
+    def test_search_returns_hrid_only(
+        self, predictable_user_id: str, sample_note_data: dict, test_helpers
     ):
-        # Configure mocks
-        mock_config.return_value = MagicMock()
-        mock_config.return_value.memg.qdrant_collection_name = "memories"
-        mock_config.return_value.memg.kuzu_database_path = "/tmp/kuzu"
-
-        mock_qdrant.return_value = MagicMock()
-        mock_kuzu.return_value = MagicMock()
-        mock_embedder.return_value = MagicMock()
-
-        # Mock search result
-        memory = Memory(
-            id="test-memory-id",
-            user_id="test-user",
-            memory_type="memo_test",
-            payload={"statement": "Test content", "details": "Test details"},
+        """Test that search results contain HRIDs, not UUIDs."""
+        # Add a memory first
+        _hrid = add_memory(
+            memory_type="note", payload=sample_note_data, user_id=predictable_user_id
         )
-        result = SearchResult(
-            memory=memory,
-            score=0.9,
-            distance=None,
-            source="test",
-            metadata={},
+
+        # Search for it
+        results = search(query="test", user_id=predictable_user_id, limit=10)
+
+        assert len(results) > 0, "Should find the added memory"
+
+        # Check that results contain no UUIDs
+        for result in results:
+            test_helpers.assert_no_uuid_exposure(result)
+
+            # Should have HRID in result
+            assert hasattr(result, "memory"), "Result should have memory attribute"
+            assert hasattr(result.memory, "hrid"), "Memory should have HRID"
+            test_helpers.assert_hrid_format(result.memory.hrid, "note")
+
+    def test_delete_memory_accepts_hrid(self, predictable_user_id: str, sample_note_data: dict):
+        """Test that delete_memory accepts HRID and works correctly."""
+        # Add a memory
+        hrid = add_memory(memory_type="note", payload=sample_note_data, user_id=predictable_user_id)
+
+        # Delete using HRID
+        success = delete_memory(hrid=hrid, user_id=predictable_user_id)
+        assert success, "Delete should succeed"
+
+        # Verify it's gone
+        results = search(query=sample_note_data["statement"], user_id=predictable_user_id, limit=10)
+
+        # Should not find the deleted memory
+        found_hrids = [r.memory.hrid for r in results if hasattr(r.memory, "hrid")]
+        assert hrid not in found_hrids, "Deleted memory should not be found in search"
+
+    def test_user_isolation_in_api(self, sample_note_data: dict):
+        """Test that users can only see their own memories through API."""
+        user1 = "test_user_1"
+        user2 = "test_user_2"
+
+        # User 1 adds a memory
+        hrid1 = add_memory(memory_type="note", payload=sample_note_data, user_id=user1)
+
+        # User 2 should not see User 1's memory
+        user2_results = search(query=sample_note_data["statement"], user_id=user2, limit=10)
+
+        user2_hrids = [r.memory.hrid for r in user2_results if hasattr(r.memory, "hrid")]
+        assert hrid1 not in user2_hrids, "User 2 should not see User 1's memories"
+
+        # User 1 should see their own memory
+        user1_results = search(query=sample_note_data["statement"], user_id=user1, limit=10)
+
+        user1_hrids = [r.memory.hrid for r in user1_results if hasattr(r.memory, "hrid")]
+        assert hrid1 in user1_hrids, "User 1 should see their own memories"
+
+
+class TestPublicAPIErrorHandling:
+    """Test error handling in public API functions."""
+
+    @pytest.fixture(autouse=True)
+    def setup_environment(self, temp_db_path: str, test_yaml_path: str):
+        """Setup environment variables for each test."""
+        os.environ["QDRANT_STORAGE_PATH"] = str(Path(temp_db_path) / "qdrant")
+        os.environ["KUZU_DB_PATH"] = str(Path(temp_db_path) / "kuzu")
+        os.environ["YAML_PATH"] = test_yaml_path
+
+    def test_add_memory_invalid_type(self, predictable_user_id: str):
+        """Test that invalid memory types raise appropriate errors."""
+        with pytest.raises((ValueError, KeyError)):  # Should raise validation error
+            add_memory(
+                memory_type="invalid_type",
+                payload={"statement": "test"},
+                user_id=predictable_user_id,
+            )
+
+    def test_add_memory_missing_required_fields(self, predictable_user_id: str):
+        """Test that missing required fields raise appropriate errors."""
+        with pytest.raises((ValueError, KeyError)):  # Should raise validation error
+            add_memory(
+                memory_type="document",
+                payload={"statement": "test"},  # missing required 'details'
+                user_id=predictable_user_id,
+            )
+
+    def test_delete_nonexistent_memory(self, predictable_user_id: str):
+        """Test deleting non-existent memory returns False."""
+        success = delete_memory(
+            hrid="NOTE_XXX999",  # Non-existent HRID
+            user_id=predictable_user_id,
         )
-        mock_search.return_value = [result]
+        assert not success, "Deleting non-existent memory should return False"
 
-        # Call search
-        search(query="test query", user_id="test-user")
+    def test_delete_other_users_memory(self, sample_note_data: dict):
+        """Test that users cannot delete other users' memories."""
+        user1 = "test_user_1"
+        user2 = "test_user_2"
 
-        # Check that graph_rag_search was called with neighbor_cap=10
-        mock_search.assert_called_once()
-        assert mock_search.call_args[1].get("neighbor_cap") == 10
+        # User 1 creates a memory
+        hrid = add_memory(memory_type="note", payload=sample_note_data, user_id=user1)
+
+        # User 2 tries to delete it
+        success = delete_memory(hrid=hrid, user_id=user2)
+        assert not success, "User should not be able to delete other user's memory"
+
+        # Memory should still exist for User 1
+        results = search(query=sample_note_data["statement"], user_id=user1, limit=10)
+        found_hrids = [r.memory.hrid for r in results if hasattr(r.memory, "hrid")]
+        assert hrid in found_hrids, "Memory should still exist after failed deletion"
+
+
+class TestPublicAPISearchFiltering:
+    """Test search filtering and options in public API."""
+
+    @pytest.fixture(autouse=True)
+    def setup_environment(self, temp_db_path: str, test_yaml_path: str):
+        """Setup environment variables for each test."""
+        os.environ["QDRANT_STORAGE_PATH"] = str(Path(temp_db_path) / "qdrant")
+        os.environ["KUZU_DB_PATH"] = str(Path(temp_db_path) / "kuzu")
+        os.environ["YAML_PATH"] = test_yaml_path
+
+    def test_search_by_memory_type(self, predictable_user_id: str):
+        """Test searching with memory type filter."""
+        # Add different types of memories
+        note_hrid = add_memory(
+            memory_type="note",
+            payload={"statement": "authentication system note"},
+            user_id=predictable_user_id,
+        )
+
+        doc_hrid = add_memory(
+            memory_type="document",
+            payload={
+                "statement": "authentication system documentation",
+                "details": "Detailed authentication guide",
+            },
+            user_id=predictable_user_id,
+        )
+
+        # Search for notes only
+        note_results = search(
+            query="authentication", user_id=predictable_user_id, memory_type="note", limit=10
+        )
+
+        note_hrids = [r.memory.hrid for r in note_results if hasattr(r.memory, "hrid")]
+        assert note_hrid in note_hrids, "Should find note"
+        assert doc_hrid not in note_hrids, "Should not find document when filtering for notes"
+
+        # Search for documents only
+        doc_results = search(
+            query="authentication", user_id=predictable_user_id, memory_type="document", limit=10
+        )
+
+        doc_hrids = [r.memory.hrid for r in doc_results if hasattr(r.memory, "hrid")]
+        assert doc_hrid in doc_hrids, "Should find document"
+        assert note_hrid not in doc_hrids, "Should not find note when filtering for documents"
+
+    def test_search_limit_parameter(self, predictable_user_id: str):
+        """Test that search limit parameter works correctly."""
+        # Add multiple memories
+        hrids = []
+        for i in range(5):
+            hrid = add_memory(
+                memory_type="note",
+                payload={"statement": f"test note number {i}"},
+                user_id=predictable_user_id,
+            )
+            hrids.append(hrid)
+
+        # Search with limit
+        results = search(query="test note", user_id=predictable_user_id, limit=3)
+
+        assert len(results) <= 3, f"Should return at most 3 results, got {len(results)}"
+        assert len(results) > 0, "Should return some results"
+
+    def test_empty_search_query(self, predictable_user_id: str, sample_note_data: dict):
+        """Test behavior with empty search query."""
+        # Add a memory
+        add_memory(memory_type="note", payload=sample_note_data, user_id=predictable_user_id)
+
+        # Search with empty query
+        results = search(query="", user_id=predictable_user_id, limit=10)
+
+        # Should handle empty query gracefully (implementation dependent)
+        assert isinstance(results, list), "Should return a list even with empty query"
