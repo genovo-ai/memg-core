@@ -310,5 +310,11 @@ def mock_embedder():
     # Return a consistent fake embedding vector
     mock_embedder.get_embedding.return_value = [0.1] * 384  # 384-dim vector like snowflake model
 
-    with patch("memg_core.core.interfaces.embedder.Embedder", return_value=mock_embedder):
+    # Patch both the Embedder class and the get_embedder method
+    with (
+        patch("memg_core.core.interfaces.embedder.Embedder", return_value=mock_embedder),
+        patch(
+            "memg_core.utils.db_clients.DatabaseClients.get_embedder", return_value=mock_embedder
+        ),
+    ):
         yield mock_embedder
