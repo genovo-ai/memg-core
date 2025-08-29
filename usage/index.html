@@ -1,0 +1,1357 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Memory Graph Core — AI memory + GraphRAG engine">
+      
+      
+      
+        <link rel="canonical" href="https://genovo-ai.github.io/memg-core/usage/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../reference/api/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.18">
+    
+    
+      
+        <title>Usage - memg-core</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#usage-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="memg-core" class="md-header__button md-logo" aria-label="memg-core" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            memg-core
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Usage
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/genovo-ai/memg-core" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    genovo-ai/memg-core
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/api/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="memg-core" class="md-nav__button md-logo" aria-label="memg-core" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    memg-core
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/genovo-ai/memg-core" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    genovo-ai/memg-core
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Usage
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Usage
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Installation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-pypi" class="md-nav__link">
+    <span class="md-ellipsis">
+      From PyPI
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#development-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Development Setup
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Required Variables
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optional Variables
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#yaml-schema-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      YAML Schema Configuration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="YAML Schema Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-different-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using Different Schemas
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#basic-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Operations
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Basic Operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-memories" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adding Memories
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#searching-memories" class="md-nav__link">
+    <span class="md-ellipsis">
+      Searching Memories
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deleting-memories" class="md-nav__link">
+    <span class="md-ellipsis">
+      Deleting Memories
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Usage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-types-and-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Memory Types and Schemas
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory Types and Schemas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-types-corememoyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Types (core.memo.yaml)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enhanced-types-software_devyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enhanced Types (software_dev.yaml)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#working-with-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      Working with Projects
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#embedding-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Embedding Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#user-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      User Isolation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Tips
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Issues
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debug-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Debug Mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Checking Configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Changelog
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Installation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-pypi" class="md-nav__link">
+    <span class="md-ellipsis">
+      From PyPI
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#development-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Development Setup
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Required Variables
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optional Variables
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#yaml-schema-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      YAML Schema Configuration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="YAML Schema Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-different-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using Different Schemas
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#basic-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Operations
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Basic Operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-memories" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adding Memories
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#searching-memories" class="md-nav__link">
+    <span class="md-ellipsis">
+      Searching Memories
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deleting-memories" class="md-nav__link">
+    <span class="md-ellipsis">
+      Deleting Memories
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Usage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-types-and-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Memory Types and Schemas
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory Types and Schemas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-types-corememoyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basic Types (core.memo.yaml)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enhanced-types-software_devyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enhanced Types (software_dev.yaml)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#working-with-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      Working with Projects
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#embedding-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Embedding Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#user-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      User Isolation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Tips
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Issues
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debug-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Debug Mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Checking Configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="usage-guide">Usage Guide</h1>
+<p>This guide covers installation, configuration, and common usage patterns for memg-core.</p>
+<h2 id="installation">Installation</h2>
+<h3 id="from-pypi">From PyPI</h3>
+<pre><code class="language-bash">pip install memg-core
+</code></pre>
+<h3 id="development-setup">Development Setup</h3>
+<pre><code class="language-bash"># 1) Clone the repository
+git clone https://github.com/genovo-ai/memg-core.git
+cd memg-core
+
+# 2) Create virtualenv and install dependencies
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt
+
+# 3) For development, install dev dependencies
+pip install -r requirements-dev.txt
+
+# 4) Run tests
+export YAML_PATH=&quot;config/core.test.yaml&quot;
+export QDRANT_STORAGE_PATH=&quot;$HOME/.local/share/qdrant&quot;
+export KUZU_DB_PATH=&quot;$HOME/.local/share/kuzu/memg&quot;
+mkdir -p &quot;$QDRANT_STORAGE_PATH&quot; &quot;$HOME/.local/share/kuzu&quot;
+PYTHONPATH=$(pwd)/src pytest -q
+</code></pre>
+<h2 id="configuration">Configuration</h2>
+<p>Configure memg-core using environment variables:</p>
+<h3 id="required-variables">Required Variables</h3>
+<pre><code class="language-bash"># Storage paths
+export QDRANT_STORAGE_PATH=&quot;/path/to/qdrant&quot;
+export KUZU_DB_PATH=&quot;/path/to/kuzu/database&quot;
+export YAML_PATH=&quot;config/core.memo.yaml&quot;
+</code></pre>
+<h3 id="optional-variables">Optional Variables</h3>
+<pre><code class="language-bash"># Embeddings configuration
+export EMBEDDER_MODEL=&quot;Snowflake/snowflake-arctic-embed-xs&quot;  # Default
+
+# For MCP server (if using)
+export MEMORY_SYSTEM_MCP_PORT=8787
+</code></pre>
+<h2 id="yaml-schema-configuration">YAML Schema Configuration</h2>
+<p>memg-core uses YAML schemas to define memory types. Core ships with example schemas:</p>
+<ul>
+<li><code>config/core.memo.yaml</code>: Basic memory types (<code>memo</code>, <code>note</code>, <code>document</code>, <code>task</code>)</li>
+<li><code>config/software_dev.yaml</code>: Enhanced schema with <code>bug</code> and <code>solution</code> types</li>
+<li><code>config/core.test.yaml</code>: Test configuration for development</li>
+</ul>
+<h3 id="using-different-schemas">Using Different Schemas</h3>
+<pre><code class="language-bash"># Basic schema
+export YAML_PATH=&quot;config/core.memo.yaml&quot;
+
+# Enhanced development schema
+export YAML_PATH=&quot;config/software_dev.yaml&quot;
+
+# Test schema
+export YAML_PATH=&quot;config/core.test.yaml&quot;
+</code></pre>
+<h2 id="basic-operations">Basic Operations</h2>
+<h3 id="adding-memories">Adding Memories</h3>
+<pre><code class="language-python">from memg_core.api.public import add_memory
+
+# Add a simple note
+note_hrid = add_memory(
+    memory_type=&quot;note&quot;,
+    payload={
+        &quot;statement&quot;: &quot;Remember to update the API documentation&quot;,
+        &quot;project&quot;: &quot;docs-update&quot;
+    },
+    user_id=&quot;user123&quot;
+)
+print(f&quot;Created: {note_hrid}&quot;)  # Returns &quot;NOTE_AAA001&quot;
+
+# Add a document with more details
+doc_hrid = add_memory(
+    memory_type=&quot;document&quot;,
+    payload={
+        &quot;statement&quot;: &quot;API Authentication Guide&quot;,
+        &quot;details&quot;: &quot;Complete guide for implementing JWT authentication in our API&quot;,
+        &quot;project&quot;: &quot;backend-auth&quot;,
+        &quot;url&quot;: &quot;https://wiki.company.com/auth-guide&quot;
+    },
+    user_id=&quot;user123&quot;
+)
+
+# Add a task
+task_hrid = add_memory(
+    memory_type=&quot;task&quot;,
+    payload={
+        &quot;statement&quot;: &quot;Implement user registration endpoint&quot;,
+        &quot;assignee&quot;: &quot;john.doe&quot;,
+        &quot;priority&quot;: &quot;high&quot;,
+        &quot;status&quot;: &quot;in_progress&quot;,
+        &quot;project&quot;: &quot;backend-auth&quot;
+    },
+    user_id=&quot;user123&quot;
+)
+</code></pre>
+<h3 id="searching-memories">Searching Memories</h3>
+<pre><code class="language-python">from memg_core.api.public import search
+
+# Basic search
+results = search(
+    query=&quot;authentication API&quot;,
+    user_id=&quot;user123&quot;,
+    limit=10
+)
+
+for result in results:
+    memory = result.memory
+    print(f&quot;[{memory.memory_type}] {memory.hrid}: {memory.payload['statement']}&quot;)
+    print(f&quot;Score: {result.score:.3f}&quot;)
+    print(&quot;---&quot;)
+
+# Search with memory type filtering
+task_results = search(
+    query=&quot;registration&quot;,
+    user_id=&quot;user123&quot;,
+    memory_type=&quot;task&quot;,
+    limit=5
+)
+
+# Search with project filtering
+project_results = search(
+    query=&quot;backend authentication&quot;,
+    user_id=&quot;user123&quot;,
+    project=&quot;backend-auth&quot;,
+    limit=10
+)
+</code></pre>
+<h3 id="deleting-memories">Deleting Memories</h3>
+<pre><code class="language-python">from memg_core.api.public import delete_memory
+
+# Delete by HRID
+success = delete_memory(hrid=&quot;NOTE_AAA001&quot;, user_id=&quot;user123&quot;)
+print(f&quot;Deletion successful: {success}&quot;)
+
+# Delete by UUID (if you have it)
+success = delete_memory(memory_id=&quot;550e8400-e29b-41d4-a716-446655440000&quot;, user_id=&quot;user123&quot;)
+</code></pre>
+<h2 id="advanced-usage">Advanced Usage</h2>
+<h3 id="memory-types-and-schemas">Memory Types and Schemas</h3>
+<p>The available memory types depend on your YAML schema. Common types include:</p>
+<h4 id="basic-types-corememoyaml">Basic Types (core.memo.yaml)</h4>
+<ul>
+<li><strong>memo</strong>: Simple statements or observations</li>
+<li><strong>note</strong>: Notes with optional project association</li>
+<li><strong>document</strong>: Structured documents with details and optional URLs</li>
+<li><strong>task</strong>: Task items with assignee, priority, and status</li>
+</ul>
+<h4 id="enhanced-types-software_devyaml">Enhanced Types (software_dev.yaml)</h4>
+<ul>
+<li><strong>bug</strong>: Bug reports with severity, status, and reproduction steps</li>
+<li><strong>solution</strong>: Solutions with code snippets and test status</li>
+</ul>
+<h3 id="working-with-projects">Working with Projects</h3>
+<p>Use the <code>project</code> field to organize memories:</p>
+<pre><code class="language-python"># Add memories to a project
+add_memory(
+    memory_type=&quot;note&quot;,
+    payload={&quot;statement&quot;: &quot;Database migration notes&quot;, &quot;project&quot;: &quot;v2-migration&quot;},
+    user_id=&quot;user123&quot;
+)
+
+# Search within a project
+results = search(
+    query=&quot;migration&quot;,
+    user_id=&quot;user123&quot;,
+    project=&quot;v2-migration&quot;
+)
+</code></pre>
+<h3 id="embedding-configuration">Embedding Configuration</h3>
+<p>memg-core uses FastEmbed for local, offline embeddings:</p>
+<pre><code class="language-python"># Default model (recommended)
+export EMBEDDER_MODEL=&quot;Snowflake/snowflake-arctic-embed-xs&quot;
+
+# Alternative models
+export EMBEDDER_MODEL=&quot;intfloat/e5-small&quot;
+export EMBEDDER_MODEL=&quot;BAAI/bge-small-en-v1.5&quot;
+</code></pre>
+<h3 id="user-isolation">User Isolation</h3>
+<p>All operations are user-scoped. Each user has their own:
+- Memory namespace
+- HRID sequences (NOTE_AAA001, NOTE_BBB001, etc.)
+- Search results</p>
+<pre><code class="language-python"># User A's memories
+add_memory(memory_type=&quot;note&quot;, payload={&quot;statement&quot;: &quot;User A note&quot;}, user_id=&quot;userA&quot;)
+
+# User B's memories (completely isolated)
+add_memory(memory_type=&quot;note&quot;, payload={&quot;statement&quot;: &quot;User B note&quot;}, user_id=&quot;userB&quot;)
+
+# Search only returns memories for the specified user
+results_a = search(query=&quot;note&quot;, user_id=&quot;userA&quot;)  # Only User A's memories
+results_b = search(query=&quot;note&quot;, user_id=&quot;userB&quot;)  # Only User B's memories
+</code></pre>
+<h2 id="error-handling">Error Handling</h2>
+<pre><code class="language-python">from memg_core.core.exceptions import MemgCoreError
+
+try:
+    result = add_memory(
+        memory_type=&quot;invalid_type&quot;,
+        payload={&quot;statement&quot;: &quot;This will fail&quot;},
+        user_id=&quot;user123&quot;
+    )
+except MemgCoreError as e:
+    print(f&quot;Error: {e}&quot;)
+</code></pre>
+<h2 id="performance-tips">Performance Tips</h2>
+<ol>
+<li><strong>Batch Operations</strong>: For multiple memories, consider batching your operations</li>
+<li><strong>Appropriate Limits</strong>: Use reasonable search limits (5-50 results typically)</li>
+<li><strong>Memory Types</strong>: Use specific memory type filters when possible</li>
+<li><strong>Project Filtering</strong>: Leverage project-based filtering for better performance</li>
+</ol>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="common-issues">Common Issues</h3>
+<ol>
+<li><strong>Storage Path Errors</strong>: Ensure storage directories exist and are writable</li>
+<li><strong>YAML Schema Errors</strong>: Validate your YAML schema file exists and is valid</li>
+<li><strong>Memory Type Errors</strong>: Ensure memory types match your YAML schema</li>
+<li><strong>User Isolation</strong>: Remember that all operations are user-scoped</li>
+</ol>
+<h3 id="debug-mode">Debug Mode</h3>
+<p>Enable debug logging:</p>
+<pre><code class="language-python">import logging
+logging.basicConfig(level=logging.DEBUG)
+</code></pre>
+<h3 id="checking-configuration">Checking Configuration</h3>
+<pre><code class="language-python">from memg_core.core.config import get_config
+
+config = get_config()
+print(f&quot;YAML Path: {config.yaml_path}&quot;)
+print(f&quot;Qdrant Path: {config.qdrant_storage_path}&quot;)
+print(f&quot;Kuzu Path: {config.kuzu_db_path}&quot;)
+</code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tabs", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+    
+  </body>
+</html>
