@@ -16,7 +16,7 @@ COPY requirements_mcp.txt /app/requirements_mcp.txt
 RUN pip install --no-cache-dir -r requirements_mcp.txt
 
 # Create directories for persistent storage
-RUN mkdir -p /app/tmp/qdrant /app/tmp/kuzu
+RUN mkdir -p /qdrant /kuzu /app/config
 
 # Copy MCP server files from current directory
 COPY mcp_server.py /app/
@@ -24,7 +24,7 @@ COPY software_dev.yaml /app/
 COPY .env /app/
 
 # Set proper ownership for non-root user
-RUN chown -R memg:memg /app
+RUN chown -R memg:memg /app /qdrant /kuzu
 
 # Keep curl for health checks, but clean up other packages
 RUN apt-get autoremove -y && apt-get clean

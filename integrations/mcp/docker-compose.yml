@@ -8,12 +8,19 @@ services:
     container_name: memg-mcp-server-${MEMORY_SYSTEM_MCP_PORT:-8888}
     ports:
       - "${MEMORY_SYSTEM_MCP_PORT:-8888}:${MEMORY_SYSTEM_MCP_PORT:-8888}"
+    # Persistent storage with safe mounting
+    volumes:
+      - ${BASE_MEMORY_PATH:-./memg_data}_${MEMORY_SYSTEM_MCP_PORT:-8888}/qdrant:/qdrant
+      - ${BASE_MEMORY_PATH:-./memg_data}_${MEMORY_SYSTEM_MCP_PORT:-8888}/kuzu:/kuzu
     env_file:
       - .env
     environment:
       MEMORY_SYSTEM_MCP_PORT: ${MEMORY_SYSTEM_MCP_PORT:-8888}
       MEMORY_SYSTEM_MCP_HOST: "0.0.0.0"  # Docker container binding
       MEMG_YAML_SCHEMA: ${MEMG_YAML_SCHEMA:-software_dev.yaml}
+      # Database paths for persistent storage
+      QDRANT_STORAGE_PATH: /qdrant
+      KUZU_DB_PATH: /kuzu/memg
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${MEMORY_SYSTEM_MCP_PORT:-8888}/health"]

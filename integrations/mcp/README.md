@@ -69,6 +69,9 @@ integrations/mcp/
 - `MEMORY_SYSTEM_MCP_PORT`: Server port (default: 8888)
 - `MEMORY_SYSTEM_MCP_HOST`: Server host (default: 0.0.0.0)
 - `MEMG_YAML_SCHEMA`: Schema file (default: software_dev.yaml)
+- `BASE_MEMORY_PATH`: Base path for persistent storage (default: $HOME/.local/share/memg_mcp)
+- `QDRANT_STORAGE_PATH`: Internal Qdrant storage path (set by Docker)
+- `KUZU_DB_PATH`: Internal Kuzu database path (set by Docker)
 
 ### Schema Configuration
 The `software_dev.yaml` file defines:
@@ -127,12 +130,24 @@ The server has been comprehensively tested:
 - **Non-root Container**: Runs as dedicated `memg` user
 - **Resource Limits**: Proper memory and CPU management
 
+## 💾 Data Persistence
+
+### Mounted Volumes (Default)
+Data is now persisted using Docker volumes:
+- **Qdrant data**: `$HOME/.local/share/memg_mcp_8888/qdrant`
+- **Kuzu data**: `$HOME/.local/share/memg_mcp_8888/kuzu`
+- **Port-specific**: Each port gets its own data directory
+
+### Internal Storage (Fallback)
+If volume mounting fails, data stays inside container (non-persistent).
+
 ## 📊 Performance
 
 - **Startup**: Fast initialization with embedding pre-loading
 - **Search**: Sub-second semantic search with relevance scoring
 - **Relationships**: Efficient graph traversal with configurable depth
 - **Memory**: Clean HRID generation and proper user scoping
+- **Persistence**: Data survives container restarts and rebuilds
 
 ## 🚨 Troubleshooting
 

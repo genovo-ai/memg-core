@@ -38,8 +38,40 @@ def initialize_client() -> None:
         return
 
     logger.info("🔧 Initializing MemgClient during startup...")
-    yaml_path = os.getenv("MEMG_YAML_PATH", "software_dev.yaml")
-    db_path = os.getenv("MEMG_DB_PATH", "tmp")
+    yaml_path = os.getenv("MEMG_YAML_SCHEMA", "software_dev.yaml")
+
+    # Check if we have mounted volumes configured
+    qdrant_path = os.getenv("QDRANT_STORAGE_PATH")
+    kuzu_path = os.getenv("KUZU_DB_PATH")
+
+    if qdrant_path and kuzu_path:
+        # Using mounted volumes - create a temporary structure that memg-core expects
+        # memg-core expects db_path/qdrant and db_path/kuzu structure
+        db_path = "/app/data"  # Use a consistent path
+        os.makedirs(f"{db_path}/qdrant", exist_ok=True)
+        os.makedirs(f"{db_path}/kuzu", exist_ok=True)
+
+        # Create symlinks to the mounted volumes
+        qdrant_link = f"{db_path}/qdrant"
+        kuzu_link = f"{db_path}/kuzu"
+
+        # Remove existing directories and create symlinks
+        if os.path.exists(qdrant_link) and not os.path.islink(qdrant_link):
+            os.rmdir(qdrant_link)
+        if not os.path.exists(qdrant_link):
+            os.symlink(qdrant_path, qdrant_link)
+
+        if os.path.exists(kuzu_link) and not os.path.islink(kuzu_link):
+            os.rmdir(kuzu_link)
+        if not os.path.exists(kuzu_link):
+            os.symlink(os.path.dirname(kuzu_path), kuzu_link)  # kuzu_path includes db name
+
+        logger.info(f"🔧 Using mounted volumes via symlinks - qdrant: {qdrant_path} -> {qdrant_link}, kuzu: {kuzu_path} -> {kuzu_link}")
+    else:
+        # Fallback to tmp directory for non-mounted usage
+        db_path = "tmp"
+        logger.info(f"🔧 Using internal storage: {db_path}")
+
     logger.info(f"🔧 Using yaml_path={yaml_path}, db_path={db_path}")
 
     try:
@@ -359,8 +391,9 @@ def create_app() -> FastMCP:
             "service": "MEMG Core MCP Server",
             "version": __version__,
             "memg_client": client_status,
-            "database_path": os.getenv("MEMG_DB_PATH", "tmp"),
-            "yaml_schema": os.getenv("MEMG_YAML_PATH", "software_dev.yaml")
+            "database_path": os.getenv("QDRANT_STORAGE_PATH", "tmp") if os.getenv("QDRANT_STORAGE_PATH") else "tmp",
+            "yaml_schema": os.getenv("MEMG_YAML_SCHEMA", "software_dev.yaml"),
+            "storage_type": "mounted_volumes" if os.getenv("QDRANT_STORAGE_PATH") else "internal"
         }
 
     return app
