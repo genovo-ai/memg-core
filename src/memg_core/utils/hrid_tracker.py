@@ -1,4 +1,4 @@
-"""HRID Tracker: UUID ↔ HRID translation and lifecycle management
+"""HRID Tracker: UUID ↔ HRID translation and lifecycle management.
 
 Handles all HRID mapping operations using the existing KuzuInterface.
 Provides transparent translation between user-facing HRIDs and internal UUIDs.
@@ -13,28 +13,32 @@ from ..core.interfaces.kuzu import KuzuInterface
 
 
 class HridTracker:
-    """Manages HRID ↔ UUID mappings using KuzuInterface"""
+    """Manages HRID ↔ UUID mappings using KuzuInterface.
+
+    Attributes:
+        kuzu: Pre-configured Kuzu interface for database operations.
+    """
 
     def __init__(self, kuzu_interface: KuzuInterface):
-        """Initialize with existing KuzuInterface
+        """Initialize with existing KuzuInterface.
 
         Args:
-            kuzu_interface: Pre-configured Kuzu interface for database operations
+            kuzu_interface: Pre-configured Kuzu interface for database operations.
         """
         self.kuzu = kuzu_interface
 
     def get_uuid(self, hrid: str, user_id: str) -> str:
-        """Translate HRID to UUID
+        """Translate HRID to UUID.
 
         Args:
-            hrid: Human-readable ID (e.g., 'TASK_AAA001')
-            user_id: User ID for scoped lookup
+            hrid: Human-readable ID (e.g., 'TASK_AAA001').
+            user_id: User ID for scoped lookup.
 
         Returns:
-            UUID string for internal operations
+            str: UUID string for internal operations.
 
         Raises:
-            DatabaseError: If HRID not found or is deleted
+            DatabaseError: If HRID not found or is deleted.
         """
         try:
             query = """
@@ -64,17 +68,17 @@ class HridTracker:
             )
 
     def get_hrid(self, uuid: str, user_id: str) -> str:
-        """Translate UUID to HRID with user verification
+        """Translate UUID to HRID with user verification.
 
         Args:
-            uuid: Internal UUID
-            user_id: User ID for ownership verification
+            uuid: Internal UUID.
+            user_id: User ID for ownership verification.
 
         Returns:
-            Human-readable ID string
+            str: Human-readable ID string.
 
         Raises:
-            DatabaseError: If UUID not found, deleted, or doesn't belong to user
+            DatabaseError: If UUID not found, deleted, or doesn't belong to user.
         """
         try:
             query = """
@@ -104,16 +108,16 @@ class HridTracker:
             )
 
     def create_mapping(self, hrid: str, uuid: str, memory_type: str, user_id: str) -> None:
-        """Create new HRID ↔ UUID mapping
+        """Create new HRID ↔ UUID mapping.
 
         Args:
-            hrid: Human-readable ID
-            uuid: Internal UUID
-            memory_type: Entity type (e.g., 'task', 'note')
-            user_id: User ID for scoped mapping
+            hrid: Human-readable ID.
+            uuid: Internal UUID.
+            memory_type: Entity type (e.g., 'task', 'note').
+            user_id: User ID for scoped mapping.
 
         Raises:
-            DatabaseError: If mapping creation fails
+            DatabaseError: If mapping creation fails.
         """
         try:
             now = datetime.now(UTC).isoformat()
@@ -176,14 +180,14 @@ class HridTracker:
             )
 
     def get_highest_hrid(self, memory_type: str, user_id: str) -> tuple[str, int, int] | None:
-        """Get highest HRID for a memory type (for generation)
+        """Get highest HRID for a memory type (for generation).
 
         Args:
-            memory_type: Entity type to check (case insensitive)
-            user_id: User ID for scoped HRID lookup
+            memory_type: Entity type to check (case insensitive).
+            user_id: User ID for scoped HRID lookup.
 
         Returns:
-            Tuple of (hrid, alpha_idx, num) or None if no HRIDs exist for this user
+            tuple[str, int, int] | None: (hrid, alpha_idx, num) or None if no HRIDs exist.
         """
         try:
             # Normalize to lowercase for database query (YAML types are lowercase)
@@ -238,13 +242,13 @@ class HridTracker:
             )
 
     def exists(self, hrid: str) -> bool:
-        """Check if HRID exists (active, not deleted)
+        """Check if HRID exists (active, not deleted).
 
         Args:
-            hrid: Human-readable ID to check
+            hrid: Human-readable ID to check.
 
         Returns:
-            True if HRID exists and is active
+            bool: True if HRID exists and is active.
         """
         try:
             query = """

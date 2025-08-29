@@ -1,5 +1,11 @@
 # 💾 memg-core
 
+[![PyPI](https://img.shields.io/pypi/v/memg-core.svg)](https://pypi.org/project/memg-core/)
+[![Python Version](https://img.shields.io/pypi/pyversions/memg-core.svg)](https://pypi.org/project/memg-core/)
+[![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://genovo-ai.github.io/memg-core/)
+[![License](https://img.shields.io/github/license/genovo-ai/memg-core.svg)](https://github.com/genovo-ai/memg-core/blob/main/LICENSE)
+[![Tests](https://github.com/genovo-ai/memg-core/workflows/tests/badge.svg)](https://github.com/genovo-ai/memg-core/actions)
+
 **The foundation of structured memory for AI agents.**
 
 memg-core is the deterministic, schema-driven memory engine at the heart of the larger MEMG system. It gives AI developers a fast, reliable, testable memory layer powered by:
@@ -180,9 +186,10 @@ memg-core provides a deterministic, YAML-driven memory layer with dual storage:
 
 ## Links
 
-- [Repository](https://github.com/genovo-ai/memg-core)
-- [Issues](https://github.com/genovo-ai/memg-core/issues)
-- [Documentation](https://github.com/genovo-ai/memg-core#readme)
+- [📚 Documentation](https://genovo-ai.github.io/memg-core/)
+- [📦 PyPI Package](https://pypi.org/project/memg-core/)
+- [🐙 Repository](https://github.com/genovo-ai/memg-core)
+- [🐛 Issues](https://github.com/genovo-ai/memg-core/issues)
 
 ## License
 

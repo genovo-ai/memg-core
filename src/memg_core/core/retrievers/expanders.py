@@ -20,7 +20,14 @@ from . import (
 
 
 def _is_uuid_format(value: str) -> bool:
-    """Check if a string matches UUID format (8-4-4-4-12 hex digits)."""
+    """Check if a string matches UUID format (8-4-4-4-12 hex digits).
+
+    Args:
+        value: String to check.
+
+    Returns:
+        bool: True if string matches UUID format.
+    """
     uuid_pattern = re.compile(
         r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
     )
@@ -44,6 +51,18 @@ def _find_semantic_expansion(
     3. Search Qdrant for similar memories in target_types
     4. Apply threshold and limit filters
     5. Return as see_also_<type> results
+
+    Args:
+        seeds: Initial seed results from vector search.
+        qdrant: Qdrant interface instance.
+        embedder: Embedder instance.
+        user_id: User ID for filtering.
+        projection: Optional field projection.
+        hrid_tracker: Optional HRID tracker.
+        yaml_translator: Optional YAML translator.
+
+    Returns:
+        list[SearchResult]: List of semantically related results.
     """
     see_also_results: list[SearchResult] = []
 
@@ -149,15 +168,18 @@ def _append_neighbors(
     """Expand neighbors from Kuzu graph with progressive score decay.
 
     Args:
-        seeds: Initial seed results from vector search
-        kuzu: Kuzu graph interface
-        user_id: User ID for isolation
-        relation_names: Specific relation types to expand (None = all relations)
-        neighbor_limit: Max neighbors per seed
-        hops: Number of hops to expand (progressive score decay)
+        seeds: Initial seed results from vector search.
+        kuzu: Kuzu graph interface.
+        user_id: User ID for isolation.
+        relation_names: Specific relation types to expand (None = all relations).
+        neighbor_limit: Max neighbors per seed.
+        hops: Number of hops to expand (progressive score decay).
+        projection: Optional field projection.
+        hrid_tracker: Optional HRID tracker.
+        yaml_translator: Optional YAML translator.
 
     Returns:
-        Combined list of seeds + neighbors with anchor-only payloads for neighbors
+        list[SearchResult]: Combined list of seeds + neighbors with anchor-only payloads for neighbors.
     """
     all_results: list[SearchResult] = list(seeds)  # Start with seeds
 

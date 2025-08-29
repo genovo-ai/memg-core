@@ -1,4 +1,4 @@
-"""Pure CRUD Kuzu interface wrapper - NO DDL operations"""
+"""Pure CRUD Kuzu interface wrapper - NO DDL operations."""
 
 from typing import Any
 
@@ -8,18 +8,30 @@ from ..exceptions import DatabaseError
 
 
 class KuzuInterface:
-    """Pure CRUD wrapper around Kuzu database - NO DDL operations"""
+    """Pure CRUD wrapper around Kuzu database - NO DDL operations.
+
+    Attributes:
+        conn: Pre-initialized Kuzu connection.
+    """
 
     def __init__(self, connection: kuzu.Connection):
         """Initialize with pre-created connection.
 
         Args:
-            connection: Pre-initialized Kuzu connection from DatabaseClients
+            connection: Pre-initialized Kuzu connection from DatabaseClients.
         """
         self.conn = connection
 
     def add_node(self, table: str, properties: dict[str, Any]) -> None:
-        """Add a node to the graph - pure CRUD operation"""
+        """Add a node to the graph - pure CRUD operation.
+
+        Args:
+            table: Node table name.
+            properties: Node properties.
+
+        Raises:
+            DatabaseError: If node creation fails.
+        """
         try:
             props = ", ".join([f"{k}: ${k}" for k in properties])
             query = f"CREATE (:{table} {{{props}}})"
@@ -42,7 +54,20 @@ class KuzuInterface:
         user_id: str,
         props: dict[str, Any] | None = None,
     ) -> None:
-        """Add relationship between nodes"""
+        """Add relationship between nodes.
+
+        Args:
+            from_table: Source node table name.
+            to_table: Target node table name.
+            rel_type: Relationship type.
+            from_id: Source node ID.
+            to_id: Target node ID.
+            user_id: User ID for ownership verification.
+            props: Optional relationship properties.
+
+        Raises:
+            DatabaseError: If relationship creation fails.
+        """
         try:
             props = props or {}
 
@@ -113,7 +138,18 @@ class KuzuInterface:
         return results
 
     def query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-        """Execute Cypher query and return results"""
+        """Execute Cypher query and return results.
+
+        Args:
+            cypher: Cypher query string.
+            params: Query parameters.
+
+        Returns:
+            list[dict[str, Any]]: Query results.
+
+        Raises:
+            DatabaseError: If query execution fails.
+        """
         try:
             qr = self.conn.execute(cypher, parameters=params or {})
             return self._extract_query_results(qr)
@@ -135,19 +171,23 @@ class KuzuInterface:
         limit: int = 10,
         neighbor_label: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Fetch neighbors of a node by UUID only
+        """Fetch neighbors of a node by UUID only.
 
         Args:
-            node_label: Node type/table name (e.g., "Memory", "bug") - NOT a UUID
-            node_uuid: UUID of the specific node to find neighbors for
-            user_id: User ID for isolation - only return neighbors belonging to this user
-            rel_types: List of relationship types to filter by
-            direction: "in", "out", or "any" for relationship direction
-            limit: Maximum number of neighbors to return
-            neighbor_label: Type of neighbor nodes to return
+            node_label: Node type/table name (e.g., "Memory", "bug") - NOT a UUID.
+            node_uuid: UUID of the specific node to find neighbors for.
+            user_id: User ID for isolation - only return neighbors belonging to this user.
+            rel_types: List of relationship types to filter by.
+            direction: "in", "out", or "any" for relationship direction.
+            limit: Maximum number of neighbors to return.
+            neighbor_label: Type of neighbor nodes to return.
+
+        Returns:
+            list[dict[str, Any]]: List of neighbor nodes with relationship info.
 
         Raises:
-            ValueError: If node_label is a UUID or node_uuid is not a UUID
+            ValueError: If node_label is a UUID or node_uuid is not a UUID.
+            DatabaseError: If neighbor query fails.
         """
         # Validate parameters to prevent common bugs
         if self._is_uuid(node_label):

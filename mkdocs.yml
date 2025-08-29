@@ -1,0 +1,29 @@
+site_name: memg-core
+site_description: Memory Graph Core — AI memory + GraphRAG engine
+site_url: https://genovo-ai.github.io/memg-core
+repo_url: https://github.com/genovo-ai/memg-core
+repo_name: genovo-ai/memg-core
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - content.code.copy
+    - content.tabs.link
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+
+nav:
+  - Home: index.md
+  - Usage: usage.md
+  - API Reference:
+      - API: reference/api.md
+  - Changelog: changelog.md

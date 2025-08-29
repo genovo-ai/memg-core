@@ -1,4 +1,4 @@
-"""Pure CRUD Qdrant interface wrapper - NO DDL operations"""
+"""Pure CRUD Qdrant interface wrapper - NO DDL operations."""
 
 from typing import Any
 import uuid
@@ -18,14 +18,19 @@ from ..exceptions import DatabaseError
 
 
 class QdrantInterface:
-    """Pure CRUD wrapper around QdrantClient - NO DDL operations"""
+    """Pure CRUD wrapper around QdrantClient - NO DDL operations.
+
+    Attributes:
+        client: Pre-initialized QdrantClient.
+        collection_name: Name of the Qdrant collection.
+    """
 
     def __init__(self, client: QdrantClient, collection_name: str):
         """Initialize with pre-created client and collection.
 
         Args:
-            client: Pre-initialized QdrantClient from DatabaseClients
-            collection_name: Name of pre-created collection
+            client: Pre-initialized QdrantClient from DatabaseClients.
+            collection_name: Name of pre-created collection.
         """
         self.client = client
         self.collection_name = collection_name
@@ -37,7 +42,20 @@ class QdrantInterface:
         point_id: str | None = None,
         collection: str | None = None,
     ) -> tuple[bool, str]:
-        """Add a single point to collection - pure CRUD operation"""
+        """Add a single point to collection - pure CRUD operation.
+
+        Args:
+            vector: Embedding vector.
+            payload: Point payload data.
+            point_id: Optional point ID (auto-generated if None).
+            collection: Optional collection name override.
+
+        Returns:
+            tuple[bool, str]: (success, point_id) where success indicates if operation succeeded.
+
+        Raises:
+            DatabaseError: If point addition fails.
+        """
         try:
             collection = collection or self.collection_name
 
@@ -76,7 +94,20 @@ class QdrantInterface:
         collection: str | None = None,
         filters: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """Search for similar points with mandatory user isolation - pure CRUD operation"""
+        """Search for similar points with mandatory user isolation - pure CRUD operation.
+
+        Args:
+            vector: Query embedding vector.
+            limit: Maximum number of results.
+            collection: Optional collection name override.
+            filters: Search filters (must include user_id for security).
+
+        Returns:
+            list[dict[str, Any]]: List of search results with id, score, and payload.
+
+        Raises:
+            DatabaseError: If search fails or user_id is missing from filters.
+        """
         try:
             # CRITICAL SECURITY: Validate user_id is present in filters
             if not filters or "user_id" not in filters:

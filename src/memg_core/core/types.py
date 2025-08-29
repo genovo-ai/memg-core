@@ -1,5 +1,4 @@
-"""
-Centralized type registry for MEMG Core.
+"""Centralized type registry for MEMG Core.
 
 SINGLE SOURCE OF TRUTH for all YAML-derived types.
 One YAML orchestrates everything - this module enforces that principle.
@@ -13,11 +12,18 @@ import yaml
 
 
 class TypeRegistry:
-    """
-    Singleton registry for all YAML-derived types.
+    """Singleton registry for all YAML-derived types.
 
     CRITICAL: Initialize once from YAML, use everywhere.
     NO defaults, NO fallbacks - crash early if YAML incomplete.
+
+    Attributes:
+        _instance: Singleton instance.
+        _initialized: Whether registry has been initialized.
+        _entity_types: EntityType enum.
+        _relation_predicates: RelationPredicate enum.
+        _pydantic_models: Dictionary of Pydantic models.
+        _yaml_schema: Raw YAML schema.
     """
 
     _instance: Optional["TypeRegistry"] = None
@@ -31,18 +37,34 @@ class TypeRegistry:
 
     @classmethod
     def get_instance(cls) -> "TypeRegistry":
-        """Get singleton instance - crashes if not initialized."""
+        """Get singleton instance - crashes if not initialized.
+
+        Returns:
+            TypeRegistry: Singleton instance.
+
+        Raises:
+            RuntimeError: If instance not created.
+        """
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
     @classmethod
     def initialize_from_yaml(cls, yaml_path: str) -> "TypeRegistry":
-        """
-        One-time initialization from YAML.
+        """One-time initialization from YAML.
 
         CRASHES IMMEDIATELY if YAML is incomplete or missing required fields.
         This is INTENTIONAL - no defaults, no fallbacks.
+
+        Args:
+            yaml_path: Path to YAML schema file.
+
+        Returns:
+            TypeRegistry: Initialized singleton instance.
+
+        Raises:
+            RuntimeError: If YAML loading fails.
+            ValueError: If YAML structure is invalid.
         """
         instance = cls.get_instance()
 
@@ -244,7 +266,14 @@ class TypeRegistry:
     # Public accessors - crash if not initialized
 
     def get_entity_type_enum(self) -> type[Enum]:
-        """Get EntityType enum - crashes if not initialized."""
+        """Get EntityType enum - crashes if not initialized.
+
+        Returns:
+            type[Enum]: EntityType enum class.
+
+        Raises:
+            RuntimeError: If TypeRegistry not initialized.
+        """
         if self._entity_types is None:
             raise RuntimeError("TypeRegistry not initialized - call initialize_from_yaml() first")
         return self._entity_types
@@ -256,7 +285,17 @@ class TypeRegistry:
         return self._relation_predicates
 
     def get_entity_model(self, entity_name: str) -> type[BaseModel]:
-        """Get Pydantic model for entity - crashes if not found."""
+        """Get Pydantic model for entity - crashes if not found.
+
+        Args:
+            entity_name: Name of the entity.
+
+        Returns:
+            type[BaseModel]: Pydantic model class.
+
+        Raises:
+            ValueError: If entity model not found.
+        """
         if entity_name not in self._pydantic_models:
             raise ValueError(f"No Pydantic model found for entity: {entity_name}")
         return self._pydantic_models[entity_name]
@@ -274,12 +313,26 @@ class TypeRegistry:
         return [p.value for p in self._relation_predicates]
 
     def validate_entity_type(self, entity_type: str) -> bool:
-        """Validate entity type against YAML schema."""
+        """Validate entity type against YAML schema.
+
+        Args:
+            entity_type: Entity type to validate.
+
+        Returns:
+            bool: True if entity type is valid.
+        """
         valid_names = self.get_valid_entity_names()
         return entity_type in valid_names
 
     def validate_relation_predicate(self, predicate: str) -> bool:
-        """Validate relation predicate against YAML schema."""
+        """Validate relation predicate against YAML schema.
+
+        Args:
+            predicate: Relation predicate to validate.
+
+        Returns:
+            bool: True if predicate is valid.
+        """
         valid_predicates = self.get_valid_predicates()
         return predicate in valid_predicates
 
@@ -288,30 +341,63 @@ class TypeRegistry:
 
 
 def get_entity_type_enum() -> type[Enum]:
-    """Get EntityType enum from global registry."""
+    """Get EntityType enum from global registry.
+
+    Returns:
+        type[Enum]: EntityType enum class.
+    """
     return TypeRegistry.get_instance().get_entity_type_enum()
 
 
 def get_relation_predicate_enum() -> type[Enum]:
-    """Get RelationPredicate enum from global registry."""
+    """Get RelationPredicate enum from global registry.
+
+    Returns:
+        type[Enum]: RelationPredicate enum class.
+    """
     return TypeRegistry.get_instance().get_relation_predicate_enum()
 
 
 def get_entity_model(entity_name: str) -> type[BaseModel]:
-    """Get Pydantic model for entity from global registry."""
+    """Get Pydantic model for entity from global registry.
+
+    Args:
+        entity_name: Name of the entity.
+
+    Returns:
+        type[BaseModel]: Pydantic model class.
+    """
     return TypeRegistry.get_instance().get_entity_model(entity_name)
 
 
 def validate_entity_type(entity_type: str) -> bool:
-    """Validate entity type against global registry."""
+    """Validate entity type against global registry.
+
+    Args:
+        entity_type: Entity type to validate.
+
+    Returns:
+        bool: True if entity type is valid.
+    """
     return TypeRegistry.get_instance().validate_entity_type(entity_type)
 
 
 def validate_relation_predicate(predicate: str) -> bool:
-    """Validate relation predicate against global registry."""
+    """Validate relation predicate against global registry.
+
+    Args:
+        predicate: Relation predicate to validate.
+
+    Returns:
+        bool: True if predicate is valid.
+    """
     return TypeRegistry.get_instance().validate_relation_predicate(predicate)
 
 
 def initialize_types_from_yaml(yaml_path: str) -> None:
-    """Initialize global type registry from YAML - call once at startup."""
+    """Initialize global type registry from YAML - call once at startup.
+
+    Args:
+        yaml_path: Path to YAML schema file.
+    """
     TypeRegistry.initialize_from_yaml(yaml_path)

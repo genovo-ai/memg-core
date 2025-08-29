@@ -1,3 +1,5 @@
+"""Memory parsing and projection utilities."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -20,13 +22,14 @@ def _project_payload(
     """Project payload based on include_details setting and optional projection.
 
     Args:
-        memory_type: Entity type for YAML anchor field lookup
-        payload: Original payload dict
-        include_details: "none" (anchor only) or "self" (full payload)
-        projection: Optional per-type field allowlist
+        memory_type: Entity type for YAML anchor field lookup.
+        payload: Original payload dict.
+        include_details: "none" (anchor only) or "self" (full payload).
+        projection: Optional per-type field allowlist.
+        yaml_translator: YAML translator instance.
 
     Returns:
-        Projected payload dict with anchor field always included
+        dict[str, Any]: Projected payload dict with anchor field always included.
     """
     if not payload:
         return {}
@@ -56,7 +59,13 @@ def _project_payload(
 def _dedupe_and_sort(results: list[SearchResult]) -> list[SearchResult]:
     """Merge results by ID, keep highest score, then sort deterministically.
 
-    Sort order: score DESC, then hrid index ASC, then id ASC
+    Sort order: score DESC, then hrid index ASC, then id ASC.
+
+    Args:
+        results: List of search results to deduplicate and sort.
+
+    Returns:
+        list[SearchResult]: Deduplicated and sorted results.
     """
     # Dedupe by memory ID, keeping highest score
     by_id: dict[str, SearchResult] = {}
@@ -72,7 +81,14 @@ def _dedupe_and_sort(results: list[SearchResult]) -> list[SearchResult]:
 
 
 def _sort_key(result: SearchResult) -> tuple:
-    """Stable ordering: score DESC, then hrid index ASC, then id ASC."""
+    """Stable ordering: score DESC, then hrid index ASC, then id ASC.
+
+    Args:
+        result: Search result to generate sort key for.
+
+    Returns:
+        tuple: Sort key components.
+    """
     memory = result.memory
     hrid = getattr(memory, "hrid", None) or "ZZZ_ZZZ999"
 
@@ -94,7 +110,17 @@ def _sort_key(result: SearchResult) -> tuple:
 
 
 def _parse_datetime(date_str: str) -> datetime:
-    """Parse datetime string - crash if invalid."""
+    """Parse datetime string - crash if invalid.
+
+    Args:
+        date_str: ISO format datetime string.
+
+    Returns:
+        datetime: Parsed datetime object.
+
+    Raises:
+        ValueError: If datetime string is invalid.
+    """
     return datetime.fromisoformat(date_str)
 
 
@@ -113,16 +139,16 @@ def translate_hrid(uuid: str, user_id: str, hrid_tracker) -> str:
     """Translate UUID to HRID using tracker, with fallback to UUID.
 
     Args:
-        uuid: Internal UUID to translate
-        user_id: User ID for ownership verification
-        hrid_tracker: HridTracker instance (can be None)
+        uuid: Internal UUID to translate.
+        user_id: User ID for ownership verification.
+        hrid_tracker: HridTracker instance (can be None).
 
     Returns:
-        HRID if tracker available and translation succeeds, UUID otherwise
+        str: HRID if tracker available and translation succeeds, UUID otherwise.
 
     Note:
         This centralizes the HRID translation logic that was duplicated
-        across retrieval.py and expanders.py
+        across retrieval.py and expanders.py.
     """
     if not hrid_tracker:
         return uuid
@@ -141,12 +167,12 @@ def build_memory_from_flat_payload(
     """Build Memory object from flat Qdrant payload.
 
     Args:
-        point_id: Point ID from Qdrant (UUID)
-        payload: Flat payload from Qdrant
-        hrid_tracker: Optional HridTracker for UUID→HRID translation
+        point_id: Point ID from Qdrant (UUID).
+        payload: Flat payload from Qdrant.
+        hrid_tracker: Optional HridTracker for UUID→HRID translation.
 
     Returns:
-        Memory object with proper field separation
+        Memory: Memory object with proper field separation.
     """
     # Get HRID from tracker if available (extract user_id from payload)
     user_id = payload.get("user_id", "")
@@ -175,14 +201,14 @@ def build_memory_from_kuzu_row(row: dict[str, Any], hrid_tracker=None) -> Memory
     """Build Memory object from Kuzu row data.
 
     Args:
-        row: Row data from Kuzu query result
-        hrid_tracker: Optional HridTracker for UUID→HRID translation
+        row: Row data from Kuzu query result.
+        hrid_tracker: Optional HridTracker for UUID→HRID translation.
 
     Returns:
-        Memory object with proper field separation
+        Memory: Memory object with proper field separation.
 
     Note:
-        This handles the complex Kuzu row format that can have nested node objects
+        This handles the complex Kuzu row format that can have nested node objects.
     """
     # Extract neighbor memory from row - handle both formats
     neighbor_id = row["id"]

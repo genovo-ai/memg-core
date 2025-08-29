@@ -1,3 +1,5 @@
+"""Core models for the memory system."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -10,7 +12,18 @@ _MAX_SCORE_TOLERANCE = 1.001
 
 
 class Memory(BaseModel):
-    """Core memory model with YAML-driven payload validation."""
+    """Core memory model with YAML-driven payload validation.
+
+    Attributes:
+        id: Unique identifier (UUID or HRID).
+        user_id: Owner of the memory.
+        memory_type: Entity type from YAML schema.
+        payload: Entity-specific fields.
+        vector: Embedding vector.
+        created_at: Creation timestamp.
+        updated_at: Last update timestamp.
+        hrid: Human-readable identifier.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -30,6 +43,17 @@ class Memory(BaseModel):
     @field_validator("memory_type")
     @classmethod
     def memory_type_not_empty(cls, v: str) -> str:
+        """Validate that memory_type is not empty.
+
+        Args:
+            v: Memory type value.
+
+        Returns:
+            str: Stripped memory type.
+
+        Raises:
+            ValueError: If memory_type is empty or whitespace.
+        """
         if not v or not v.strip():
             raise ValueError("memory_type cannot be empty")
         return v.strip()
@@ -41,6 +65,9 @@ class Memory(BaseModel):
 
         This method is deprecated and will be removed in a future version.
         The current implementation uses flat payload structure directly in MemoryStore.
+
+        Returns:
+            dict[str, Any]: Deprecated payload structure.
         """
         import warnings
 
@@ -67,9 +94,12 @@ class Memory(BaseModel):
         return {"core": core, "entity": entity}
 
     def to_kuzu_node(self) -> dict[str, Any]:
-        """
-        Exports a minimal node for Kuzu, containing only core fields.
+        """Export a minimal node for Kuzu, containing only core fields.
+
         NO hardcoded fields - only system fields stored in graph.
+
+        Returns:
+            dict[str, Any]: Node data for Kuzu storage.
         """
         node = {
             "id": self.id,
@@ -90,6 +120,15 @@ class Memory(BaseModel):
         No fallback logic, no backward compatibility. If the field is not
         in the payload dictionary, raises AttributeError immediately.
         This enforces strict YAML schema compliance.
+
+        Args:
+            item: Field name to access.
+
+        Returns:
+            Any: Field value from payload.
+
+        Raises:
+            AttributeError: If field is not in payload.
         """
         payload = self.__dict__.get("payload")
         if isinstance(payload, dict) and item in payload:
@@ -105,6 +144,9 @@ class Memory(BaseModel):
         Returns an instance of the auto-generated model class that matches
         the entity type defined in the YAML schema. Only non-system fields
         are included.
+
+        Returns:
+            BaseModel: Dynamic Pydantic model instance.
         """
         from .types import get_entity_model  # Use TypeRegistry directly
 
@@ -125,7 +167,13 @@ class Memory(BaseModel):
 
 
 class MemoryPoint(BaseModel):
-    """Memory with embedding vector for Qdrant"""
+    """Memory with embedding vector for Qdrant.
+
+    Attributes:
+        memory: Memory instance.
+        vector: Embedding vector.
+        point_id: Qdrant point ID.
+    """
 
     memory: Memory
     vector: list[float] = Field(..., description="Embedding vector")
@@ -134,13 +182,32 @@ class MemoryPoint(BaseModel):
     @field_validator("vector")
     @classmethod
     def vector_not_empty(cls, v):
+        """Validate that vector is not empty.
+
+        Args:
+            v: Vector to validate.
+
+        Returns:
+            list[float]: Validated vector.
+
+        Raises:
+            ValueError: If vector is empty.
+        """
         if not v:
             raise ValueError("Vector cannot be empty")
         return v
 
 
 class SearchResult(BaseModel):
-    """Search result from vector/graph search"""
+    """Search result from vector/graph search.
+
+    Attributes:
+        memory: Memory instance.
+        score: Similarity score (0.0-1.0).
+        distance: Vector distance.
+        source: Search source (qdrant/kuzu/hybrid).
+        metadata: Additional metadata.
+    """
 
     memory: Memory
     score: float = Field(..., ge=0.0, le=1.0 + _MAX_SCORE_TOLERANCE, description="Similarity score")
@@ -162,6 +229,15 @@ class SearchResult(BaseModel):
         - Caps scores > 1.0 to exactly 1.0 (for small floating-point errors)
         - Raises error for scores significantly > 1.0 (indicates real problems)
         - Ensures scores >= 0.0
+
+        Args:
+            v: Raw similarity score.
+
+        Returns:
+            float: Normalized similarity score.
+
+        Raises:
+            ValueError: If score is negative or significantly above 1.0.
         """
         if v < 0.0:
             raise ValueError(f"Similarity score cannot be negative: {v}")
@@ -174,7 +250,14 @@ class SearchResult(BaseModel):
 
 
 class ProcessingResult(BaseModel):
-    """Result from memory processing pipelines - type-agnostic"""
+    """Result from memory processing pipelines - type-agnostic.
+
+    Attributes:
+        success: Whether processing succeeded.
+        memories_created: List of created memories.
+        errors: List of error messages.
+        processing_time_ms: Processing time in milliseconds.
+    """
 
     success: bool
     memories_created: list[Memory] = Field(default_factory=list)
@@ -183,5 +266,9 @@ class ProcessingResult(BaseModel):
 
     @property
     def total_created(self) -> int:
-        """Total memories created (all types)"""
+        """Total memories created (all types).
+
+        Returns:
+            int: Number of memories created.
+        """
         return len(self.memories_created)

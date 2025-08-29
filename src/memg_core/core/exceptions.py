@@ -1,10 +1,17 @@
-"""Custom exception hierarchy for the memory system - minimal set"""
+"""Custom exception hierarchy for the memory system - minimal set."""
 
 from typing import Any
 
 
 class MemorySystemError(Exception):
-    """Base exception for all memory system errors"""
+    """Base exception for all memory system errors.
+
+    Attributes:
+        message: Error message.
+        operation: Operation that caused the error.
+        context: Additional context information.
+        original_error: Original exception that was wrapped.
+    """
 
     def __init__(
         self,
@@ -29,25 +36,25 @@ class MemorySystemError(Exception):
 
 
 class ConfigurationError(MemorySystemError):
-    """Configuration-related errors (env vars, validation)"""
+    """Configuration-related errors (env vars, validation)."""
 
     pass
 
 
 class DatabaseError(MemorySystemError):
-    """Database operation failures (Qdrant, Kuzu)"""
+    """Database operation failures (Qdrant, Kuzu)."""
 
     pass
 
 
 class ValidationError(MemorySystemError):
-    """Data validation failures (schema, input format)"""
+    """Data validation failures (schema, input format)."""
 
     pass
 
 
 class ProcessingError(MemorySystemError):
-    """Memory processing operation failures (catch-all for processing)"""
+    """Memory processing operation failures (catch-all for processing)."""
 
     pass
 
@@ -55,7 +62,16 @@ class ProcessingError(MemorySystemError):
 def wrap_exception(
     original_error: Exception, operation: str, context: dict[str, Any] | None = None
 ) -> MemorySystemError:
-    """Wrap a generic exception in an appropriate MemorySystemError subclass"""
+    """Wrap a generic exception in an appropriate MemorySystemError subclass.
+
+    Args:
+        original_error: Original exception to wrap.
+        operation: Operation that caused the error.
+        context: Additional context information.
+
+    Returns:
+        MemorySystemError: Wrapped exception with appropriate subclass.
+    """
     error_message = str(original_error)
 
     # Map common exceptions to our hierarchy
@@ -86,7 +102,14 @@ def wrap_exception(
 
 
 def handle_with_context(operation: str):
-    """Decorator for consistent error handling with context"""
+    """Decorator for consistent error handling with context.
+
+    Args:
+        operation: Operation name for error context.
+
+    Returns:
+        callable: Decorated function with error handling.
+    """
 
     def decorator(func):
         def wrapper(*args, **kwargs):

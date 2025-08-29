@@ -7,7 +7,21 @@ from typing import Any
 
 @dataclass
 class MemGConfig:
-    """Core memory system configuration"""
+    """Core memory system configuration.
+
+    Attributes:
+        similarity_threshold: Threshold for conflict detection (0.0-1.0).
+        score_threshold: Minimum score for search results (0.0-1.0).
+        high_similarity_threshold: Threshold for duplicate detection (0.0-1.0).
+        enable_ai_type_verification: Enable AI-based type detection.
+        enable_temporal_reasoning: Enable temporal reasoning.
+        vector_dimension: Embedding dimension size.
+        batch_processing_size: Batch size for bulk operations.
+        embedder_model: FastEmbed model name.
+        template_name: Active template name.
+        qdrant_collection_name: Qdrant collection name.
+        kuzu_database_path: Kuzu database path.
+    """
 
     # Core similarity and scoring thresholds
     similarity_threshold: float = 0.7  # For conflict detection
@@ -31,7 +45,11 @@ class MemGConfig:
     kuzu_database_path: str = "kuzu_db"
 
     def __post_init__(self):
-        """Validate configuration parameters"""
+        """Validate configuration parameters.
+
+        Raises:
+            ValueError: If any threshold values are outside valid range [0.0, 1.0].
+        """
         if not 0.0 <= self.similarity_threshold <= 1.0:
             raise ValueError("similarity_threshold must be between 0.0 and 1.0")
         if not 0.0 <= self.score_threshold <= 1.0:
@@ -40,7 +58,11 @@ class MemGConfig:
             raise ValueError("high_similarity_threshold must be between 0.0 and 1.0")
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert configuration to dictionary"""
+        """Convert configuration to dictionary.
+
+        Returns:
+            dict[str, Any]: Dictionary representation of configuration.
+        """
         return {
             "similarity_threshold": self.similarity_threshold,
             "score_threshold": self.score_threshold,
@@ -56,15 +78,25 @@ class MemGConfig:
 
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> "MemGConfig":
-        """Create configuration from dictionary"""
+        """Create configuration from dictionary.
+
+        Args:
+            config_dict: Dictionary containing configuration values.
+
+        Returns:
+            MemGConfig: Configuration instance.
+        """
         return cls(**config_dict)
 
     @classmethod
     def from_env(cls) -> "MemGConfig":
-        """Create configuration from environment variables
+        """Create configuration from environment variables.
 
         Each instance should use explicit environment variables for isolation.
         The core memory system doesn't know or care about server ports.
+
+        Returns:
+            MemGConfig: Configuration instance with environment-derived values.
         """
         return cls(
             similarity_threshold=float(os.getenv("MEMG_SIMILARITY_THRESHOLD", "0.7")),
@@ -85,7 +117,13 @@ class MemGConfig:
 
 @dataclass
 class MemorySystemConfig:
-    """Core memory system configuration - NO SERVER CONCERNS"""
+    """Core memory system configuration - NO SERVER CONCERNS.
+
+    Attributes:
+        memg: Core memory configuration instance.
+        debug_mode: Enable debug mode.
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+    """
 
     memg: MemGConfig = field(default_factory=MemGConfig)
 
@@ -94,13 +132,21 @@ class MemorySystemConfig:
     log_level: str = "INFO"
 
     def __post_init__(self):
-        """Validate core system configuration"""
+        """Validate core system configuration.
+
+        Raises:
+            ValueError: If log_level is not a valid logging level.
+        """
         if self.log_level not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
             raise ValueError("log_level must be a valid logging level")
 
     @classmethod
     def from_env(cls) -> "MemorySystemConfig":
-        """Create core memory system configuration from environment variables"""
+        """Create core memory system configuration from environment variables.
+
+        Returns:
+            MemorySystemConfig: Configuration instance with environment-derived values.
+        """
         return cls(
             memg=MemGConfig.from_env(),
             debug_mode=os.getenv("MEMORY_SYSTEM_DEBUG", "false").lower() == "true",
@@ -114,5 +160,9 @@ DEFAULT_SYSTEM_CONFIG = MemorySystemConfig()
 
 
 def get_config() -> MemorySystemConfig:
-    """Get system configuration, preferring environment variables"""
+    """Get system configuration, preferring environment variables.
+
+    Returns:
+        MemorySystemConfig: System configuration instance.
+    """
     return MemorySystemConfig.from_env()

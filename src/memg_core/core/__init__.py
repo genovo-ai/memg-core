@@ -1,4 +1,5 @@
-# Core module - minimal exports
+"""Core module - minimal exports"""
+
 from . import config, exceptions, models, yaml_translator
 from .interfaces import Embedder, KuzuInterface, QdrantInterface
 from .retrievers import (

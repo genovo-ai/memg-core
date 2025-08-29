@@ -1,5 +1,4 @@
-"""
-Public API for memg-core - designed for long-running servers.
+"""Public API for memg-core - designed for long-running servers.
 
 Provides MemgClient for explicit initialization and module-level functions for
 environment-based usage.
@@ -20,10 +19,18 @@ from ..utils.db_clients import DatabaseClients
 
 
 class MemgClient:
-    """Client for memg-core operations - initialize once, use throughout server lifetime."""
+    """Client for memg-core operations - initialize once, use throughout server lifetime.
+
+    Provides a clean interface for memory operations with explicit resource management.
+    """
 
     def __init__(self, yaml_path: str, db_path: str):
-        """Initialize client for long-running server usage."""
+        """Initialize client for long-running server usage.
+
+        Args:
+            yaml_path: Path to YAML schema configuration file.
+            db_path: Base directory path for database storage.
+        """
         self._db_clients = DatabaseClients(yaml_path=yaml_path)
         self._db_clients.init_dbs(db_path=db_path, db_name=self._db_clients.db_name)
 
@@ -34,20 +41,49 @@ class MemgClient:
             raise RuntimeError("Failed to initialize memg-core services")
 
     def add_memory(self, memory_type: str, payload: dict[str, Any], user_id: str) -> str:
-        """Add memory and return HRID."""
+        """Add memory and return HRID.
+
+        Args:
+            memory_type: Entity type from YAML schema (e.g., 'task', 'note').
+            payload: Memory data conforming to YAML schema.
+            user_id: Owner of the memory.
+
+        Returns:
+            str: Human-readable ID (HRID) for the created memory.
+        """
         return self._memory_service.add_memory(memory_type, payload, user_id)
 
     def search(
         self, query: str, user_id: str, memory_type: str | None = None, limit: int = 10, **kwargs
     ) -> list[SearchResult]:
-        """Search memories."""
+        """Search memories.
+
+        Args:
+            query: Text to search for.
+            user_id: User ID for filtering results.
+            memory_type: Optional memory type filter.
+            limit: Maximum number of results to return.
+            **kwargs: Additional search parameters.
+
+        Returns:
+            list[SearchResult]: List of search results with scores and metadata.
+        """
         clean_query = query.strip() if query else ""
         return self._search_service.search(
             clean_query, user_id, memory_type=memory_type, limit=limit, **kwargs
         )
 
     def delete_memory(self, hrid: str, user_id: str, memory_type: str | None = None) -> bool:
-        """Delete memory by HRID."""
+        """Delete memory by HRID.
+
+        Args:
+            hrid: Human-readable ID of the memory to delete.
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type hint.
+
+        Returns:
+            bool: True if deletion succeeded, False otherwise.
+        """
         try:
             if memory_type is None:
                 memory_type = hrid.split("_")[0].lower()
@@ -68,7 +104,17 @@ class MemgClient:
         user_id: str,
         properties: dict[str, Any] | None = None,
     ) -> None:
-        """Add relationship between memories."""
+        """Add relationship between memories.
+
+        Args:
+            from_memory_hrid: Source memory HRID.
+            to_memory_hrid: Target memory HRID.
+            relation_type: Relationship type from YAML schema.
+            from_memory_type: Source memory entity type.
+            to_memory_type: Target memory entity type.
+            user_id: User ID for ownership verification.
+            properties: Optional relationship properties.
+        """
         self._memory_service.add_relationship(
             from_memory_hrid,
             to_memory_hrid,
@@ -80,7 +126,10 @@ class MemgClient:
         )
 
     def close(self):
-        """Close client and cleanup resources."""
+        """Close client and cleanup resources.
+
+        Should be called when the client is no longer needed to free database connections.
+        """
         if hasattr(self, "_db_clients") and self._db_clients:
             self._db_clients.close()
 
@@ -91,7 +140,14 @@ _CLIENT: MemgClient | None = None
 
 
 def _get_client() -> MemgClient:
-    """Get or create singleton client from environment variables."""
+    """Get or create singleton client from environment variables.
+
+    Returns:
+        MemgClient: Singleton client instance.
+
+    Raises:
+        RuntimeError: If required environment variables are not set.
+    """
     global _CLIENT
     if _CLIENT is None:
         yaml_path = os.environ.get("MEMG_YAML_PATH")
@@ -105,19 +161,48 @@ def _get_client() -> MemgClient:
 
 
 def add_memory(memory_type: str, payload: dict[str, Any], user_id: str) -> str:
-    """Add memory using environment-based client."""
+    """Add memory using environment-based client.
+
+    Args:
+        memory_type: Entity type from YAML schema (e.g., 'task', 'note').
+        payload: Memory data conforming to YAML schema.
+        user_id: Owner of the memory.
+
+    Returns:
+        str: Human-readable ID (HRID) for the created memory.
+    """
     return _get_client().add_memory(memory_type, payload, user_id)
 
 
 def search(
     query: str, user_id: str, memory_type: str | None = None, limit: int = 10, **kwargs
 ) -> list[SearchResult]:
-    """Search memories using environment-based client."""
+    """Search memories using environment-based client.
+
+    Args:
+        query: Text to search for.
+        user_id: User ID for filtering results.
+        memory_type: Optional memory type filter.
+        limit: Maximum number of results to return.
+        **kwargs: Additional search parameters.
+
+    Returns:
+        list[SearchResult]: List of search results with scores and metadata.
+    """
     return _get_client().search(query, user_id, memory_type, limit, **kwargs)
 
 
 def delete_memory(hrid: str, user_id: str, memory_type: str | None = None) -> bool:
-    """Delete memory using environment-based client."""
+    """Delete memory using environment-based client.
+
+    Args:
+        hrid: Human-readable ID of the memory to delete.
+        user_id: User ID for ownership verification.
+        memory_type: Optional memory type hint.
+
+    Returns:
+        bool: True if deletion succeeded, False otherwise.
+    """
     return _get_client().delete_memory(hrid, user_id, memory_type)
 
 
@@ -130,7 +215,17 @@ def add_relationship(
     user_id: str,
     properties: dict[str, Any] | None = None,
 ) -> None:
-    """Add relationship using environment-based client."""
+    """Add relationship using environment-based client.
+
+    Args:
+        from_memory_hrid: Source memory HRID.
+        to_memory_hrid: Target memory HRID.
+        relation_type: Relationship type from YAML schema.
+        from_memory_type: Source memory entity type.
+        to_memory_type: Target memory entity type.
+        user_id: User ID for ownership verification.
+        properties: Optional relationship properties.
+    """
     _get_client().add_relationship(
         from_memory_hrid,
         to_memory_hrid,
@@ -143,7 +238,10 @@ def add_relationship(
 
 
 def shutdown_services():
-    """Shutdown singleton client."""
+    """Shutdown singleton client.
+
+    Closes database connections and cleans up resources.
+    """
     global _CLIENT
     if _CLIENT:
         _CLIENT.close()
@@ -152,7 +250,11 @@ def shutdown_services():
 
 # Legacy compatibility for MCP server
 def get_services() -> tuple[MemoryService, SearchService, YamlTranslator]:
-    """Get services from singleton client (MCP server compatibility)."""
+    """Get services from singleton client (MCP server compatibility).
+
+    Returns:
+        tuple[MemoryService, SearchService, YamlTranslator]: Service instances for direct access.
+    """
     client = _get_client()
     yaml_translator = YamlTranslator(os.environ.get("MEMG_YAML_PATH"))
     return client._memory_service, client._search_service, yaml_translator

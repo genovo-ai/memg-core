@@ -1,4 +1,3 @@
-# memg_core/core/pipelines/graph_retriever.py
 """Clean GraphRAG retrieval pipelines - vector seeds → graph expansion → semantic enhancement.
 
 True GraphRAG architecture:
@@ -31,13 +30,20 @@ class SearchService:
 
     Provides GraphRAG search functionality using DatabaseClients for interface access.
     Eliminates the need to pass interfaces as function parameters.
+
+    Attributes:
+        qdrant: Qdrant interface instance.
+        kuzu: Kuzu interface instance.
+        embedder: Embedder instance.
+        yaml_translator: YAML translator instance.
+        hrid_tracker: HRID tracker instance.
     """
 
     def __init__(self, db_clients):
         """Initialize SearchService with DatabaseClients.
 
         Args:
-            db_clients: DatabaseClients instance (after init_dbs() called)
+            db_clients: DatabaseClients instance (after init_dbs() called).
         """
         if not isinstance(db_clients, DatabaseClients):
             raise TypeError("db_clients must be a DatabaseClients instance")
@@ -71,21 +77,21 @@ class SearchService:
         eliminating the need to pass interfaces as parameters.
 
         Args:
-            query: Search query text (required)
-            user_id: User ID for filtering (required)
-            limit: Maximum results to return (default: 20)
-            memory_type: Optional memory type filter
-            relation_names: Specific relations to expand (None = all relations)
-            neighbor_limit: Max neighbors per seed (default: 5)
-            hops: Number of graph hops to expand (default: 1)
-            include_semantic: Enable semantic expansion via see_also (default: True)
-            include_details: "self" (full payload) or "none" (anchor only) for seeds
-            modified_within_days: Filter by recency (e.g., last 7 days)
-            filters: Custom field-based filtering (e.g., {"project": "memg-core"})
-            projection: Control which fields to return per memory type
+            query: Search query text (required).
+            user_id: User ID for filtering (required).
+            limit: Maximum results to return (default: 20).
+            memory_type: Optional memory type filter.
+            relation_names: Specific relations to expand (None = all relations).
+            neighbor_limit: Max neighbors per seed (default: 5).
+            hops: Number of graph hops to expand (default: 1).
+            include_semantic: Enable semantic expansion via see_also (default: True).
+            include_details: "self" (full payload) or "none" (anchor only) for seeds.
+            modified_within_days: Filter by recency (e.g., last 7 days).
+            filters: Custom field-based filtering (e.g., {"project": "memg-core"}).
+            projection: Control which fields to return per memory type.
 
         Returns:
-            List of SearchResult objects with HRIDs, deduplicated and sorted
+            list[SearchResult]: List of SearchResult objects with HRIDs, deduplicated and sorted.
         """
         if not query or not query.strip():
             return []
@@ -183,16 +189,16 @@ class SearchService:
         """Build Qdrant filters from parameters with mandatory user isolation.
 
         Args:
-            user_id: User ID for filtering (CRITICAL: included in filters dict)
-            memory_type: Optional memory type filter
-            modified_within_days: Filter by recency (days)
-            extra_filters: Additional custom filters
+            user_id: User ID for filtering (CRITICAL: included in filters dict).
+            memory_type: Optional memory type filter.
+            modified_within_days: Filter by recency (days).
+            extra_filters: Additional custom filters.
 
         Returns:
-            Combined filters dictionary for Qdrant with user_id always included
+            dict[str, Any]: Combined filters dictionary for Qdrant with user_id always included.
 
         Note:
-            user_id is now included in filters dict for security validation
+            user_id is now included in filters dict for security validation.
         """
         # CRITICAL SECURITY: Always start with user_id
         filters: dict[str, Any] = {"user_id": user_id}
@@ -217,9 +223,9 @@ def create_search_service(db_clients) -> SearchService:
     """Factory function to create a SearchService instance.
 
     Args:
-        db_clients: DatabaseClients instance (after init_dbs() called)
+        db_clients: DatabaseClients instance (after init_dbs() called).
 
     Returns:
-        Configured SearchService instance
+        SearchService: Configured SearchService instance.
     """
     return SearchService(db_clients)

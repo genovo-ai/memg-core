@@ -1,4 +1,4 @@
-"""MemoryStore: Unified YAML-driven memory storage class
+"""MemoryStore: Unified YAML-driven memory storage class.
 
 Clean, class-based interface that handles both graph and vector operations.
 Follows Option 3 (Composite Interface) pattern with full YAML schema compliance.
@@ -26,13 +26,20 @@ class MemoryService:
     Provides a clean, class-based interface for all memory operations using
     DatabaseClients for both DDL initialization and CRUD interface access.
     Eliminates the need for scattered interface creation.
+
+    Attributes:
+        qdrant: Qdrant interface instance.
+        kuzu: Kuzu interface instance.
+        embedder: Embedder instance.
+        yaml_translator: YAML translator instance.
+        hrid_tracker: HRID tracker instance.
     """
 
     def __init__(self, db_clients):
         """Initialize MemoryService with DatabaseClients.
 
         Args:
-            db_clients: DatabaseClients instance (after init_dbs() called)
+            db_clients: DatabaseClients instance (after init_dbs() called).
         """
         if not isinstance(db_clients, DatabaseClients):
             raise TypeError("db_clients must be a DatabaseClients instance")
@@ -54,16 +61,16 @@ class MemoryService:
         """Add a memory to both graph and vector storage.
 
         Args:
-            memory_type: Entity type from YAML schema (e.g., 'task', 'note')
-            payload: Memory data conforming to YAML schema
-            user_id: Owner of the memory
-            collection: Optional Qdrant collection override
+            memory_type: Entity type from YAML schema (e.g., 'task', 'note').
+            payload: Memory data conforming to YAML schema.
+            user_id: Owner of the memory.
+            collection: Optional Qdrant collection override.
 
         Returns:
-            Memory HRID (Human-readable ID string)
+            str: Memory HRID (Human-readable ID string).
 
         Raises:
-            ProcessingError: If validation fails or storage operations fail
+            ProcessingError: If validation fails or storage operations fail.
         """
         try:
             # Create and validate memory from YAML schema using our instance
@@ -153,16 +160,16 @@ class MemoryService:
         """Add a relationship between two memories using HRIDs.
 
         Args:
-            from_memory_hrid: Source memory HRID
-            to_memory_hrid: Target memory HRID
-            relation_type: Relationship type from YAML schema (e.g., 'ANNOTATES')
-            from_memory_type: Source memory entity type
-            to_memory_type: Target memory entity type
-            user_id: User ID for ownership verification
-            properties: Optional relationship properties
+            from_memory_hrid: Source memory HRID.
+            to_memory_hrid: Target memory HRID.
+            relation_type: Relationship type from YAML schema (e.g., 'ANNOTATES').
+            from_memory_type: Source memory entity type.
+            to_memory_type: Target memory entity type.
+            user_id: User ID for ownership verification.
+            properties: Optional relationship properties.
 
         Raises:
-            ProcessingError: If relationship creation fails
+            ProcessingError: If relationship creation fails.
         """
         try:
             # Translate HRIDs to UUIDs
@@ -201,14 +208,14 @@ class MemoryService:
         """Search memories using vector similarity.
 
         Args:
-            query_text: Text to search for
-            limit: Maximum number of results
-            user_id: Filter by user ID
-            memory_types: Filter by memory types
-            collection: Optional Qdrant collection override
+            query_text: Text to search for.
+            limit: Maximum number of results.
+            user_id: Filter by user ID.
+            memory_types: Filter by memory types.
+            collection: Optional Qdrant collection override.
 
         Returns:
-            List of memory results with scores
+            list[dict[str, Any]]: List of memory results with scores.
         """
         try:
             # Generate query vector
@@ -290,12 +297,12 @@ class MemoryService:
         """Delete a memory from both storages using HRID.
 
         Args:
-            memory_hrid: Memory HRID to delete
-            memory_type: Memory entity type
-            user_id: User ID for ownership verification
+            memory_hrid: Memory HRID to delete.
+            memory_type: Memory entity type.
+            user_id: User ID for ownership verification.
 
         Returns:
-            True if deletion succeeded
+            bool: True if deletion succeeded.
         """
         try:
             # Translate HRID to UUID
@@ -326,10 +333,10 @@ def create_memory_service(db_clients) -> MemoryService:
     """Factory function to create a MemoryService instance.
 
     Args:
-        db_clients: DatabaseClients instance (after init_dbs() called)
+        db_clients: DatabaseClients instance (after init_dbs() called).
 
     Returns:
-        Configured MemoryService instance
+        MemoryService: Configured MemoryService instance.
     """
     return MemoryService(db_clients)
 

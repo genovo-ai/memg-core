@@ -1,4 +1,5 @@
-# allow relative imports from utils package
+"""Utils module - database clients, HRID management, and graph registration."""
+
 from .db_clients import DatabaseClients
 from .graph_register import GraphRegister
 from .hrid import generate_hrid, hrid_to_index, parse_hrid, reset_counters

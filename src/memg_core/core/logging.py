@@ -1,4 +1,4 @@
-"""Centralized logging configuration for the memory system"""
+"""Centralized logging configuration for the memory system."""
 
 import logging
 from pathlib import Path
@@ -6,7 +6,12 @@ import sys
 
 
 class MemorySystemLogger:
-    """Centralized logger for the memory system"""
+    """Centralized logger for the memory system.
+
+    Attributes:
+        _loggers: Cache of created loggers by component name.
+        _configured: Whether logging has been configured.
+    """
 
     _loggers: dict[str, logging.Logger] = {}
     _configured = False
@@ -19,7 +24,17 @@ class MemorySystemLogger:
         console_output: bool = True,
         file_level: str | None = None,
     ) -> logging.Logger:
-        """Configure centralized logging for the entire memory system"""
+        """Configure centralized logging for the entire memory system.
+
+        Args:
+            level: Console logging level.
+            log_file: Optional log file path.
+            console_output: Whether to enable console logging.
+            file_level: Optional file logging level (defaults to console level).
+
+        Returns:
+            logging.Logger: Root logger instance.
+        """
         if cls._configured:
             return cls.get_logger("memg_core")
 
@@ -62,7 +77,14 @@ class MemorySystemLogger:
 
     @classmethod
     def get_logger(cls, component: str) -> logging.Logger:
-        """Get or create a logger for a specific component"""
+        """Get or create a logger for a specific component.
+
+        Args:
+            component: Component name for the logger.
+
+        Returns:
+            logging.Logger: Logger instance for the component.
+        """
         logger_name = f"memg_core.{component}"
 
         if logger_name not in cls._loggers:
@@ -77,7 +99,14 @@ class MemorySystemLogger:
 
     @classmethod
     def log_operation(cls, component: str, operation: str, level: str = "INFO", **context):
-        """Log an operation with structured context"""
+        """Log an operation with structured context.
+
+        Args:
+            component: Component name.
+            operation: Operation being performed.
+            level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+            **context: Additional context key-value pairs.
+        """
         logger = cls.get_logger(component)
         log_method = getattr(logger, level.lower())
 
@@ -91,7 +120,14 @@ class MemorySystemLogger:
 
     @classmethod
     def log_performance(cls, component: str, operation: str, duration_ms: float, **context):
-        """Log performance metrics for operations"""
+        """Log performance metrics for operations.
+
+        Args:
+            component: Component name.
+            operation: Operation being measured.
+            duration_ms: Duration in milliseconds.
+            **context: Additional context key-value pairs.
+        """
         logger = cls.get_logger(component)
         context_str = " | ".join([f"{k}={v}" for k, v in context.items()])
         message = f"⚡ [{operation}] {duration_ms:.1f}ms"
@@ -101,7 +137,14 @@ class MemorySystemLogger:
 
     @classmethod
     def log_error(cls, component: str, operation: str, error: Exception, **context):
-        """Log errors with consistent formatting and context"""
+        """Log errors with consistent formatting and context.
+
+        Args:
+            component: Component name.
+            operation: Operation that failed.
+            error: Exception that occurred.
+            **context: Additional context key-value pairs.
+        """
         logger = cls.get_logger(component)
         context_str = " | ".join([f"{k}={v}" for k, v in context.items()])
         message = f"❌ [{operation}] {error.__class__.__name__}: {error}"
@@ -112,25 +155,60 @@ class MemorySystemLogger:
 
 # Convenience functions for common logging patterns
 def get_logger(component: str) -> logging.Logger:
-    """Get a logger for a component"""
+    """Get a logger for a component.
+
+    Args:
+        component: Component name.
+
+    Returns:
+        logging.Logger: Logger instance for the component.
+    """
     return MemorySystemLogger.get_logger(component)
 
 
 def setup_memory_logging(level: str = "INFO", log_file: str | None = None) -> logging.Logger:
-    """Setup memory system logging"""
+    """Setup memory system logging.
+
+    Args:
+        level: Logging level.
+        log_file: Optional log file path.
+
+    Returns:
+        logging.Logger: Root logger instance.
+    """
     return MemorySystemLogger.setup_logging(level=level, log_file=log_file)
 
 
 def log_operation(component: str, operation: str, **context):
-    """Log an operation"""
+    """Log an operation.
+
+    Args:
+        component: Component name.
+        operation: Operation being performed.
+        **context: Additional context key-value pairs.
+    """
     MemorySystemLogger.log_operation(component, operation, **context)
 
 
 def log_performance(component: str, operation: str, duration_ms: float, **context):
-    """Log performance metrics"""
+    """Log performance metrics.
+
+    Args:
+        component: Component name.
+        operation: Operation being measured.
+        duration_ms: Duration in milliseconds.
+        **context: Additional context key-value pairs.
+    """
     MemorySystemLogger.log_performance(component, operation, duration_ms, **context)
 
 
 def log_error(component: str, operation: str, error: Exception, **context):
-    """Log an error"""
+    """Log an error.
+
+    Args:
+        component: Component name.
+        operation: Operation that failed.
+        error: Exception that occurred.
+        **context: Additional context key-value pairs.
+    """
     MemorySystemLogger.log_error(component, operation, error, **context)

@@ -58,8 +58,10 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/genovo-ai/memg-core"
+Documentation = "https://genovo-ai.github.io/memg-core/"
 Repository = "https://github.com/genovo-ai/memg-core"
 Issues = "https://github.com/genovo-ai/memg-core/issues"
+Changelog = "https://genovo-ai.github.io/memg-core/changelog/"
 
 [tool.setuptools_scm]
 write_to = "src/memg_core/version.py"   # generates version at sdist

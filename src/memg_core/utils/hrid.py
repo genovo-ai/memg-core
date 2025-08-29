@@ -1,5 +1,4 @@
-"""
-HRID generator and parser for MEMG Core.
+"""HRID generator and parser for MEMG Core.
 
 Format: {TYPE_UPPER}_{AAA000}
 - TYPE: uppercase alphanumeric type name (no spaces)
@@ -23,7 +22,15 @@ _COUNTERS: dict[tuple[str, str], tuple[int, int]] = {}  # {(type, user_id): (alp
 
 
 class StorageQueryInterface(Protocol):
-    """Protocol for storage backends that can query for existing HRIDs."""
+    """Protocol for storage backends that can query for existing HRIDs.
+
+    Attributes:
+        vector: Query embedding vector.
+        limit: Maximum number of results.
+        collection: Optional collection name.
+        user_id: User ID for filtering.
+        filters: Additional search filters.
+    """
 
     def search_points(
         self,
@@ -33,12 +40,30 @@ class StorageQueryInterface(Protocol):
         user_id: str | None = None,
         filters: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """Search for points with optional filtering."""
+        """Search for points with optional filtering.
+
+        Args:
+            vector: Query embedding vector.
+            limit: Maximum number of results.
+            collection: Optional collection name.
+            user_id: User ID for filtering.
+            filters: Additional search filters.
+
+        Returns:
+            list[dict[str, Any]]: List of search results.
+        """
         raise NotImplementedError("Subclasses must implement search_points method")
 
 
 def _alpha_to_idx(alpha: str) -> int:
-    """AAA -> 0, AAB -> 1, ..., ZZZ -> 17575."""
+    """Convert alpha string to index: AAA -> 0, AAB -> 1, ..., ZZZ -> 17575.
+
+    Args:
+        alpha: Three-letter alpha string (AAA-ZZZ).
+
+    Returns:
+        int: Numeric index.
+    """
     idx = 0
     for char in alpha:
         idx = idx * 26 + (ord(char) - ord("A"))
@@ -46,7 +71,14 @@ def _alpha_to_idx(alpha: str) -> int:
 
 
 def _idx_to_alpha(idx: int) -> str:
-    """0 -> AAA, 1 -> AAB, ..., 17575 -> ZZZ."""
+    """Convert index to alpha string: 0 -> AAA, 1 -> AAB, ..., 17575 -> ZZZ.
+
+    Args:
+        idx: Numeric index (0-17575).
+
+    Returns:
+        str: Three-letter alpha string.
+    """
     chars = []
     for _ in range(3):
         chars.append(chr(ord("A") + idx % 26))
@@ -194,17 +226,17 @@ def generate_hrid(type_name: str, user_id: str, hrid_tracker=None) -> str:
     """Generate the next HRID for the given type.
 
     Args:
-        type_name: The memory type (e.g., 'note', 'task')
-        user_id: User ID for scoped HRID generation
-        hrid_tracker: Optional HridTracker instance for querying existing HRIDs
+        type_name: The memory type (e.g., 'note', 'task').
+        user_id: User ID for scoped HRID generation.
+        hrid_tracker: Optional HridTracker instance for querying existing HRIDs.
 
     Returns:
-        str: The next HRID in format TYPE_AAA000
+        str: The next HRID in format TYPE_AAA000.
 
     Notes:
-        - Uses HridTracker to query HridMapping table for existing HRIDs
-        - Falls back to in-memory counter if no tracker provided
-        - Ensures no duplicates by checking complete HRID history
+        - Uses HridTracker to query HridMapping table for existing HRIDs.
+        - Falls back to in-memory counter if no tracker provided.
+        - Ensures no duplicates by checking complete HRID history.
     """
     t = type_name.strip().upper()
 
@@ -226,7 +258,17 @@ def generate_hrid(type_name: str, user_id: str, hrid_tracker=None) -> str:
 
 
 def parse_hrid(hrid: str) -> tuple[str, str, int]:
-    """Parse HRID into (type, alpha, num)."""
+    """Parse HRID into (type, alpha, num).
+
+    Args:
+        hrid: HRID string to parse.
+
+    Returns:
+        tuple[str, str, int]: (type, alpha, num) components.
+
+    Raises:
+        ValueError: If HRID format is invalid.
+    """
     m = _HRID_RE.match(hrid.strip().upper())
     if not m:
         raise ValueError(f"Invalid HRID format: {hrid}")
@@ -252,7 +294,14 @@ def _type_key(t: str) -> int:
 
 
 def hrid_to_index(hrid: str) -> int:
-    """Convert HRID into a single integer index for ordering across types."""
+    """Convert HRID into a single integer index for ordering across types.
+
+    Args:
+        hrid: HRID string to convert.
+
+    Returns:
+        int: Single integer index for cross-type ordering.
+    """
     type_, alpha, num = parse_hrid(hrid)
     intra = _alpha_to_idx(alpha) * 1000 + num  # 0 .. 17,575,999  (needs 25 bits)
     return (_type_key(type_) << 25) | intra

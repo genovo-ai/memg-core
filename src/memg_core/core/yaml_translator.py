@@ -20,15 +20,35 @@ from .types import initialize_types_from_yaml
 
 
 class YamlTranslatorError(MemorySystemError):
-    """Error in YAML schema translation or validation."""
+    """Error in YAML schema translation or validation.
+
+    Attributes:
+        message: Error message.
+        operation: Operation that caused the error.
+        context: Additional context information.
+        original_error: Original exception that was wrapped.
+    """
 
     pass
 
 
 class YamlTranslator:
-    """Translates YAML schema definitions to Pydantic models for strict validation."""
+    """Translates YAML schema definitions to Pydantic models for strict validation.
+
+    Attributes:
+        yaml_path: Path to YAML schema file.
+        _schema: Cached schema dictionary.
+    """
 
     def __init__(self, yaml_path: str | None = None) -> None:
+        """Initialize YamlTranslator with YAML schema path.
+
+        Args:
+            yaml_path: Path to YAML schema file. If None, uses MEMG_YAML_SCHEMA env var.
+
+        Raises:
+            YamlTranslatorError: If YAML path not provided or TypeRegistry initialization fails.
+        """
         # Require explicit YAML path - no silent defaults
         if yaml_path:
             self.yaml_path = yaml_path
@@ -108,6 +128,15 @@ class YamlTranslator:
         """Get the anchor field name for the given entity type from YAML schema.
 
         Now reads from vector.anchored_to instead of separate anchor field.
+
+        Args:
+            entity_name: Name of the entity type.
+
+        Returns:
+            str: Anchor field name.
+
+        Raises:
+            YamlTranslatorError: If anchor field not found.
         """
         if not entity_name:
             raise YamlTranslatorError("Empty entity name")
@@ -184,9 +213,18 @@ class YamlTranslator:
         }
 
     def build_anchor_text(self, memory) -> str:
-        """
-        Builds anchor text for embedding from YAML-defined anchor field.
+        """Build anchor text for embedding from YAML-defined anchor field.
+
         NO hardcoded field names - reads anchor field from YAML schema.
+
+        Args:
+            memory: Memory object containing payload data.
+
+        Returns:
+            str: Anchor text for embedding.
+
+        Raises:
+            YamlTranslatorError: If anchor field is missing or invalid.
         """
         mem_type = getattr(memory, "memory_type", None)
         if not mem_type:

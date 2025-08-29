@@ -27,6 +27,14 @@ class DatabaseClients:
 
     NO INTERFACES - pure schema creation only.
     Consumer must create interfaces separately using returned raw clients.
+
+    Attributes:
+        qdrant_client: Pre-initialized QdrantClient.
+        kuzu_connection: Pre-initialized Kuzu connection.
+        db_name: Database name.
+        qdrant_path: Path to Qdrant database.
+        kuzu_path: Path to Kuzu database.
+        yaml_translator: YAML translator instance.
     """
 
     def __init__(self, yaml_path: str | None = None):
@@ -47,8 +55,8 @@ class DatabaseClients:
         """Initialize databases with structured paths.
 
         Args:
-            db_path: Base database directory
-            db_name: Database name (used for collection and file names)
+            db_path: Base database directory.
+            db_name: Database name (used for collection and file names).
         """
         # Structure paths
         qdrant_path = os.path.join(db_path, "qdrant")
@@ -128,10 +136,10 @@ class DatabaseClients:
         """Get Qdrant interface using the initialized client.
 
         Returns:
-            QdrantInterface configured with the DDL-created client and collection
+            QdrantInterface: Configured with the DDL-created client and collection.
 
         Raises:
-            DatabaseError: If client not initialized (call init_dbs first)
+            DatabaseError: If client not initialized (call init_dbs first).
         """
         if self.qdrant_client is None:
             raise DatabaseError(
@@ -144,10 +152,10 @@ class DatabaseClients:
         """Get Kuzu interface using the initialized connection.
 
         Returns:
-            KuzuInterface configured with the DDL-created connection
+            KuzuInterface: Configured with the DDL-created connection.
 
         Raises:
-            DatabaseError: If connection not initialized (call init_dbs first)
+            DatabaseError: If connection not initialized (call init_dbs first).
         """
         if self.kuzu_connection is None:
             raise DatabaseError(
@@ -160,7 +168,7 @@ class DatabaseClients:
         """Get embedder instance.
 
         Returns:
-            Embedder instance for generating vectors
+            Embedder: Instance for generating vectors.
         """
         return Embedder()
 
@@ -168,10 +176,10 @@ class DatabaseClients:
         """Get the YAML translator used for schema operations.
 
         Returns:
-            YamlTranslator instance used during DDL operations
+            YamlTranslator: Instance used during DDL operations.
 
         Raises:
-            DatabaseError: If YAML translator not initialized
+            DatabaseError: If YAML translator not initialized.
         """
         if self.yaml_translator is None:
             raise DatabaseError(
@@ -181,7 +189,10 @@ class DatabaseClients:
         return self.yaml_translator
 
     def close(self):
-        """Close all database connections and cleanup resources."""
+        """Close all database connections and cleanup resources.
+
+        Should be called when database clients are no longer needed.
+        """
         if self.qdrant_client is not None:
             with suppress(Exception):
                 # Ignore cleanup errors - best effort
