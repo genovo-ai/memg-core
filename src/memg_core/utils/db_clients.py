@@ -162,7 +162,7 @@ class DatabaseClients:
                 "Kuzu connection not initialized. Call init_dbs() first.",
                 operation="get_kuzu_interface",
             )
-        return KuzuInterface(self.kuzu_connection)
+        return KuzuInterface(self.kuzu_connection, self.yaml_translator)
 
     def get_embedder(self) -> Embedder:
         """Get embedder instance.

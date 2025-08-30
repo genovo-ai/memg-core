@@ -120,7 +120,23 @@ class TypeRegistry:
         self._entity_types = Enum("EntityType", entity_names)  # type: ignore[misc]
 
     def _build_relation_predicates(self) -> None:
-        """Build RelationPredicate enum dynamically from YAML relations."""
+        """Build RelationPredicate enum dynamically from YAML relations.
+
+        Supports both legacy list format and new target-first mapping format.
+        Legacy format example under an entity:
+            relations:
+              - name: ...
+                predicates: [FIXES]
+                source: solution
+                target: bug
+
+        New format example under an entity:
+            relations:
+              bug:
+                - name: solution_fixes_bug
+                  predicate: FIXES
+                  directed: true
+        """
         if self._yaml_schema is None:
             raise RuntimeError("YAML schema not loaded")
         schema = self._yaml_schema
@@ -133,23 +149,65 @@ class TypeRegistry:
         entities = entities_obj
         predicates = set()
 
-        # Extract all predicates from all entity relations
+        # Extract all predicates from all entity relations (supports 2 formats)
         for entity in entities:
-            relations = entity.get("relations", [])
-            for relation in relations:
-                if "predicates" not in relation:
-                    raise ValueError(
-                        f"Relation missing 'predicates' field in entity "
-                        f"{entity['name']}: {relation}"
-                    )
+            entity_name = entity.get("name", "<unknown>")
+            relations_section = entity.get("relations")
 
-                relation_predicates = relation["predicates"]
-                if not relation_predicates:
-                    raise ValueError(
-                        f"Empty 'predicates' list in relation {relation.get('name', 'unnamed')}"
-                    )
+            if relations_section is None:
+                continue
 
-                predicates.update(relation_predicates)
+            # New target-first format: mapping target -> list[relation]
+            if isinstance(relations_section, dict):
+                if not relations_section:
+                    continue
+                for _target, items in relations_section.items():
+                    if not isinstance(items, list):
+                        raise ValueError(
+                            f"Invalid relations format for entity {entity_name}: expected list under target"
+                        )
+                    for item in items:
+                        if not isinstance(item, dict):
+                            raise ValueError(
+                                f"Invalid relation item in entity {entity_name}: {item}"
+                            )
+                        if "predicate" not in item:
+                            raise ValueError(
+                                f"Relation missing 'predicate' field in entity {entity_name}: {item}"
+                            )
+                        pred = item["predicate"]
+                        if not isinstance(pred, str) or not pred:
+                            raise ValueError(
+                                f"Invalid 'predicate' value in entity {entity_name}: {item}"
+                            )
+                        predicates.add(pred.upper())
+
+            # Legacy list format: list of relation dicts with 'predicates' list
+            elif isinstance(relations_section, list):
+                for relation in relations_section:
+                    if "predicates" not in relation:
+                        raise ValueError(
+                            f"Relation missing 'predicates' field in entity "
+                            f"{entity_name}: {relation}"
+                        )
+
+                    relation_predicates = relation["predicates"]
+                    if not relation_predicates:
+                        raise ValueError(
+                            f"Empty 'predicates' list in relation {relation.get('name', 'unnamed')}"
+                        )
+
+                    for p in relation_predicates:
+                        if not isinstance(p, str) or not p:
+                            raise ValueError(
+                                f"Invalid predicate value in entity {entity_name}: {relation_predicates}"
+                            )
+                        predicates.add(p.upper())
+
+            else:
+                raise ValueError(
+                    f"Invalid 'relations' type for entity {entity_name}: {type(relations_section).__name__}"
+                )
 
         if not predicates:
             raise ValueError(

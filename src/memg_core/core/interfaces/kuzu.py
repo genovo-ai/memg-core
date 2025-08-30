@@ -12,15 +12,18 @@ class KuzuInterface:
 
     Attributes:
         conn: Pre-initialized Kuzu connection.
+        yaml_translator: Optional YAML translator for relationship operations.
     """
 
-    def __init__(self, connection: kuzu.Connection):
+    def __init__(self, connection: kuzu.Connection, yaml_translator=None):
         """Initialize with pre-created connection.
 
         Args:
             connection: Pre-initialized Kuzu connection from DatabaseClients.
+            yaml_translator: Optional YamlTranslator for relationship operations.
         """
         self.conn = connection
+        self.yaml_translator = yaml_translator
 
     def add_node(self, table: str, properties: dict[str, Any]) -> None:
         """Add a node to the graph - pure CRUD operation.
@@ -98,13 +101,28 @@ class KuzuInterface:
                     f"or don't belong to user {user_id}"
                 )
 
-            # Now create the relationship
+            # Generate relationship table name using YamlTranslator
+            if not self.yaml_translator:
+                raise DatabaseError(
+                    "YamlTranslator required for relationship operations",
+                    operation="add_relationship",
+                    context={"from_table": from_table, "to_table": to_table, "rel_type": rel_type},
+                )
+
+            relationship_table_name = self.yaml_translator.relationship_table_name(
+                source=from_table,
+                predicate=rel_type,
+                target=to_table,
+                directed=True,  # Direction affects semantics but not table naming for now
+            )
+
+            # Now create the relationship using the unique table name
             prop_str = ", ".join([f"{k}: ${k}" for k in props.keys()]) if props else ""
             rel_props = f" {{{prop_str}}}" if prop_str else ""
             create_query = (
                 f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}}), "
                 f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
-                f"CREATE (a)-[:{rel_type}{rel_props}]->(b)"
+                f"CREATE (a)-[:{relationship_table_name}{rel_props}]->(b)"
             )
             create_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id, **props}
             self.conn.execute(create_query, parameters=create_params)
@@ -200,16 +218,36 @@ class KuzuInterface:
             raise ValueError(f"node_uuid must be a valid UUID format, got: {node_uuid}")
 
         try:
-            rel_filter = "|".join([r.upper() for r in rel_types]) if rel_types else ""
-            neighbor = f":{neighbor_label}" if neighbor_label else ""
+            # Use YamlTranslator to expand predicates to concrete relationship labels
+            if not self.yaml_translator:
+                raise DatabaseError(
+                    "YamlTranslator required for neighbor operations",
+                    operation="neighbors",
+                    context={"node_label": node_label, "rel_types": rel_types},
+                )
 
-            # Format relationship pattern properly - don't include ':' if no filter
-            rel_part = f":{rel_filter}" if rel_filter else ""
+            # Get concrete relationship labels for this source and predicates
+            if rel_types:
+                relationship_labels = self.yaml_translator.get_labels_for_predicates(
+                    source_type=node_label, predicates=rel_types, neighbor_label=neighbor_label
+                )
+                if not relationship_labels:
+                    # No matching relationships found - return empty
+                    return []
+
+                # Create relationship pattern with specific labels
+                rel_filter = "|".join(relationship_labels)
+                rel_part = f":{rel_filter}"
+            else:
+                # No filtering - match all relationships
+                rel_part = ""
 
             # CRITICAL: User isolation - both source node and neighbors must belong to user
             node_condition = f"a:{node_label} {{id: $node_uuid, user_id: $user_id}}"
+            neighbor = f":{neighbor_label}" if neighbor_label else ""
             neighbor_condition = f"n{neighbor} {{user_id: $user_id}}"
 
+            # Build direction-aware pattern
             if direction == "out":
                 pattern = f"({node_condition})-[r{rel_part}]->({neighbor_condition})"
             elif direction == "in":

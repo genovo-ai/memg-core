@@ -124,6 +124,155 @@ class YamlTranslator:
         """Get list of available entity types from YAML schema."""
         return list(self._entities_map().keys())
 
+    # ================== RELATIONSHIP PARSING (TARGET-FIRST FORMAT) ==================
+
+    def _get_relations_mapping_for_entity(
+        self, entity_name: str
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Return raw relations mapping for an entity in target-first schema format.
+
+        The expected YAML shape under an entity is:
+            relations:
+              target_entity_name:
+                - name: ...
+                  description: ...
+                  predicate: PREDICATE_NAME
+                  directed: true|false
+
+        Returns an empty dict when no relations are defined.
+        """
+        entity_spec = self._resolve_entity_with_inheritance(entity_name)
+        relations_section = entity_spec.get("relations")
+        if not relations_section or not isinstance(relations_section, dict):
+            return {}
+
+        # Normalize keys to lower for targets; keep items as-is
+        normalized: dict[str, list[dict[str, Any]]] = {}
+        for target_name, items in relations_section.items():
+            if not isinstance(items, list):
+                # Skip invalid shapes silently at this layer; validation is higher-level
+                continue
+            normalized[str(target_name).lower()] = [i for i in items if isinstance(i, dict)]
+        return normalized
+
+    def get_relations_for_source(self, entity_name: str) -> list[dict[str, Any]]:
+        """Get normalized relation specs for a source entity in target-first schema.
+
+        Returns list of dicts with keys:
+            - source (str)
+            - target (str)
+            - name (str | None)
+            - description (str | None)
+            - predicate (str)
+            - directed (bool)
+        """
+        if not entity_name:
+            raise YamlTranslatorError("Empty entity name")
+
+        source_l = entity_name.lower()
+        relations_map = self._get_relations_mapping_for_entity(source_l)
+        if not relations_map:
+            return []
+
+        out: list[dict[str, Any]] = []
+        for target_l, items in relations_map.items():
+            for item in items:
+                predicate = item.get("predicate")
+                if not predicate or not isinstance(predicate, str):
+                    # Skip invalid entries - strict behavior can be added later
+                    continue
+                directed = bool(item.get("directed", True))
+                out.append(
+                    {
+                        "source": source_l,
+                        "target": target_l,
+                        "name": item.get("name"),
+                        "description": item.get("description"),
+                        "predicate": predicate.upper(),
+                        "directed": directed,
+                    }
+                )
+        return out
+
+    @staticmethod
+    def relationship_table_name(
+        source: str, predicate: str, target: str, *, directed: bool = True
+    ) -> str:
+        """Generate relationship table name.
+
+        For now, table name does not encode direction; direction affects creation/query semantics.
+        Canonicalization for undirected pairs can be added here later if decided.
+        """
+        return f"{str(source).upper()}_{str(predicate).upper()}_{str(target).upper()}"
+
+    def get_labels_for_predicates(
+        self,
+        source_type: str,
+        predicates: list[str] | None,
+        neighbor_label: str | None = None,
+    ) -> list[str]:
+        """Expand predicate names to concrete relationship labels for a given source.
+
+        Args:
+            source_type: Source entity type name
+            predicates: List of predicate names to include (case-insensitive). If None, include all.
+            neighbor_label: Optional target entity type filter (case-insensitive)
+
+        Returns:
+            List of concrete relationship labels (table names) matching the filter.
+        """
+        if not source_type:
+            raise YamlTranslatorError("Empty source_type")
+
+        preds_u = set(p.upper() for p in predicates) if predicates else None
+        neighbor_l = neighbor_label.lower() if neighbor_label else None
+
+        labels: list[str] = []
+        for spec in self.get_relations_for_source(source_type):
+            if preds_u is not None and spec["predicate"].upper() not in preds_u:
+                continue
+            if neighbor_l is not None and spec["target"].lower() != neighbor_l:
+                continue
+            labels.append(
+                self.relationship_table_name(
+                    source=spec["source"],
+                    predicate=spec["predicate"],
+                    target=spec["target"],
+                    directed=spec["directed"],
+                )
+            )
+        return labels
+
+    def debug_relation_map(self) -> dict[str, dict[str, list[dict[str, Any]]]]:
+        """Return a nested relation map for debugging/printing.
+
+        Structure:
+        {
+          source: {
+            target: [ {name, predicate, directed, description} ... ]
+          }
+        }
+        """
+        out: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        for source in self.get_entity_types():
+            specs = self.get_relations_for_source(source)
+            if not specs:
+                continue
+            if source not in out:
+                out[source] = {}
+            for spec in specs:
+                target = spec["target"]
+                out[source].setdefault(target, [])
+                out[source][target].append(
+                    {
+                        "name": spec.get("name"),
+                        "predicate": spec.get("predicate"),
+                        "directed": spec.get("directed", True),
+                        "description": spec.get("description"),
+                    }
+                )
+        return out
+
     def get_anchor_field(self, entity_name: str) -> str:
         """Get the anchor field name for the given entity type from YAML schema.
 

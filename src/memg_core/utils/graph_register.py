@@ -116,7 +116,10 @@ class GraphRegister:
         return ddl_statements
 
     def generate_relationship_tables_ddl(self) -> list[str]:
-        """Generate DDL for relationship tables from YAML schema.
+        """Generate DDL for relationship tables from YAML schema using YamlTranslator.
+
+        Uses YamlTranslator to discover relations and centralized table naming.
+        Handles directed/undirected semantics for table creation.
 
         Returns:
             List of DDL strings for relationship tables
@@ -129,42 +132,42 @@ class GraphRegister:
             return []
 
         ddl_statements = []
+        created_tables = set()  # Track unique table names to avoid duplicates
 
         try:
-            # Get entities map from YamlTranslator (same as original logic)
-            entities_map = self.yaml_translator._entities_map()  # pylint: disable=protected-access
+            # Use YamlTranslator to discover all relations across all entities
+            for entity_name in self.yaml_translator.get_entity_types():
+                relation_specs = self.yaml_translator.get_relations_for_source(entity_name)
 
-            for entity_name, entity_spec in entities_map.items():
-                relations = entity_spec.get("relations", [])
-                if not relations:
-                    continue
+                for spec in relation_specs:
+                    # Validate predicate against TypeRegistry
+                    predicate = spec["predicate"]
+                    if not self.type_registry.validate_relation_predicate(predicate):
+                        raise DatabaseError(
+                            f"Invalid predicate '{predicate}' not found in TypeRegistry",
+                            operation="generate_relationship_tables_ddl",
+                            context={"predicate": predicate, "spec": spec},
+                        )
 
-                for relation in relations:
-                    if not isinstance(relation, dict):
+                    # Generate table name using centralized helper
+                    table_name = self.yaml_translator.relationship_table_name(
+                        source=spec["source"],
+                        predicate=spec["predicate"],
+                        target=spec["target"],
+                        directed=spec["directed"],
+                    )
+
+                    # Skip if we've already created this table
+                    if table_name in created_tables:
                         continue
 
-                    rel_name = relation.get("name")
-                    source = relation.get("source", entity_name)
-                    target = relation.get("target")
-                    predicates = relation.get("predicates", [])
+                    created_tables.add(table_name)
 
-                    if not all([rel_name, source, target, predicates]):
-                        continue
-
-                    # Create relationship table for each predicate
-                    for predicate in predicates:
-                        # Validate predicate against TypeRegistry
-                        if not self.type_registry.validate_relation_predicate(predicate):
-                            raise DatabaseError(
-                                f"Invalid predicate '{predicate}' not found in TypeRegistry",
-                                operation="generate_relationship_tables_ddl",
-                                context={"predicate": predicate, "relation": rel_name},
-                            )
-
-                        ddl = f"""CREATE REL TABLE IF NOT EXISTS {predicate}(
-                        FROM {source} TO {target}
+                    # Create DDL - direction affects semantics but not table structure
+                    ddl = f"""CREATE REL TABLE IF NOT EXISTS {table_name}(
+                        FROM {spec["source"]} TO {spec["target"]}
                     )"""
-                        ddl_statements.append(ddl)
+                    ddl_statements.append(ddl)
 
         except Exception as e:
             if isinstance(e, DatabaseError):
