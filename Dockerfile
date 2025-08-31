@@ -21,7 +21,7 @@ RUN mkdir -p /qdrant /kuzu /app/config
 # Copy MCP server files from current directory
 COPY integrations/mcpp/mcp_server.py /app/
 COPY integrations/mcpp/software_dev.yaml /app/
-COPY .env /app/
+#COPY .env /app/
 
 # Set proper ownership for non-root user
 RUN chown -R memg:memg /app /qdrant /kuzu
