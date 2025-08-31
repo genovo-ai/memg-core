@@ -45,5 +45,7 @@ jobs:
 
       - name: build docker image and push it gcr
         run: |
+          ls -ll
+          ls -R integrations
           docker build -t public.ecr.aws/z8i1z7l3/memg-core:${{env.branch_name}}-${{env.full_sha}} .
           docker push public.ecr.aws/z8i1z7l3/memg-core:${{env.branch_name}}-${{env.full_sha}}
