@@ -234,7 +234,7 @@ test_venv/
 
 # Integration folder - selective inclusion for MCP Docker
 # Include only MCP-required files, exclude development/optional components
-integration/*
+#integration/*
 !integration/__init__.py
 !integration/mcp/
 !integration/sync_wrapper.py
@@ -254,5 +254,6 @@ temp*
 *.ipynb*
 
 *.zip
+
 
 #integration*

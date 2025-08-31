@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir -r requirements_mcp.txt
 # Create directories for persistent storage
 RUN mkdir -p /qdrant /kuzu /app/config
 
+
 # Copy MCP server files from current directory
 COPY integrations/mcpp/mcp_server.py /app/
 COPY integrations/mcpp/software_dev.yaml /app/
