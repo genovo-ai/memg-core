@@ -26,6 +26,7 @@ COPY integrations/mcpp/software_dev.yaml /app/
 # Set proper ownership for non-root user
 RUN chown -R memg:memg /app /qdrant /kuzu
 
+
 # Keep curl for health checks, but clean up other packages
 RUN apt-get autoremove -y && apt-get clean
 
