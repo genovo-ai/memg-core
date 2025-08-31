@@ -1,10 +1,12 @@
 FROM python:3.11-slim
+# Set working directory
 
+WORKDIR /app
 # Create non-root user for security
 RUN groupadd -r memg && useradd -r -g memg -d /app -s /bin/bash memg
 
-# Set working directory
-WORKDIR /app
+
+
 
 # Install system dependencies (temporarily for health checks)
 RUN apt-get update && apt-get install -y \
@@ -19,12 +21,12 @@ RUN pip install --no-cache-dir -r requirements_mcp.txt
 RUN mkdir -p /qdrant /kuzu /app/config
 
 # Copy MCP server files from current directory
-#COPY integrations/mcpp/mcp_server.py /app/
-#COPY integrations/mcpp/software_dev.yaml /app/
+COPY integrations/mcpp/mcp_server.py /app/
+COPY integrations/mcpp/software_dev.yaml /app/
 #COPY .env /app/
 
 
-COPY integrations/mcpp /app
+#COPY integrations/mcpp /app
 
 # Set proper ownership for non-root user
 RUN chown -R memg:memg /app /qdrant /kuzu

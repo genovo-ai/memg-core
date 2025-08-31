@@ -255,4 +255,4 @@ temp*
 
 *.zip
 
-integration*
+#integration*
