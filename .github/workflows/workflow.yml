@@ -2,7 +2,7 @@
 name: MEMG Core – Main
 
 on:
-  push: push
+  push:
   workflow_dispatch:
 
 concurrency:
