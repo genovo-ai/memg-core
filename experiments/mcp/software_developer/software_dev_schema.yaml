@@ -1,0 +1,164 @@
+version: v1
+
+id_policy:
+  kind: uuid
+  field: id
+
+defaults:
+  vector:
+    metric: cosine
+    normalize: true
+  timestamps:
+    auto_create: true
+    auto_update: true
+
+entities:
+  - name: memo # base entity - all other entities are derived from this
+    description: "Base memory unit"
+    fields:
+      id:          { type: string, required: true, system: true } # uuid
+      user_id:     { type: string, required: true, system: true } # system: true = handled by API, not in user payload
+      statement:   { type: string, required: true, max_length: 8000 }
+      created_at:  { type: datetime, required: true, system: true }
+      updated_at:  { type: datetime, system: true }
+      vector:      { type: vector, anchored_to: statement, system: true }
+    relations:
+      memo:
+        - name: memo_related
+          description: "Generic relation between memos"
+          predicate: RELATED_TO
+          directed: false
+
+  - name: note
+    parent: memo
+    description: "General note or observation to memorize"
+    fields:
+      project: { type: string }  # Optional project namespace for filtering
+      origin: { type: enum, choices: [system, user], default: system } # source of the note
+    relations:
+      note:
+        - name: note_related_to_note
+          description: "Generic relation between notes"
+          predicate: RELATED_TO
+          directed: false
+      document:
+        - name: note_annotates_document
+          description: "Note providing context to a document"
+          predicate: ANNOTATES
+          directed: true
+      task:
+        - name: note_annotates_task
+          description: "Note associated with a task"
+          predicate: ANNOTATES
+          directed: true
+      bug:
+        - name: note_reports_bug
+          description: "Note reporting or identifying a bug"
+          predicate: REPORTS
+          directed: true
+      solution:
+        - name: note_describes_solution
+          description: "Note describing or explaining a solution"
+          predicate: DESCRIBES
+          directed: true
+
+  - name: document
+    parent: memo
+    description: "Document-like memo with extended content"
+    fields:
+      project: { type: string }  # Optional project namespace for filtering
+      details: { type: string, required: true }
+      url:     { type: string }  # Reference URL for external docs
+    relations:
+      note:
+        - name: document_referenced_by_note
+          description: "Document referenced by a note"
+          predicate: REFERENCED_BY
+          directed: true
+      task:
+        - name: document_supports_task
+          description: "Document providing details or requirements for a task"
+          predicate: SUPPORTS
+          directed: true
+      bug:
+        - name: document_documents_bug
+          description: "Document describing or analyzing a bug"
+          predicate: DOCUMENTS
+          directed: true
+      solution:
+        - name: document_specifies_solution
+          description: "Document specifying or detailing a solution"
+          predicate: SPECIFIES
+          directed: true
+
+  - name: task
+    parent: memo
+    description: "Development task or work item"
+    fields:
+      project:     { type: string }  # Optional project namespace for filtering
+      details:     { type: string }
+      status:      { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled], default: backlog }
+      priority:    { type: enum, choices: [low, medium, high, critical], default: medium }
+      due_date:    { type: datetime }
+    relations:
+      task:
+        - name: task_blocks_task
+          description: "Task blocking another task"
+          predicate: BLOCKS
+          directed: true
+        - name: task_depends_on_task
+          description: "Task depending on another task"
+          predicate: DEPENDS_ON
+          directed: true
+      bug:
+        - name: task_addresses_bug
+          description: "Task created to fix a bug"
+          predicate: ADDRESSES
+          directed: true
+      solution:
+        - name: task_solved_by_solution
+          description: "Task implemented by a solution"
+          predicate: SOLVED_BY
+          directed: true
+
+  - name: bug
+    parent: memo
+    description: "Bug report or issue"
+    fields:
+      project:      { type: string }  # Optional project namespace for filtering
+      details:      { type: string, required: true }
+      severity:     { type: enum, choices: [low, medium, high, critical], default: medium }
+      status:       { type: enum, choices: [open, in_progress, resolved], default: open }
+      file_path:    { type: string }  # File where bug occurs
+      reference:    { type: string }  # main reference where bug occurs, such as function or class name
+    relations:
+      task:
+        - name: bug_tracked_by_task
+          description: "Bug being tracked or addressed by a task"
+          predicate: TRACKED_BY
+          directed: true
+      solution:
+        - name: bug_fixed_by_solution
+          description: "Bug resolved by a solution"
+          predicate: FIXED_BY
+          directed: true
+
+  - name: solution
+    parent: memo
+    description: "Solution, fix, or implementation approach"
+    fields:
+      project:      { type: string }  # Optional project namespace for filtering
+      details:      { type: string }
+      file_path:    { type: string }  # File being modified
+      test_status:  { type: enum, choices: [untested, manual_test, unit_test, integration_test], default: untested }
+    relations:
+      bug:
+        - name: solution_fixes_bug
+          description: "Solution addressing a bug"
+          predicate: FIXES
+          directed: true
+      task:
+        - name: solution_implements_task
+          description: "Solution implementing a task"
+          predicate: IMPLEMENTS
+          directed: true

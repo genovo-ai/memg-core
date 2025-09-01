@@ -1,0 +1,7 @@
+# MCP Server specific dependencies
+fastmcp>=2.11.3
+fastapi>=0.115.0
+uvicorn>=0.35.0
+pydantic>=2.11.7
+starlette>=0.47.2
+memg-core>=0.6.3  # Commented out - using local wheel instead
