@@ -124,7 +124,6 @@ class MemoryService:
             # Add to Kuzu (graph storage) - use entity-specific table
             kuzu_data = {
                 "id": memory.id,
-                "hrid": hrid,  # Include HRID for complete backup capability
                 "user_id": memory.user_id,
                 "memory_type": memory.memory_type,
                 "created_at": memory.created_at.isoformat(),
@@ -251,7 +250,6 @@ class MemoryService:
             # Update Kuzu node (need to implement update_node method)
             kuzu_data = {
                 "id": memory.id,
-                "hrid": hrid,
                 "user_id": memory.user_id,
                 "memory_type": memory.memory_type,
                 "created_at": memory.created_at.isoformat(),
