@@ -85,7 +85,15 @@ class DatabaseClients:
         self._setup_kuzu_tables_with_graph_register(kuzu_conn)
 
     def _setup_qdrant_collection(self, client: QdrantClient, collection_name: str) -> None:
-        """Create Qdrant collection if it doesn't exist"""
+        """Create Qdrant collection if it doesn't exist.
+
+        Args:
+            client: Qdrant client instance.
+            collection_name: Name of the collection to create.
+
+        Raises:
+            DatabaseError: If collection creation fails.
+        """
         try:
             config = get_config()
             vector_dimension = config.memg.vector_dimension
@@ -104,7 +112,14 @@ class DatabaseClients:
             ) from e
 
     def _setup_kuzu_tables_with_graph_register(self, conn: kuzu.Connection) -> None:
-        """Create Kuzu tables using GraphRegister for DDL generation"""
+        """Create Kuzu tables using GraphRegister for DDL generation.
+
+        Args:
+            conn: Kuzu database connection.
+
+        Raises:
+            DatabaseError: If YAML translator not initialized or table creation fails.
+        """
         if not self.yaml_translator:
             raise DatabaseError(
                 "YAML translator not initialized. Provide yaml_path to constructor.",

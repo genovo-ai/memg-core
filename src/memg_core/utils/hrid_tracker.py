@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 from ..core.exceptions import DatabaseError
 from ..core.interfaces.kuzu import KuzuInterface
+from .hrid import _alpha_to_idx, parse_hrid
 
 
 class HridTracker:
@@ -65,7 +66,7 @@ class HridTracker:
                 operation="get_uuid",
                 context={"hrid": hrid},
                 original_error=e,
-            )
+            ) from e
 
     def get_hrid(self, uuid: str, user_id: str) -> str:
         """Translate UUID to HRID with user verification.
@@ -105,7 +106,7 @@ class HridTracker:
                 operation="get_hrid",
                 context={"uuid": uuid},
                 original_error=e,
-            )
+            ) from e
 
     def create_mapping(self, hrid: str, uuid: str, memory_type: str, user_id: str) -> None:
         """Create new HRID ↔ UUID mapping.
@@ -140,7 +141,7 @@ class HridTracker:
                 operation="create_mapping",
                 context={"hrid": hrid, "uuid": uuid, "memory_type": memory_type},
                 original_error=e,
-            )
+            ) from e
 
     def mark_deleted(self, hrid: str) -> None:
         """Mark HRID mapping as deleted (soft delete)
@@ -177,7 +178,7 @@ class HridTracker:
                 operation="mark_deleted",
                 context={"hrid": hrid},
                 original_error=e,
-            )
+            ) from e
 
     def get_highest_hrid(self, memory_type: str, user_id: str) -> tuple[str, int, int] | None:
         """Get highest HRID for a memory type (for generation).
@@ -206,8 +207,6 @@ class HridTracker:
                 return None
 
             # Find the highest HRID by parsing all results
-            from .hrid import _alpha_to_idx, parse_hrid
-
             highest_hrid = None
             highest_alpha_idx = -1
             highest_num = -1
@@ -215,7 +214,8 @@ class HridTracker:
             for result in results:
                 hrid = result["hrid"]
                 try:
-                    parsed_type, alpha, num = parse_hrid(hrid)
+                    # TODO: parsed_type available for future use (e.g., type validation)
+                    _, alpha, num = parse_hrid(hrid)
                     alpha_idx = _alpha_to_idx(alpha)
 
                     if alpha_idx > highest_alpha_idx or (
@@ -239,7 +239,7 @@ class HridTracker:
                 operation="get_highest_hrid",
                 context={"memory_type": memory_type, "user_id": user_id},
                 original_error=e,
-            )
+            ) from e
 
     def exists(self, hrid: str) -> bool:
         """Check if HRID exists (active, not deleted).
@@ -259,5 +259,5 @@ class HridTracker:
             results = self.kuzu.query(query, {"hrid": hrid})
             return results[0]["count"] > 0 if results else False
 
-        except Exception:
+        except (DatabaseError, ValueError, KeyError):
             return False  # Assume doesn't exist on any error

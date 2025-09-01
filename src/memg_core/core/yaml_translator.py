@@ -16,7 +16,8 @@ from typing import Any
 import yaml
 
 from .exceptions import MemorySystemError
-from .types import initialize_types_from_yaml
+from .models import Memory
+from .types import get_entity_model, initialize_types_from_yaml
 
 
 class YamlTranslatorError(MemorySystemError):
@@ -28,8 +29,6 @@ class YamlTranslatorError(MemorySystemError):
         context: Additional context information.
         original_error: Original exception that was wrapped.
     """
-
-    pass
 
 
 class YamlTranslator:
@@ -72,6 +71,7 @@ class YamlTranslator:
 
     @property
     def schema(self) -> dict[str, Any]:
+        """Get the loaded YAML schema, loading it if necessary."""
         if self._schema is not None:
             return self._schema
 
@@ -196,7 +196,11 @@ class YamlTranslator:
 
     @staticmethod
     def relationship_table_name(
-        source: str, predicate: str, target: str, *, directed: bool = True
+        source: str,
+        predicate: str,
+        target: str,
+        *,
+        directed: bool = True,  # noqa: unused-argument
     ) -> str:
         """Generate relationship table name.
 
@@ -413,6 +417,18 @@ class YamlTranslator:
         )
 
     def _fields_contract(self, spec: dict[str, Any]) -> tuple[list[str], list[str]]:
+        """Extract required and optional fields from entity specification.
+
+        Supports either:
+        - fields: {required:[...], optional:[...]} format
+        - Individual field definitions with required flags
+
+        Args:
+            spec: Entity specification dictionary.
+
+        Returns:
+            tuple[list[str], list[str]]: (required_fields, optional_fields)
+        """
         # supports either fields: {required:[...], optional:[...]} OR flat dict
         fields = spec.get("fields") or {}
         if "required" in fields or "optional" in fields:
@@ -440,7 +456,14 @@ class YamlTranslator:
         return required_fields, optional_fields
 
     def _resolve_inherited_fields(self, spec: dict[str, Any]) -> dict[str, Any]:
-        """Resolve all fields including inherited ones from parent entities."""
+        """Resolve all fields including inherited ones from parent entities.
+
+        Args:
+            spec: Entity specification dictionary.
+
+        Returns:
+            dict[str, Any]: Dictionary containing all fields (inherited + current).
+        """
         all_fields = {}
         entities_map = self._entities_map()
 
@@ -460,7 +483,14 @@ class YamlTranslator:
         return all_fields
 
     def _get_system_fields(self, spec: dict[str, Any]) -> set[str]:
-        """Extract system fields from YAML schema (fields marked with system: true)."""
+        """Extract system fields from YAML schema (fields marked with system: true).
+
+        Args:
+            spec: Entity specification dictionary.
+
+        Returns:
+            set[str]: Set of field names that are marked as system fields.
+        """
         system_fields = set()
         all_fields = self._resolve_inherited_fields(spec)
 
@@ -512,6 +542,7 @@ class YamlTranslator:
     def validate_memory_against_yaml(
         self, memory_type: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
+        """Validate memory payload against YAML schema and return cleaned payload."""
         if not memory_type:
             raise YamlTranslatorError("memory_type is required")
         if payload is None:
@@ -562,7 +593,7 @@ class YamlTranslator:
         return cleaned
 
     def create_memory_from_yaml(self, memory_type: str, payload: dict[str, Any], user_id: str):
-        from .models import Memory  # local import to avoid cycles
+        """Create a Memory object from YAML-validated payload."""
 
         # Get anchor field from YAML schema
         anchor_field = self.get_anchor_field(memory_type)
@@ -587,6 +618,4 @@ class YamlTranslator:
 
     def get_entity_model(self, entity_name: str):
         """Get Pydantic model from TypeRegistry - NO REDUNDANCY."""
-        from .types import get_entity_model
-
         return get_entity_model(entity_name)

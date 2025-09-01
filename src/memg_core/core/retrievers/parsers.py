@@ -100,7 +100,8 @@ def _sort_key(result: SearchResult) -> tuple:
         # Use a high index for UUIDs to sort them after proper HRIDs
         idx = 999999999
     else:
-        # Parse HRID index. Raises ValueError if format is invalid, intentionally crashing to expose data quality issues early.
+        # Parse HRID index. Raises ValueError if format is invalid,
+        # intentionally crashing to expose data quality issues early.
         idx = hrid_to_index(hrid)
 
     return (-float(result.score), idx, memory.id)

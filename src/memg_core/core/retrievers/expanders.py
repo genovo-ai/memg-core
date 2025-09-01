@@ -161,7 +161,8 @@ def _append_neighbors(
         yaml_translator: Optional YAML translator.
 
     Returns:
-        list[SearchResult]: Combined list of seeds + neighbors with anchor-only payloads for neighbors.
+        list[SearchResult]: Combined list of seeds + neighbors with
+        anchor-only payloads for neighbors.
     """
     all_results: list[SearchResult] = list(seeds)  # Start with seeds
 

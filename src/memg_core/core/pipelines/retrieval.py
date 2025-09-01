@@ -14,8 +14,10 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from ...core.exceptions import DatabaseError
 from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
+from ..exceptions import ProcessingError
 from ..models import SearchResult
 from ..retrievers.expanders import _append_neighbors, _find_semantic_expansion
 from ..retrievers.parsers import (
@@ -280,7 +282,7 @@ class SearchService:
 
             return memory_data
 
-        except Exception:
+        except (DatabaseError, ValueError, KeyError):
             return None
 
     def get_memories(
@@ -390,7 +392,7 @@ class SearchService:
 
             return memories
 
-        except Exception:
+        except (DatabaseError, ValueError, KeyError):
             return []
 
     def get_memory_neighbors(
@@ -425,8 +427,6 @@ class SearchService:
                 limit=limit,
             )
         except Exception as e:
-            from ..exceptions import ProcessingError
-
             raise ProcessingError(
                 "Failed to get memory neighbors",
                 operation="get_memory_neighbors",

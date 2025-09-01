@@ -187,7 +187,18 @@ class QdrantInterface:
             ) from e
 
     def get_point(self, point_id: str, collection: str | None = None) -> dict[str, Any] | None:
-        """Get a single point by ID - pure CRUD operation"""
+        """Get a single point by ID - pure CRUD operation.
+
+        Args:
+            point_id: ID of the point to retrieve.
+            collection: Optional collection name override.
+
+        Returns:
+            dict[str, Any] | None: Point data including id, vector, and payload, or None if not found.
+
+        Raises:
+            DatabaseError: If retrieval fails.
+        """
         try:
             collection = collection or self.collection_name
 
@@ -214,7 +225,19 @@ class QdrantInterface:
     def delete_points(
         self, point_ids: list[str], user_id: str, collection: str | None = None
     ) -> bool:
-        """Delete points by IDs with user ownership verification"""
+        """Delete points by IDs with user ownership verification.
+
+        Args:
+            point_ids: List of point IDs to delete.
+            user_id: User ID for ownership verification.
+            collection: Optional collection name override.
+
+        Returns:
+            bool: True if deletion succeeded.
+
+        Raises:
+            DatabaseError: If points not found or don't belong to user, or deletion fails.
+        """
         try:
             collection = collection or self.collection_name
 
@@ -248,7 +271,17 @@ class QdrantInterface:
             ) from e
 
     def get_collection_info(self, collection: str | None = None) -> dict[str, Any]:
-        """Get collection information - pure read operation"""
+        """Get collection information - pure read operation.
+
+        Args:
+            collection: Optional collection name override.
+
+        Returns:
+            dict[str, Any]: Collection information including existence, vector count, point count, and config.
+
+        Raises:
+            DatabaseError: If collection info retrieval fails.
+        """
         try:
             collection = collection or self.collection_name
 

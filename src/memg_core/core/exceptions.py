@@ -38,25 +38,17 @@ class MemorySystemError(Exception):
 class ConfigurationError(MemorySystemError):
     """Configuration-related errors (env vars, validation)."""
 
-    pass
-
 
 class DatabaseError(MemorySystemError):
     """Database operation failures (Qdrant, Kuzu)."""
-
-    pass
 
 
 class ValidationError(MemorySystemError):
     """Data validation failures (schema, input format)."""
 
-    pass
-
 
 class ProcessingError(MemorySystemError):
     """Memory processing operation failures (catch-all for processing)."""
-
-    pass
 
 
 def wrap_exception(
@@ -120,7 +112,7 @@ def handle_with_context(operation: str):
                 raise
             except Exception as e:
                 # Wrap unknown exceptions
-                raise wrap_exception(e, operation, {"args": args, "kwargs": kwargs})
+                raise wrap_exception(e, operation, {"args": args, "kwargs": kwargs}) from e
 
         return wrapper
 

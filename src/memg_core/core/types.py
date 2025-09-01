@@ -4,8 +4,9 @@ SINGLE SOURCE OF TRUTH for all YAML-derived types.
 One YAML orchestrates everything - this module enforces that principle.
 """
 
+from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, create_model
 import yaml
@@ -164,7 +165,8 @@ class TypeRegistry:
                 for _target, items in relations_section.items():
                     if not isinstance(items, list):
                         raise ValueError(
-                            f"Invalid relations format for entity {entity_name}: expected list under target"
+                            f"Invalid relations format for entity {entity_name}: "
+                            "expected list under target"
                         )
                     for item in items:
                         if not isinstance(item, dict):
@@ -173,7 +175,8 @@ class TypeRegistry:
                             )
                         if "predicate" not in item:
                             raise ValueError(
-                                f"Relation missing 'predicate' field in entity {entity_name}: {item}"
+                                f"Relation missing 'predicate' field in entity "
+                                f"{entity_name}: {item}"
                             )
                         pred = item["predicate"]
                         if not isinstance(pred, str) or not pred:
@@ -200,13 +203,15 @@ class TypeRegistry:
                     for p in relation_predicates:
                         if not isinstance(p, str) or not p:
                             raise ValueError(
-                                f"Invalid predicate value in entity {entity_name}: {relation_predicates}"
+                                f"Invalid predicate value in entity "
+                                f"{entity_name}: {relation_predicates}"
                             )
                         predicates.add(p.upper())
 
             else:
                 raise ValueError(
-                    f"Invalid 'relations' type for entity {entity_name}: {type(relations_section).__name__}"
+                    f"Invalid 'relations' type for entity {entity_name}: "
+                    f"{type(relations_section).__name__}"
                 )
 
         if not predicates:
@@ -302,9 +307,6 @@ class TypeRegistry:
 
     def _get_python_type(self, yaml_type: str, field_def: dict[str, Any]) -> Any:
         """Convert YAML type to Python type - crash on unknown types."""
-        from datetime import datetime
-        from typing import Literal
-
         yaml_type = yaml_type.lower()
 
         if yaml_type == "string":

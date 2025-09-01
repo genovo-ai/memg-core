@@ -5,8 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
+import warnings
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from .types import get_entity_model
 
 _MAX_SCORE_TOLERANCE = 1.001
 
@@ -69,8 +72,6 @@ class Memory(BaseModel):
         Returns:
             dict[str, Any]: Deprecated payload structure.
         """
-        import warnings
-
         warnings.warn(
             "Memory.to_qdrant_payload() is deprecated. Use flat payload structure directly.",
             DeprecationWarning,
@@ -81,10 +82,18 @@ class Memory(BaseModel):
             "id": self.id,
             "user_id": self.user_id,
             "memory_type": self.memory_type,
-            "created_at": self.created_at.isoformat(),
+            "created_at": (
+                self.created_at.isoformat()
+                if hasattr(self.created_at, "isoformat")
+                else str(self.created_at)
+            ),
         }
         if self.updated_at:
-            core["updated_at"] = self.updated_at.isoformat()
+            core["updated_at"] = (
+                self.updated_at.isoformat()
+                if hasattr(self.updated_at, "isoformat")
+                else str(self.updated_at)
+            )
         if self.hrid:
             core["hrid"] = self.hrid
 
@@ -105,10 +114,18 @@ class Memory(BaseModel):
             "id": self.id,
             "user_id": self.user_id,
             "memory_type": self.memory_type,
-            "created_at": self.created_at.isoformat(),
+            "created_at": (
+                self.created_at.isoformat()
+                if hasattr(self.created_at, "isoformat")
+                else str(self.created_at)
+            ),
         }
         if self.updated_at:
-            node["updated_at"] = self.updated_at.isoformat()
+            node["updated_at"] = (
+                self.updated_at.isoformat()
+                if hasattr(self.updated_at, "isoformat")
+                else str(self.updated_at)
+            )
         if self.hrid:
             node["hrid"] = self.hrid
 
@@ -148,8 +165,6 @@ class Memory(BaseModel):
         Returns:
             BaseModel: Dynamic Pydantic model instance.
         """
-        from .types import get_entity_model  # Use TypeRegistry directly
-
         model_cls = get_entity_model(self.memory_type)
         # Pass only fields that the model expects
         model_fields = {

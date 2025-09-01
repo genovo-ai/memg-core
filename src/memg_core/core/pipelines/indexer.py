@@ -214,8 +214,6 @@ class MemoryService:
             memory.id = uuid  # Preserve existing UUID for relationships
 
             # Update timestamps - preserve created_at, update updated_at
-            from datetime import UTC, datetime
-
             memory.created_at = datetime.fromisoformat(current_payload.get("created_at"))
             memory.updated_at = datetime.now(UTC)
 

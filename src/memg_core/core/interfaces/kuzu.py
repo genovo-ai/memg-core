@@ -1,10 +1,12 @@
 """Pure CRUD Kuzu interface wrapper - NO DDL operations."""
 
+import re
 from typing import Any
 
 import kuzu
 
 from ..exceptions import DatabaseError
+from ..types import validate_relation_predicate
 
 
 class KuzuInterface:
@@ -138,8 +140,6 @@ class KuzuInterface:
             props = props or {}
 
             # VALIDATE RELATIONSHIP AGAINST YAML SCHEMA - crash if invalid
-            from ..types import validate_relation_predicate
-
             if not validate_relation_predicate(rel_type):
                 raise ValueError(
                     f"Invalid relationship predicate: {rel_type}. Must be defined in YAML schema."
@@ -239,8 +239,6 @@ class KuzuInterface:
         """
         try:
             # VALIDATE RELATIONSHIP AGAINST YAML SCHEMA - crash if invalid
-            from ..types import validate_relation_predicate
-
             if not validate_relation_predicate(rel_type):
                 raise ValueError(
                     f"Invalid relationship predicate: {rel_type}. Must be defined in YAML schema."
@@ -327,7 +325,14 @@ class KuzuInterface:
             ) from e
 
     def _extract_query_results(self, query_result) -> list[dict[str, Any]]:
-        """Extract results from Kuzu QueryResult using raw iteration"""
+        """Extract results from Kuzu QueryResult using raw iteration.
+
+        Args:
+            query_result: Kuzu QueryResult object.
+
+        Returns:
+            list[dict[str, Any]]: List of dictionaries containing query results.
+        """
         # Type annotations disabled for QueryResult - dynamic interface from kuzu package
         qr = query_result  # type: ignore
 
@@ -584,7 +589,18 @@ class KuzuInterface:
             ) from e
 
     def _get_kuzu_type(self, key: str, value: Any) -> str:
-        """Map Python types to Kuzu types with proper validation"""
+        """Map Python types to Kuzu types with proper validation.
+
+        Args:
+            key: Property key name.
+            value: Property value to type-check.
+
+        Returns:
+            str: Kuzu type name.
+
+        Raises:
+            DatabaseError: If the Python type is not supported by Kuzu.
+        """
         if isinstance(value, bool):
             # Check bool first (bool is subclass of int in Python!)
             return "BOOLEAN"
@@ -610,16 +626,14 @@ class KuzuInterface:
         """Check if string looks like a UUID (36 chars with hyphens in right positions).
 
         Args:
-            value: String to check
+            value: String to check.
 
         Returns:
-            True if value matches UUID format (8-4-4-4-12 hex pattern)
+            bool: True if value matches UUID format (8-4-4-4-12 hex pattern), False otherwise.
         """
         if not isinstance(value, str) or len(value) != 36:
             return False
 
         # UUID format: 8-4-4-4-12 (e.g., 550e8400-e29b-41d4-a716-446655440000)
-        import re
-
         uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         return bool(re.match(uuid_pattern, value, re.IGNORECASE))
