@@ -156,9 +156,15 @@ def search_test_data() -> list[dict]:
         },
         {
             "type": "note",
-            "payload": {"statement": "authentication system for users", "project": "auth"},
+            "payload": {
+                "statement": "authentication system for users",
+                "project": "auth",
+            },
         },
-        {"type": "note", "payload": {"statement": "login authentication flow", "project": "auth"}},
+        {
+            "type": "note",
+            "payload": {"statement": "login authentication flow", "project": "auth"},
+        },
         {
             "type": "document",
             "payload": {
@@ -221,7 +227,10 @@ def search_test_data() -> list[dict]:
             },
         },
         # Cluster 5: Unrelated office content (true negatives)
-        {"type": "note", "payload": {"statement": "coffee machine maintenance schedule"}},
+        {
+            "type": "note",
+            "payload": {"statement": "coffee machine maintenance schedule"},
+        },
         {"type": "note", "payload": {"statement": "office parking assignments"}},
         {
             "type": "document",
@@ -345,7 +354,8 @@ def mock_embedder():
     with (
         patch("memg_core.core.interfaces.embedder.Embedder", return_value=mock_embedder),
         patch(
-            "memg_core.utils.db_clients.DatabaseClients.get_embedder", return_value=mock_embedder
+            "memg_core.utils.db_clients.DatabaseClients.get_embedder",
+            return_value=mock_embedder,
         ),
     ):
         yield mock_embedder
