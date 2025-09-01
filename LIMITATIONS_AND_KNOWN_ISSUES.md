@@ -60,6 +60,67 @@ status: "pending"         # ❌ Should fail but is accepted and stored
 
 **Tested Fields**: All enum fields affected (task.status, task.priority, bug.severity, bug.status, note.origin)
 
+### 3. Partial Memory Creation on Schema Validation Failure ⚠️ ACTIVE LIMITATION
+
+**Issue**: When memory creation fails due to schema validation (e.g., invalid field names), the memory may be partially saved to Qdrant but fail in Kuzu, creating data inconsistency.
+
+**Current Behavior**:
+```bash
+# Attempt to create memory with invalid field:
+add_memory(type="note", payload={"statement": "test", "invalid_field": "value"})
+
+# Result:
+# ✅ Memory saved to Qdrant (vector database)
+# ❌ Memory creation fails in Kuzu (graph database)
+# 🔍 Memory appears in search results but has no HRID/relationships
+```
+
+**Impact**:
+- **Data Inconsistency**: Memory exists in vector search but not in graph database
+- **Orphaned Records**: Memories without proper HRID mapping
+- **Potential Duplicates**: Retry attempts may create multiple Qdrant entries
+- **Search Pollution**: Invalid memories appear in search results
+
+**Root Cause**: Memory creation is not atomic across both storage systems. Qdrant write succeeds before Kuzu validation occurs.
+
+**Workaround**: Always validate payload against schema before memory creation attempts.
+
+**Status**: Active limitation - needs atomic transaction implementation or better validation ordering
+
+### 4. MCP Server Exception Handling Inconsistency 🚨 CRITICAL BUG
+
+**Issue**: Some MCP tool functions lack proper exception handling, causing unhandled exceptions to break MCP connections or restart the server.
+
+**Current Behavior**:
+```python
+# ❌ BAD - No exception handling (add_memory_tool)
+def add_memory_tool(...):
+    client = get_memg_client()
+    hrid = client.add_memory(...)  # Can throw unhandled exception
+    return {"result": "Success"}
+
+# ✅ GOOD - Proper exception handling (delete_memory_tool)
+def delete_memory_tool(...):
+    try:
+        client = get_memg_client()
+        success = client.delete_memory(...)
+        return {"result": "Success"}
+    except Exception as e:
+        return {"error": f"Failed: {str(e)}"}
+```
+
+**Impact**:
+- **Server Instability**: Unhandled exceptions can restart the MCP server
+- **Connection Breaks**: MCP handshake fails after server restart
+- **Poor User Experience**: User mistakes cause system-wide disruption
+- **Data Inconsistency**: Partial operations may complete before crash
+
+**Root Cause**: Inconsistent exception handling across MCP tool functions
+
+**Affected Tools**: `add_memory_tool`, `add_relationship_tool`, and potentially others
+
+**Status**: Critical bug - requires immediate fix for production stability
+
 ---
 
 ## 🟡 YAML Schema Design Issues

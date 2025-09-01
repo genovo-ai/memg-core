@@ -218,6 +218,224 @@ class SearchService:
 
         return filters
 
+    def get_memory(
+        self,
+        hrid: str,
+        user_id: str,
+        memory_type: str | None = None,
+        collection: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Get a single memory by HRID.
+
+        Args:
+            hrid: Human-readable identifier of the memory.
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type hint (inferred from HRID if not provided).
+            collection: Optional Qdrant collection override.
+
+        Returns:
+            dict[str, Any] | None: Memory data with full payload, or None if not found.
+        """
+        try:
+            # Infer memory type from HRID if not provided
+            if memory_type is None:
+                memory_type = hrid.split("_")[0].lower()
+
+            # Get UUID from HRID
+            uuid = self.hrid_tracker.get_uuid(hrid, user_id)
+            if not uuid:
+                return None
+
+            # Get memory data from Qdrant
+            point_data = self.qdrant.get_point(uuid, collection)
+            if not point_data:
+                return None
+
+            # Verify user ownership
+            payload = point_data.get("payload", {})
+            if payload.get("user_id") != user_id:
+                return None
+
+            # Build response with full memory information
+            memory_data = {
+                "hrid": hrid,
+                "uuid": uuid,
+                "memory_type": payload.get("memory_type", memory_type),
+                "user_id": user_id,
+                "created_at": payload.get("created_at"),
+                "updated_at": payload.get("updated_at"),
+                "payload": {
+                    k: v
+                    for k, v in payload.items()
+                    if k
+                    not in (
+                        "id",
+                        "user_id",
+                        "memory_type",
+                        "created_at",
+                        "updated_at",
+                        "hrid",
+                    )
+                },
+            }
+
+            return memory_data
+
+        except Exception:
+            return None
+
+    def get_memories(
+        self,
+        user_id: str,
+        memory_type: str | None = None,
+        filters: dict[str, Any] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        include_neighbors: bool = False,
+        hops: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Get multiple memories with filtering and optional graph expansion.
+
+        Args:
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type filter (e.g., "task", "note").
+            filters: Optional field filters (e.g., {"status": "open", "priority": "high"}).
+            limit: Maximum number of memories to return (default 50).
+            offset: Number of memories to skip for pagination (default 0).
+            include_neighbors: Whether to include neighbor nodes via graph traversal.
+            hops: Number of hops for neighbor expansion (default 1).
+
+        Returns:
+            list[dict[str, Any]]: List of memory data with full payloads.
+        """
+        try:
+            # Use KuzuInterface to get nodes with filtering
+            results = self.kuzu.get_nodes(
+                user_id=user_id,
+                node_type=memory_type,
+                filters=filters,
+                limit=limit,
+                offset=offset,
+            )
+
+            # Convert Kuzu results to SearchResult objects for expansion
+            search_results = []
+            for result in results:
+                node_data = result.get("node", {})
+
+                # Get HRID from UUID
+                uuid = result.get("id")
+                hrid = self.hrid_tracker.get_hrid(uuid, user_id) if uuid else None
+
+                if not hrid:
+                    continue
+
+                # Build Memory object using existing utility
+                memory = build_memory_from_flat_payload(
+                    point_id=uuid,
+                    payload={
+                        **node_data,
+                        "user_id": user_id,
+                        "memory_type": result.get("memory_type"),
+                        "created_at": result.get("created_at"),
+                        "updated_at": result.get("updated_at"),
+                    },
+                    hrid_tracker=self.hrid_tracker,
+                )
+
+                # Create SearchResult with score 1.0 (not from vector search)
+                search_result = SearchResult(
+                    memory=memory,
+                    score=1.0,
+                    distance=None,
+                    source="kuzu_query",
+                    metadata={"query_type": "get_memories"},
+                )
+                search_results.append(search_result)
+
+            # Apply graph expansion if requested using existing utilities
+            if include_neighbors and hops > 0:
+                expanded_results = _append_neighbors(
+                    seeds=search_results,
+                    kuzu=self.kuzu,
+                    user_id=user_id,
+                    relation_names=None,  # All relations
+                    neighbor_limit=10,  # Reasonable limit per seed
+                    hops=hops,
+                    projection=None,
+                    hrid_tracker=self.hrid_tracker,
+                    yaml_translator=self.yaml_translator,
+                )
+                search_results = expanded_results
+
+            # Convert SearchResult objects back to memory data format
+            memories = []
+            for search_result in search_results:
+                memory = search_result.memory
+                memory_data = {
+                    "hrid": memory.hrid or memory.id,
+                    "uuid": (memory.id if memory.hrid else memory.id),  # Handle UUID fallback
+                    "memory_type": memory.memory_type,
+                    "user_id": memory.user_id,
+                    "created_at": (memory.created_at.isoformat() if memory.created_at else None),
+                    "updated_at": (memory.updated_at.isoformat() if memory.updated_at else None),
+                    "payload": memory.payload,
+                    "score": search_result.score,
+                    "source": search_result.source,
+                }
+
+                # Add metadata if from neighbor expansion
+                if search_result.metadata:
+                    memory_data["metadata"] = search_result.metadata
+
+                memories.append(memory_data)
+
+            return memories
+
+        except Exception:
+            return []
+
+    def get_memory_neighbors(
+        self,
+        memory_id: str,
+        memory_type: str,
+        user_id: str,
+        relation_types: list[str] | None = None,
+        direction: str = "any",
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Get related memories through graph relationships.
+
+        Args:
+            memory_id: Memory ID to find neighbors for
+            memory_type: Memory entity type
+            user_id: User ID for isolation
+            relation_types: Filter by specific relationship types
+            direction: "in", "out", or "any"
+            limit: Maximum number of neighbors
+
+        Returns:
+            List of neighbor memories with relationship info
+        """
+        try:
+            return self.kuzu.neighbors(
+                node_label=memory_type,
+                node_uuid=memory_id,
+                user_id=user_id,
+                rel_types=relation_types,
+                direction=direction,
+                limit=limit,
+            )
+        except Exception as e:
+            from ..exceptions import ProcessingError
+
+            raise ProcessingError(
+                "Failed to get memory neighbors",
+                operation="get_memory_neighbors",
+                context={"memory_id": memory_id, "memory_type": memory_type},
+                original_error=e,
+            ) from e
+
 
 def create_search_service(db_clients) -> SearchService:
     """Factory function to create a SearchService instance.

@@ -71,7 +71,13 @@ class GraphRegister:
 
         # Build column definitions from Pydantic model fields
         columns = []
-        system_field_names = {"id", "user_id", "memory_type", "created_at", "updated_at"}
+        system_field_names = {
+            "id",
+            "user_id",
+            "memory_type",
+            "created_at",
+            "updated_at",
+        }
 
         for field_name, _field_info in model.model_fields.items():
             # Skip system fields - they'll be added separately

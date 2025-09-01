@@ -13,7 +13,7 @@ import warnings
 from ...utils import generate_hrid
 from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
-from ..exceptions import DatabaseError, ProcessingError
+from ..exceptions import ProcessingError
 from ..interfaces.embedder import Embedder
 from ..interfaces.kuzu import KuzuInterface
 from ..interfaces.qdrant import QdrantInterface
@@ -193,7 +193,15 @@ class MemoryService:
             user_fields = {
                 k: v
                 for k, v in current_payload.items()
-                if k not in ("id", "user_id", "memory_type", "created_at", "updated_at", "hrid")
+                if k
+                not in (
+                    "id",
+                    "user_id",
+                    "memory_type",
+                    "created_at",
+                    "updated_at",
+                    "hrid",
+                )
             }
 
             # Merge updates into user fields
@@ -275,75 +283,6 @@ class MemoryService:
             raise ProcessingError(
                 "Failed to update memory",
                 operation="update_memory",
-                context={"hrid": hrid, "user_id": user_id, "memory_type": memory_type},
-                original_error=e,
-            ) from e
-
-    def get_memory(
-        self,
-        hrid: str,
-        user_id: str,
-        memory_type: str | None = None,
-        collection: str | None = None,
-    ) -> dict[str, Any] | None:
-        """Get a single memory by HRID.
-
-        Args:
-            hrid: Human-readable identifier of the memory.
-            user_id: User ID for ownership verification.
-            memory_type: Optional memory type hint (inferred from HRID if not provided).
-            collection: Optional Qdrant collection override.
-
-        Returns:
-            dict[str, Any] | None: Memory data with full payload, or None if not found.
-
-        Raises:
-            ProcessingError: If memory retrieval fails due to system error.
-        """
-        try:
-            # Infer memory type from HRID if not provided
-            if memory_type is None:
-                memory_type = hrid.split("_")[0].lower()
-
-            # Get UUID from HRID
-            uuid = self.hrid_tracker.get_uuid(hrid, user_id)
-            if not uuid:
-                # HRID not found for this user
-                return None
-
-            # Get memory data from Qdrant
-            point_data = self.qdrant.get_point(uuid, collection)
-            if not point_data:
-                # Point not found in Qdrant
-                return None
-
-            # Verify user ownership (extra safety check)
-            payload = point_data.get("payload", {})
-            if payload.get("user_id") != user_id:
-                # Memory doesn't belong to this user
-                return None
-
-            # Build response with full memory information
-            memory_data = {
-                "hrid": hrid,
-                "uuid": uuid,
-                "memory_type": payload.get("memory_type", memory_type),
-                "user_id": user_id,
-                "created_at": payload.get("created_at"),
-                "updated_at": payload.get("updated_at"),
-                "payload": {
-                    k: v
-                    for k, v in payload.items()
-                    if k not in ("id", "user_id", "memory_type", "created_at", "updated_at", "hrid")
-                },
-            }
-
-            return memory_data
-
-        except Exception as e:
-            raise ProcessingError(
-                "Failed to get memory",
-                operation="get_memory",
                 context={"hrid": hrid, "user_id": user_id, "memory_type": memory_type},
                 original_error=e,
             ) from e
@@ -463,102 +402,6 @@ class MemoryService:
                     "to_hrid": to_memory_hrid,
                     "relation_type": relation_type,
                 },
-                original_error=e,
-            ) from e
-
-    def search_memories(
-        self,
-        query_text: str,
-        limit: int = 5,
-        user_id: str | None = None,
-        memory_types: list[str] | None = None,
-        collection: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Search memories using vector similarity.
-
-        Args:
-            query_text: Text to search for.
-            limit: Maximum number of results.
-            user_id: Filter by user ID.
-            memory_types: Filter by memory types.
-            collection: Optional Qdrant collection override.
-
-        Returns:
-            list[dict[str, Any]]: List of memory results with scores.
-        """
-        try:
-            # Generate query vector
-            query_vector = self.embedder.get_embedding(query_text)
-
-            # Build filters with mandatory user_id
-            filters: dict[str, Any] = {}
-
-            # CRITICAL SECURITY: user_id is mandatory
-            if not user_id:
-                raise DatabaseError(
-                    "user_id is required for search operations",
-                    operation="indexer_search_validation",
-                    context={"user_id": user_id},
-                )
-            filters["user_id"] = user_id
-
-            if memory_types:
-                filters["memory_type"] = memory_types
-
-            # Search in Qdrant (user_id now included in filters)
-            results = self.qdrant.search_points(
-                vector=query_vector,
-                limit=limit,
-                collection=collection,
-                filters=filters,
-            )
-
-            return results
-
-        except Exception as e:
-            raise ProcessingError(
-                "Failed to search memories",
-                operation="search_memories",
-                context={"query_text": query_text, "user_id": user_id},
-                original_error=e,
-            ) from e
-
-    def get_memory_neighbors(
-        self,
-        memory_id: str,
-        memory_type: str,
-        user_id: str,
-        relation_types: list[str] | None = None,
-        direction: str = "any",
-        limit: int = 10,
-    ) -> list[dict[str, Any]]:
-        """Get related memories through graph relationships.
-
-        Args:
-            memory_id: Memory ID to find neighbors for
-            memory_type: Memory entity type
-            user_id: User ID for isolation
-            relation_types: Filter by specific relationship types
-            direction: "in", "out", or "any"
-            limit: Maximum number of neighbors
-
-        Returns:
-            List of neighbor memories with relationship info
-        """
-        try:
-            return self.kuzu.neighbors(
-                node_label=memory_type,
-                node_uuid=memory_id,
-                user_id=user_id,
-                rel_types=relation_types,
-                direction=direction,
-                limit=limit,
-            )
-        except Exception as e:
-            raise ProcessingError(
-                "Failed to get memory neighbors",
-                operation="get_memory_neighbors",
-                context={"memory_id": memory_id, "memory_type": memory_type},
                 original_error=e,
             ) from e
 

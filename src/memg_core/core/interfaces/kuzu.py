@@ -169,7 +169,11 @@ class KuzuInterface:
                 raise DatabaseError(
                     "YamlTranslator required for relationship operations",
                     operation="add_relationship",
-                    context={"from_table": from_table, "to_table": to_table, "rel_type": rel_type},
+                    context={
+                        "from_table": from_table,
+                        "to_table": to_table,
+                        "rel_type": rel_type,
+                    },
                 )
 
             relationship_table_name = self.yaml_translator.relationship_table_name(
@@ -187,7 +191,12 @@ class KuzuInterface:
                 f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
                 f"CREATE (a)-[:{relationship_table_name}{rel_props}]->(b)"
             )
-            create_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id, **props}
+            create_params = {
+                "from_id": from_id,
+                "to_id": to_id,
+                "user_id": user_id,
+                **props,
+            }
             self.conn.execute(create_query, parameters=create_params)
         except Exception as e:
             raise DatabaseError(
@@ -256,7 +265,11 @@ class KuzuInterface:
                 raise DatabaseError(
                     "YamlTranslator required for relationship operations",
                     operation="delete_relationship",
-                    context={"from_table": from_table, "to_table": to_table, "rel_type": rel_type},
+                    context={
+                        "from_table": from_table,
+                        "to_table": to_table,
+                        "rel_type": rel_type,
+                    },
                 )
 
             relationship_table_name = self.yaml_translator.relationship_table_name(
@@ -388,7 +401,9 @@ class KuzuInterface:
             # Get concrete relationship labels for this source and predicates
             if rel_types:
                 relationship_labels = self.yaml_translator.get_labels_for_predicates(
-                    source_type=node_label, predicates=rel_types, neighbor_label=neighbor_label
+                    source_type=node_label,
+                    predicates=rel_types,
+                    neighbor_label=neighbor_label,
                 )
                 if not relationship_labels:
                     # No matching relationships found - return empty
@@ -480,6 +495,77 @@ class KuzuInterface:
                 f"Failed to delete node from {table}",
                 operation="delete_node",
                 context={"table": table, "node_uuid": node_uuid, "user_id": user_id},
+                original_error=e,
+            ) from e
+
+    def get_nodes(
+        self,
+        user_id: str,
+        node_type: str | None = None,
+        filters: dict[str, Any] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Get multiple nodes with filtering and pagination.
+
+        Args:
+            user_id: User ID for ownership verification.
+            node_type: Optional node type filter (e.g., "task", "note").
+            filters: Optional field filters (e.g., {"status": "open"}).
+            limit: Maximum number of nodes to return.
+            offset: Number of nodes to skip for pagination.
+
+        Returns:
+            list[dict[str, Any]]: List of node data from Kuzu.
+
+        Raises:
+            DatabaseError: If node retrieval fails.
+        """
+        try:
+            filters = filters or {}
+
+            # Build MATCH clause
+            if node_type:
+                match_clause = f"MATCH (n:{node_type} {{user_id: $user_id"
+            else:
+                match_clause = "MATCH (n {user_id: $user_id"
+
+            # Add field filters
+            params = {"user_id": user_id, "limit": limit, "offset": offset}
+            for field_name, field_value in filters.items():
+                param_name = f"filter_{field_name}"
+                match_clause += f", {field_name}: ${param_name}"
+                params[param_name] = field_value
+
+            match_clause += "})"
+
+            # Build complete query
+            cypher_query = f"""
+            {match_clause}
+            RETURN n.id as id,
+                   n.user_id as user_id,
+                   n.memory_type as memory_type,
+                   n.created_at as created_at,
+                   n.updated_at as updated_at,
+                   n as node
+            ORDER BY n.created_at DESC
+            SKIP $offset
+            LIMIT $limit
+            """
+
+            return self.query(cypher_query, params)
+
+        except Exception as e:
+            raise DatabaseError(
+                "Failed to get nodes from Kuzu",
+                operation="get_nodes",
+                context={
+                    "user_id": user_id,
+                    "node_type": node_type,
+                    "filters": filters,
+                    "limit": limit,
+                    "offset": offset,
+                },
                 original_error=e,
             ) from e
 

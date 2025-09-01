@@ -54,7 +54,12 @@ class MemgClient:
         return self._memory_service.add_memory(memory_type, payload, user_id)
 
     def search(
-        self, query: str, user_id: str, memory_type: str | None = None, limit: int = 10, **kwargs
+        self,
+        query: str,
+        user_id: str,
+        memory_type: str | None = None,
+        limit: int = 10,
+        **kwargs,
     ) -> list[SearchResult]:
         """Search memories.
 
@@ -205,12 +210,46 @@ class MemgClient:
             dict[str, Any] | None: Memory data with full payload, or None if not found.
         """
         try:
-            return self._memory_service.get_memory(hrid, user_id, memory_type)
+            return self._search_service.get_memory(hrid, user_id, memory_type)
         except (ProcessingError, DatabaseError, ValidationError) as e:
             # Log the specific error but return None for API compatibility
             logger = get_logger("memg_client")
             logger.warning(f"Get memory failed for HRID {hrid}: {e}")
             return None
+
+    def get_memories(
+        self,
+        user_id: str,
+        memory_type: str | None = None,
+        filters: dict[str, Any] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        include_neighbors: bool = False,
+        hops: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Get multiple memories with filtering and optional graph expansion.
+
+        Args:
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type filter (e.g., "task", "note").
+            filters: Optional field filters (e.g., {"status": "open", "priority": "high"}).
+            limit: Maximum number of memories to return (default 50).
+            offset: Number of memories to skip for pagination (default 0).
+            include_neighbors: Whether to include neighbor nodes via graph traversal.
+            hops: Number of hops for neighbor expansion (default 1).
+
+        Returns:
+            list[dict[str, Any]]: List of memory data with full payloads.
+        """
+        try:
+            return self._search_service.get_memories(
+                user_id, memory_type, filters, limit, offset, include_neighbors, hops
+            )
+        except (ProcessingError, DatabaseError, ValidationError) as e:
+            # Log the specific error but return empty list for API compatibility
+            logger = get_logger("memg_client")
+            logger.warning(f"Get memories failed: {e}")
+            return []
 
     def close(self):
         """Close client and cleanup resources.
@@ -294,7 +333,10 @@ def delete_memory(hrid: str, user_id: str, memory_type: str | None = None) -> bo
 
 
 def update_memory(
-    hrid: str, payload_updates: dict[str, Any], user_id: str, memory_type: str | None = None
+    hrid: str,
+    payload_updates: dict[str, Any],
+    user_id: str,
+    memory_type: str | None = None,
 ) -> bool:
     """Update memory using environment-based client.
 
@@ -388,6 +430,34 @@ def get_memory(
         dict[str, Any] | None: Memory data with full payload, or None if not found.
     """
     return _get_client().get_memory(hrid, user_id, memory_type)
+
+
+def get_memories(
+    user_id: str,
+    memory_type: str | None = None,
+    filters: dict[str, Any] | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    include_neighbors: bool = False,
+    hops: int = 1,
+) -> list[dict[str, Any]]:
+    """Get memories using environment-based client.
+
+    Args:
+        user_id: User ID for ownership verification.
+        memory_type: Optional memory type filter (e.g., "task", "note").
+        filters: Optional field filters (e.g., {"status": "open", "priority": "high"}).
+        limit: Maximum number of memories to return (default 50).
+        offset: Number of memories to skip for pagination (default 0).
+        include_neighbors: Whether to include neighbor nodes via graph traversal.
+        hops: Number of hops for neighbor expansion (default 1).
+
+    Returns:
+        list[dict[str, Any]]: List of memory data with full payloads.
+    """
+    return _get_client().get_memories(
+        user_id, memory_type, filters, limit, offset, include_neighbors, hops
+    )
 
 
 def shutdown_services():
