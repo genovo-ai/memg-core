@@ -257,10 +257,15 @@ class MemoryService:
                 **memory.payload,
             }
 
-            # For now, use delete + add pattern until update_node is implemented
-            # This preserves relationships since we use the same UUID
-            self.kuzu.delete_node(memory_type, uuid, user_id)
-            self.kuzu.add_node(memory_type, kuzu_data)
+            # Update Kuzu node using efficient update_node method
+            # This preserves relationships and is more efficient than delete+add
+            success = self.kuzu.update_node(memory_type, uuid, kuzu_data, user_id)
+            if not success:
+                raise ProcessingError(
+                    "Failed to update memory in graph storage - memory not found",
+                    operation="update_memory",
+                    context={"memory_id": uuid, "hrid": hrid, "user_id": user_id},
+                )
 
             return True
 
@@ -270,6 +275,75 @@ class MemoryService:
             raise ProcessingError(
                 "Failed to update memory",
                 operation="update_memory",
+                context={"hrid": hrid, "user_id": user_id, "memory_type": memory_type},
+                original_error=e,
+            ) from e
+
+    def get_memory(
+        self,
+        hrid: str,
+        user_id: str,
+        memory_type: str | None = None,
+        collection: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Get a single memory by HRID.
+
+        Args:
+            hrid: Human-readable identifier of the memory.
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type hint (inferred from HRID if not provided).
+            collection: Optional Qdrant collection override.
+
+        Returns:
+            dict[str, Any] | None: Memory data with full payload, or None if not found.
+
+        Raises:
+            ProcessingError: If memory retrieval fails due to system error.
+        """
+        try:
+            # Infer memory type from HRID if not provided
+            if memory_type is None:
+                memory_type = hrid.split("_")[0].lower()
+
+            # Get UUID from HRID
+            uuid = self.hrid_tracker.get_uuid(hrid, user_id)
+            if not uuid:
+                # HRID not found for this user
+                return None
+
+            # Get memory data from Qdrant
+            point_data = self.qdrant.get_point(uuid, collection)
+            if not point_data:
+                # Point not found in Qdrant
+                return None
+
+            # Verify user ownership (extra safety check)
+            payload = point_data.get("payload", {})
+            if payload.get("user_id") != user_id:
+                # Memory doesn't belong to this user
+                return None
+
+            # Build response with full memory information
+            memory_data = {
+                "hrid": hrid,
+                "uuid": uuid,
+                "memory_type": payload.get("memory_type", memory_type),
+                "user_id": user_id,
+                "created_at": payload.get("created_at"),
+                "updated_at": payload.get("updated_at"),
+                "payload": {
+                    k: v
+                    for k, v in payload.items()
+                    if k not in ("id", "user_id", "memory_type", "created_at", "updated_at", "hrid")
+                },
+            }
+
+            return memory_data
+
+        except Exception as e:
+            raise ProcessingError(
+                "Failed to get memory",
+                operation="get_memory",
                 context={"hrid": hrid, "user_id": user_id, "memory_type": memory_type},
                 original_error=e,
             ) from e

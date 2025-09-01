@@ -188,6 +188,30 @@ class MemgClient:
             logger.warning(f"Delete relationship failed: {e}")
             return False
 
+    def get_memory(
+        self,
+        hrid: str,
+        user_id: str,
+        memory_type: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Get a single memory by HRID.
+
+        Args:
+            hrid: Human-readable identifier of the memory.
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type hint (inferred from HRID if not provided).
+
+        Returns:
+            dict[str, Any] | None: Memory data with full payload, or None if not found.
+        """
+        try:
+            return self._memory_service.get_memory(hrid, user_id, memory_type)
+        except (ProcessingError, DatabaseError, ValidationError) as e:
+            # Log the specific error but return None for API compatibility
+            logger = get_logger("memg_client")
+            logger.warning(f"Get memory failed for HRID {hrid}: {e}")
+            return None
+
     def close(self):
         """Close client and cleanup resources.
 
@@ -346,6 +370,24 @@ def delete_relationship(
         to_memory_type,
         user_id,
     )
+
+
+def get_memory(
+    hrid: str,
+    user_id: str,
+    memory_type: str | None = None,
+) -> dict[str, Any] | None:
+    """Get memory using environment-based client.
+
+    Args:
+        hrid: Human-readable identifier of the memory.
+        user_id: User ID for ownership verification.
+        memory_type: Optional memory type hint (inferred from HRID if not provided).
+
+    Returns:
+        dict[str, Any] | None: Memory data with full payload, or None if not found.
+    """
+    return _get_client().get_memory(hrid, user_id, memory_type)
 
 
 def shutdown_services():

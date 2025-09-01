@@ -47,6 +47,69 @@ class KuzuInterface:
                 original_error=e,
             ) from e
 
+    def update_node(
+        self, table: str, node_uuid: str, properties: dict[str, Any], user_id: str
+    ) -> bool:
+        """Update a node in the graph - pure CRUD operation.
+
+        Args:
+            table: Node table name.
+            node_uuid: UUID of the node to update.
+            properties: Node properties to update.
+            user_id: User ID for ownership verification.
+
+        Returns:
+            bool: True if update succeeded, False if node not found.
+
+        Raises:
+            DatabaseError: If node update fails due to system error.
+        """
+        try:
+            # CRITICAL: Check if node exists AND belongs to user
+            check_query = f"MATCH (n:{table} {{id: $uuid, user_id: $user_id}}) RETURN n.id as id"
+            check_result = self.query(check_query, {"uuid": node_uuid, "user_id": user_id})
+
+            if not check_result:
+                # Node doesn't exist for this user
+                return False
+
+            # Build SET clause for properties
+            set_clauses = []
+            params = {"uuid": node_uuid, "user_id": user_id}
+
+            for key, value in properties.items():
+                # Skip system fields that shouldn't be updated via this method
+                if key in ("id", "user_id"):
+                    continue
+
+                param_name = f"prop_{key}"
+                set_clauses.append(f"n.{key} = ${param_name}")
+                params[param_name] = value
+
+            if not set_clauses:
+                # No properties to update (all were system fields)
+                return True
+
+            # Execute update query
+            set_clause = ", ".join(set_clauses)
+            update_query = f"MATCH (n:{table} {{id: $uuid, user_id: $user_id}}) SET {set_clause}"
+            self.conn.execute(update_query, parameters=params)
+
+            return True
+
+        except Exception as e:
+            raise DatabaseError(
+                f"Failed to update node in {table}",
+                operation="update_node",
+                context={
+                    "table": table,
+                    "node_uuid": node_uuid,
+                    "properties": properties,
+                    "user_id": user_id,
+                },
+                original_error=e,
+            ) from e
+
     def add_relationship(
         self,
         from_table: str,
