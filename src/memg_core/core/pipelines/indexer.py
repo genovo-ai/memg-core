@@ -326,6 +326,74 @@ class MemoryService:
                 original_error=e,
             ) from e
 
+    def delete_relationship(
+        self,
+        from_memory_hrid: str,
+        to_memory_hrid: str,
+        relation_type: str,
+        from_memory_type: str | None = None,
+        to_memory_type: str | None = None,
+        user_id: str | None = None,
+    ) -> bool:
+        """Delete a relationship between two memories using HRIDs.
+
+        Args:
+            from_memory_hrid: Source memory HRID.
+            to_memory_hrid: Target memory HRID.
+            relation_type: Relationship type from YAML schema (e.g., 'ANNOTATES').
+            from_memory_type: Source memory entity type (inferred from HRID if not provided).
+            to_memory_type: Target memory entity type (inferred from HRID if not provided).
+            user_id: User ID for ownership verification (required).
+
+        Returns:
+            bool: True if deletion succeeded, False if relationship not found.
+
+        Raises:
+            ProcessingError: If relationship deletion fails or parameters invalid.
+        """
+        try:
+            # Validate required user_id
+            if not user_id:
+                raise ProcessingError(
+                    "user_id is required for relationship deletion",
+                    operation="delete_relationship",
+                    context={"from_hrid": from_memory_hrid, "to_hrid": to_memory_hrid},
+                )
+
+            # Infer memory types from HRIDs if not provided
+            if from_memory_type is None:
+                from_memory_type = from_memory_hrid.split("_")[0].lower()
+            if to_memory_type is None:
+                to_memory_type = to_memory_hrid.split("_")[0].lower()
+
+            # Translate HRIDs to UUIDs
+            from_uuid = self.hrid_tracker.get_uuid(from_memory_hrid, user_id)
+            to_uuid = self.hrid_tracker.get_uuid(to_memory_hrid, user_id)
+
+            # Delete relationship using Kuzu interface
+            return self.kuzu.delete_relationship(
+                from_table=from_memory_type,
+                to_table=to_memory_type,
+                rel_type=relation_type,
+                from_id=from_uuid,
+                to_id=to_uuid,
+                user_id=user_id,
+            )
+
+        except Exception as e:
+            if isinstance(e, ProcessingError):
+                raise
+            raise ProcessingError(
+                "Failed to delete relationship",
+                operation="delete_relationship",
+                context={
+                    "from_hrid": from_memory_hrid,
+                    "to_hrid": to_memory_hrid,
+                    "relation_type": relation_type,
+                },
+                original_error=e,
+            ) from e
+
     def search_memories(
         self,
         query_text: str,

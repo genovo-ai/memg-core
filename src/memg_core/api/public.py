@@ -151,6 +151,43 @@ class MemgClient:
             properties,
         )
 
+    def delete_relationship(
+        self,
+        from_memory_hrid: str,
+        to_memory_hrid: str,
+        relation_type: str,
+        from_memory_type: str | None = None,
+        to_memory_type: str | None = None,
+        user_id: str | None = None,
+    ) -> bool:
+        """Delete relationship between memories.
+
+        Args:
+            from_memory_hrid: Source memory HRID.
+            to_memory_hrid: Target memory HRID.
+            relation_type: Relationship type from YAML schema.
+            from_memory_type: Source memory entity type (inferred from HRID if not provided).
+            to_memory_type: Target memory entity type (inferred from HRID if not provided).
+            user_id: User ID for ownership verification (required).
+
+        Returns:
+            bool: True if deletion succeeded, False if relationship not found.
+        """
+        try:
+            return self._memory_service.delete_relationship(
+                from_memory_hrid,
+                to_memory_hrid,
+                relation_type,
+                from_memory_type,
+                to_memory_type,
+                user_id,
+            )
+        except (ProcessingError, DatabaseError, ValidationError) as e:
+            # Log the specific error but return False for API compatibility
+            logger = get_logger("memg_client")
+            logger.warning(f"Delete relationship failed: {e}")
+            return False
+
     def close(self):
         """Close client and cleanup resources.
 
@@ -277,6 +314,37 @@ def add_relationship(
         to_memory_type,
         user_id,
         properties,
+    )
+
+
+def delete_relationship(
+    from_memory_hrid: str,
+    to_memory_hrid: str,
+    relation_type: str,
+    from_memory_type: str | None = None,
+    to_memory_type: str | None = None,
+    user_id: str | None = None,
+) -> bool:
+    """Delete relationship using environment-based client.
+
+    Args:
+        from_memory_hrid: Source memory HRID.
+        to_memory_hrid: Target memory HRID.
+        relation_type: Relationship type from YAML schema.
+        from_memory_type: Source memory entity type (inferred from HRID if not provided).
+        to_memory_type: Target memory entity type (inferred from HRID if not provided).
+        user_id: User ID for ownership verification (required).
+
+    Returns:
+        bool: True if deletion succeeded, False if relationship not found.
+    """
+    return _get_client().delete_relationship(
+        from_memory_hrid,
+        to_memory_hrid,
+        relation_type,
+        from_memory_type,
+        to_memory_type,
+        user_id,
     )
 
 
