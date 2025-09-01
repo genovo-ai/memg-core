@@ -257,4 +257,5 @@ temp*
 
 integration*
 scripts/*
-experiments/*
+experiments/**/local_*
+experiments/job*
