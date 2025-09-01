@@ -436,6 +436,45 @@ class YamlTranslator:
 
         return required_fields, optional_fields
 
+    def _validate_enum_fields(self, memory_type: str, payload: dict[str, Any]) -> None:
+        """Validate enum fields against YAML schema choices.
+
+        Args:
+            memory_type: Entity type from YAML schema.
+            payload: Memory data to validate.
+
+        Raises:
+            YamlTranslatorError: If enum field has invalid value.
+        """
+        emap = self._entities_map()
+        spec = emap.get(memory_type.lower())
+        if not spec:
+            return  # Entity validation happens elsewhere
+
+        # Get field definitions for this entity type
+        fields = spec.get("fields", {})
+
+        # Check each field in the payload
+        for field_name, field_value in payload.items():
+            if field_name in fields:
+                field_def = fields[field_name]
+
+                # Check if this is an enum field
+                if field_def.get("type") == "enum":
+                    choices = field_def.get("choices", [])
+
+                    # Validate the value against choices
+                    if field_value is not None and field_value not in choices:
+                        raise YamlTranslatorError(
+                            f"Invalid {field_name} value '{field_value}'. Valid choices: {choices}",
+                            context={
+                                "memory_type": memory_type,
+                                "field_name": field_name,
+                                "invalid_value": field_value,
+                                "valid_choices": choices,
+                            },
+                        )
+
     def validate_memory_against_yaml(
         self, memory_type: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
@@ -463,6 +502,9 @@ class YamlTranslator:
                 f"Missing required fields: {missing}",
                 context={"memory_type": memory_type},
             )
+
+        # Validate enum fields against YAML schema choices
+        self._validate_enum_fields(memory_type, payload)
 
         # Strip system-reserved fields if present
         cleaned = dict(payload)

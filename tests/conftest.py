@@ -317,6 +317,11 @@ def setup_test_environment(test_yaml_path: str, temp_db_path: str):
     try:
         yield
     finally:
+        # Shutdown singleton client to prevent connection reuse issues
+        from memg_core.api.public import shutdown_services
+
+        shutdown_services()
+
         # Restore original values
         if original_yaml is not None:
             os.environ["MEMG_YAML_PATH"] = original_yaml

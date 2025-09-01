@@ -13,7 +13,7 @@ import warnings
 from ...utils import generate_hrid
 from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
-from ..exceptions import DatabaseError, ProcessingError
+from ..exceptions import ProcessingError
 from ..interfaces.embedder import Embedder
 from ..interfaces.kuzu import KuzuInterface
 from ..interfaces.qdrant import QdrantInterface
@@ -147,6 +147,146 @@ class MemoryService:
                 original_error=e,
             ) from e
 
+    def update_memory(
+        self,
+        hrid: str,
+        payload_updates: dict[str, Any],
+        user_id: str,
+        memory_type: str | None = None,
+        collection: str | None = None,
+    ) -> bool:
+        """Update memory with partial payload changes (patch-style update).
+
+        Args:
+            hrid: Memory HRID to update.
+            payload_updates: Dictionary of fields to update (only changed fields).
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type hint (inferred from HRID if not provided).
+            collection: Optional Qdrant collection override.
+
+        Returns:
+            bool: True if update succeeded.
+
+        Raises:
+            ProcessingError: If update fails or memory not found.
+        """
+        try:
+            # Infer memory type from HRID if not provided
+            if memory_type is None:
+                memory_type = hrid.split("_")[0].lower()
+
+            # Get existing UUID to preserve relationships
+            uuid = self.hrid_tracker.get_uuid(hrid, user_id)
+
+            # Get current memory data from Qdrant to merge with updates
+            current_point = self.qdrant.get_point(uuid, collection)
+            if not current_point:
+                raise ProcessingError(
+                    f"Memory not found for HRID {hrid}",
+                    operation="update_memory",
+                    context={"hrid": hrid, "user_id": user_id},
+                )
+
+            # Merge current payload with updates
+            current_payload = current_point.get("payload", {})
+            # Remove system fields from current payload to get user fields only
+            user_fields = {
+                k: v
+                for k, v in current_payload.items()
+                if k
+                not in (
+                    "id",
+                    "user_id",
+                    "memory_type",
+                    "created_at",
+                    "updated_at",
+                    "hrid",
+                )
+            }
+
+            # Merge updates into user fields
+            updated_user_payload = {**user_fields, **payload_updates}
+
+            # Validate merged payload against YAML schema
+            memory = self.yaml_translator.create_memory_from_yaml(
+                memory_type, updated_user_payload, user_id
+            )
+            memory.id = uuid  # Preserve existing UUID for relationships
+
+            # Update timestamps - preserve created_at, update updated_at
+            from datetime import UTC, datetime
+
+            memory.created_at = datetime.fromisoformat(current_payload.get("created_at"))
+            memory.updated_at = datetime.now(UTC)
+
+            # Get anchor text for vector update
+            anchor_text = self.yaml_translator.build_anchor_text(memory)
+            if not anchor_text:
+                raise ProcessingError(
+                    f"Empty anchor text for memory type '{memory_type}'",
+                    operation="update_memory",
+                    context={"memory_id": memory.id, "memory_type": memory_type},
+                )
+
+            # Generate new embedding from updated anchor text
+            vector = self.embedder.get_embedding(anchor_text)
+
+            # Create updated flat payload for Qdrant
+            flat_payload = {
+                "user_id": memory.user_id,
+                "memory_type": memory.memory_type,
+                "created_at": memory.created_at.isoformat(),
+                "updated_at": memory.updated_at.isoformat(),
+                "hrid": hrid,  # Preserve HRID
+                **memory.payload,  # Updated and validated payload
+            }
+
+            # Update Qdrant point (upsert with same UUID)
+            success, _point_id = self.qdrant.add_point(
+                vector=vector,
+                payload=flat_payload,
+                point_id=memory.id,  # Same UUID preserves relationships
+                collection=collection,
+            )
+            if not success:
+                raise ProcessingError(
+                    "Failed to update memory in vector storage",
+                    operation="update_memory",
+                    context={"memory_id": memory.id, "hrid": hrid},
+                )
+
+            # Update Kuzu node (need to implement update_node method)
+            kuzu_data = {
+                "id": memory.id,
+                "user_id": memory.user_id,
+                "memory_type": memory.memory_type,
+                "created_at": memory.created_at.isoformat(),
+                "updated_at": memory.updated_at.isoformat(),
+                **memory.payload,
+            }
+
+            # Update Kuzu node using efficient update_node method
+            # This preserves relationships and is more efficient than delete+add
+            success = self.kuzu.update_node(memory_type, uuid, kuzu_data, user_id)
+            if not success:
+                raise ProcessingError(
+                    "Failed to update memory in graph storage - memory not found",
+                    operation="update_memory",
+                    context={"memory_id": uuid, "hrid": hrid, "user_id": user_id},
+                )
+
+            return True
+
+        except Exception as e:
+            if isinstance(e, ProcessingError):
+                raise
+            raise ProcessingError(
+                "Failed to update memory",
+                operation="update_memory",
+                context={"hrid": hrid, "user_id": user_id, "memory_type": memory_type},
+                original_error=e,
+            ) from e
+
     def add_relationship(
         self,
         from_memory_hrid: str,
@@ -197,99 +337,71 @@ class MemoryService:
                 original_error=e,
             ) from e
 
-    def search_memories(
+    def delete_relationship(
         self,
-        query_text: str,
-        limit: int = 5,
+        from_memory_hrid: str,
+        to_memory_hrid: str,
+        relation_type: str,
+        from_memory_type: str | None = None,
+        to_memory_type: str | None = None,
         user_id: str | None = None,
-        memory_types: list[str] | None = None,
-        collection: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Search memories using vector similarity.
+    ) -> bool:
+        """Delete a relationship between two memories using HRIDs.
 
         Args:
-            query_text: Text to search for.
-            limit: Maximum number of results.
-            user_id: Filter by user ID.
-            memory_types: Filter by memory types.
-            collection: Optional Qdrant collection override.
+            from_memory_hrid: Source memory HRID.
+            to_memory_hrid: Target memory HRID.
+            relation_type: Relationship type from YAML schema (e.g., 'ANNOTATES').
+            from_memory_type: Source memory entity type (inferred from HRID if not provided).
+            to_memory_type: Target memory entity type (inferred from HRID if not provided).
+            user_id: User ID for ownership verification (required).
 
         Returns:
-            list[dict[str, Any]]: List of memory results with scores.
+            bool: True if deletion succeeded, False if relationship not found.
+
+        Raises:
+            ProcessingError: If relationship deletion fails or parameters invalid.
         """
         try:
-            # Generate query vector
-            query_vector = self.embedder.get_embedding(query_text)
-
-            # Build filters with mandatory user_id
-            filters: dict[str, Any] = {}
-
-            # CRITICAL SECURITY: user_id is mandatory
+            # Validate required user_id
             if not user_id:
-                raise DatabaseError(
-                    "user_id is required for search operations",
-                    operation="indexer_search_validation",
-                    context={"user_id": user_id},
+                raise ProcessingError(
+                    "user_id is required for relationship deletion",
+                    operation="delete_relationship",
+                    context={"from_hrid": from_memory_hrid, "to_hrid": to_memory_hrid},
                 )
-            filters["user_id"] = user_id
 
-            if memory_types:
-                filters["memory_type"] = memory_types
+            # Infer memory types from HRIDs if not provided
+            if from_memory_type is None:
+                from_memory_type = from_memory_hrid.split("_")[0].lower()
+            if to_memory_type is None:
+                to_memory_type = to_memory_hrid.split("_")[0].lower()
 
-            # Search in Qdrant (user_id now included in filters)
-            results = self.qdrant.search_points(
-                vector=query_vector,
-                limit=limit,
-                collection=collection,
-                filters=filters,
-            )
+            # Translate HRIDs to UUIDs
+            from_uuid = self.hrid_tracker.get_uuid(from_memory_hrid, user_id)
+            to_uuid = self.hrid_tracker.get_uuid(to_memory_hrid, user_id)
 
-            return results
-
-        except Exception as e:
-            raise ProcessingError(
-                "Failed to search memories",
-                operation="search_memories",
-                context={"query_text": query_text, "user_id": user_id},
-                original_error=e,
-            ) from e
-
-    def get_memory_neighbors(
-        self,
-        memory_id: str,
-        memory_type: str,
-        user_id: str,
-        relation_types: list[str] | None = None,
-        direction: str = "any",
-        limit: int = 10,
-    ) -> list[dict[str, Any]]:
-        """Get related memories through graph relationships.
-
-        Args:
-            memory_id: Memory ID to find neighbors for
-            memory_type: Memory entity type
-            user_id: User ID for isolation
-            relation_types: Filter by specific relationship types
-            direction: "in", "out", or "any"
-            limit: Maximum number of neighbors
-
-        Returns:
-            List of neighbor memories with relationship info
-        """
-        try:
-            return self.kuzu.neighbors(
-                node_label=memory_type,
-                node_uuid=memory_id,
+            # Delete relationship using Kuzu interface
+            return self.kuzu.delete_relationship(
+                from_table=from_memory_type,
+                to_table=to_memory_type,
+                rel_type=relation_type,
+                from_id=from_uuid,
+                to_id=to_uuid,
                 user_id=user_id,
-                rel_types=relation_types,
-                direction=direction,
-                limit=limit,
             )
+
         except Exception as e:
+            if isinstance(e, ProcessingError):
+                raise
             raise ProcessingError(
-                "Failed to get memory neighbors",
-                operation="get_memory_neighbors",
-                context={"memory_id": memory_id, "memory_type": memory_type},
+                "Failed to delete relationship",
+                operation="delete_relationship",
+                context={
+                    "from_hrid": from_memory_hrid,
+                    "to_hrid": to_memory_hrid,
+                    "relation_type": relation_type,
+                },
                 original_error=e,
             ) from e
 

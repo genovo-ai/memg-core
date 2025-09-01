@@ -212,7 +212,10 @@ def _append_neighbors(
                         raise DatabaseError(
                             f"Failed to resolve HRID {memory.id} to UUID for graph traversal",
                             operation="hrid_to_uuid_translation",
-                            context={"hrid": memory.id, "memory_type": memory.memory_type},
+                            context={
+                                "hrid": memory.id,
+                                "memory_type": memory.memory_type,
+                            },
                         )
 
             neighbor_rows = kuzu.neighbors(

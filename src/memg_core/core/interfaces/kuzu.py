@@ -47,6 +47,69 @@ class KuzuInterface:
                 original_error=e,
             ) from e
 
+    def update_node(
+        self, table: str, node_uuid: str, properties: dict[str, Any], user_id: str
+    ) -> bool:
+        """Update a node in the graph - pure CRUD operation.
+
+        Args:
+            table: Node table name.
+            node_uuid: UUID of the node to update.
+            properties: Node properties to update.
+            user_id: User ID for ownership verification.
+
+        Returns:
+            bool: True if update succeeded, False if node not found.
+
+        Raises:
+            DatabaseError: If node update fails due to system error.
+        """
+        try:
+            # CRITICAL: Check if node exists AND belongs to user
+            check_query = f"MATCH (n:{table} {{id: $uuid, user_id: $user_id}}) RETURN n.id as id"
+            check_result = self.query(check_query, {"uuid": node_uuid, "user_id": user_id})
+
+            if not check_result:
+                # Node doesn't exist for this user
+                return False
+
+            # Build SET clause for properties
+            set_clauses = []
+            params = {"uuid": node_uuid, "user_id": user_id}
+
+            for key, value in properties.items():
+                # Skip system fields that shouldn't be updated via this method
+                if key in ("id", "user_id"):
+                    continue
+
+                param_name = f"prop_{key}"
+                set_clauses.append(f"n.{key} = ${param_name}")
+                params[param_name] = value
+
+            if not set_clauses:
+                # No properties to update (all were system fields)
+                return True
+
+            # Execute update query
+            set_clause = ", ".join(set_clauses)
+            update_query = f"MATCH (n:{table} {{id: $uuid, user_id: $user_id}}) SET {set_clause}"
+            self.conn.execute(update_query, parameters=params)
+
+            return True
+
+        except Exception as e:
+            raise DatabaseError(
+                f"Failed to update node in {table}",
+                operation="update_node",
+                context={
+                    "table": table,
+                    "node_uuid": node_uuid,
+                    "properties": properties,
+                    "user_id": user_id,
+                },
+                original_error=e,
+            ) from e
+
     def add_relationship(
         self,
         from_table: str,
@@ -106,7 +169,11 @@ class KuzuInterface:
                 raise DatabaseError(
                     "YamlTranslator required for relationship operations",
                     operation="add_relationship",
-                    context={"from_table": from_table, "to_table": to_table, "rel_type": rel_type},
+                    context={
+                        "from_table": from_table,
+                        "to_table": to_table,
+                        "rel_type": rel_type,
+                    },
                 )
 
             relationship_table_name = self.yaml_translator.relationship_table_name(
@@ -124,12 +191,131 @@ class KuzuInterface:
                 f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
                 f"CREATE (a)-[:{relationship_table_name}{rel_props}]->(b)"
             )
-            create_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id, **props}
+            create_params = {
+                "from_id": from_id,
+                "to_id": to_id,
+                "user_id": user_id,
+                **props,
+            }
             self.conn.execute(create_query, parameters=create_params)
         except Exception as e:
             raise DatabaseError(
                 f"Failed to add relationship {rel_type}",
                 operation="add_relationship",
+                context={
+                    "from_table": from_table,
+                    "to_table": to_table,
+                    "rel_type": rel_type,
+                    "from_id": from_id,
+                    "to_id": to_id,
+                },
+                original_error=e,
+            ) from e
+
+    def delete_relationship(
+        self,
+        from_table: str,
+        to_table: str,
+        rel_type: str,
+        from_id: str,
+        to_id: str,
+        user_id: str,
+    ) -> bool:
+        """Delete relationship between nodes.
+
+        Args:
+            from_table: Source node table name.
+            to_table: Target node table name.
+            rel_type: Relationship type.
+            from_id: Source node ID.
+            to_id: Target node ID.
+            user_id: User ID for ownership verification.
+
+        Returns:
+            bool: True if deletion succeeded, False if relationship not found.
+
+        Raises:
+            DatabaseError: If relationship deletion fails due to system error.
+        """
+        try:
+            # VALIDATE RELATIONSHIP AGAINST YAML SCHEMA - crash if invalid
+            from ..types import validate_relation_predicate
+
+            if not validate_relation_predicate(rel_type):
+                raise ValueError(
+                    f"Invalid relationship predicate: {rel_type}. Must be defined in YAML schema."
+                )
+
+            # CRITICAL: Verify both nodes belong to the user before deleting relationship
+            # First check if both nodes exist and belong to the user
+            check_query = (
+                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}}), "
+                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
+                f"RETURN a.id, b.id"
+            )
+            check_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id}
+            check_result = self.query(check_query, check_params)
+
+            if not check_result:
+                # Nodes don't exist or don't belong to user - return False (not found)
+                return False
+
+            # Generate relationship table name using YamlTranslator
+            if not self.yaml_translator:
+                raise DatabaseError(
+                    "YamlTranslator required for relationship operations",
+                    operation="delete_relationship",
+                    context={
+                        "from_table": from_table,
+                        "to_table": to_table,
+                        "rel_type": rel_type,
+                    },
+                )
+
+            relationship_table_name = self.yaml_translator.relationship_table_name(
+                source=from_table,
+                predicate=rel_type,
+                target=to_table,
+                directed=True,  # Direction affects semantics but not table naming for now
+            )
+
+            # First check if the relationship exists
+            check_rel_query = (
+                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}})"
+                f"-[r:{relationship_table_name}]->"
+                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
+                f"RETURN r"
+            )
+            check_rel_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id}
+
+            # Check if relationship exists
+            relationship_exists = self.query(check_rel_query, check_rel_params)
+            if not relationship_exists:
+                # Relationship doesn't exist - return False
+                return False
+
+            # Delete the specific relationship (we know it exists)
+            delete_query = (
+                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}})"
+                f"-[r:{relationship_table_name}]->"
+                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
+                f"DELETE r"
+            )
+            delete_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id}
+
+            # Execute deletion
+            self.conn.execute(delete_query, parameters=delete_params)
+
+            # If we get here, deletion succeeded
+            return True
+
+        except Exception as e:
+            if isinstance(e, ValueError):
+                # Re-raise validation errors as-is
+                raise
+            raise DatabaseError(
+                f"Failed to delete relationship {rel_type}",
+                operation="delete_relationship",
                 context={
                     "from_table": from_table,
                     "to_table": to_table,
@@ -229,7 +415,9 @@ class KuzuInterface:
             # Get concrete relationship labels for this source and predicates
             if rel_types:
                 relationship_labels = self.yaml_translator.get_labels_for_predicates(
-                    source_type=node_label, predicates=rel_types, neighbor_label=neighbor_label
+                    source_type=node_label,
+                    predicates=rel_types,
+                    neighbor_label=neighbor_label,
                 )
                 if not relationship_labels:
                     # No matching relationships found - return empty
@@ -321,6 +509,77 @@ class KuzuInterface:
                 f"Failed to delete node from {table}",
                 operation="delete_node",
                 context={"table": table, "node_uuid": node_uuid, "user_id": user_id},
+                original_error=e,
+            ) from e
+
+    def get_nodes(
+        self,
+        user_id: str,
+        node_type: str | None = None,
+        filters: dict[str, Any] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Get multiple nodes with filtering and pagination.
+
+        Args:
+            user_id: User ID for ownership verification.
+            node_type: Optional node type filter (e.g., "task", "note").
+            filters: Optional field filters (e.g., {"status": "open"}).
+            limit: Maximum number of nodes to return.
+            offset: Number of nodes to skip for pagination.
+
+        Returns:
+            list[dict[str, Any]]: List of node data from Kuzu.
+
+        Raises:
+            DatabaseError: If node retrieval fails.
+        """
+        try:
+            filters = filters or {}
+
+            # Build MATCH clause
+            if node_type:
+                match_clause = f"MATCH (n:{node_type} {{user_id: $user_id"
+            else:
+                match_clause = "MATCH (n {user_id: $user_id"
+
+            # Add field filters
+            params = {"user_id": user_id, "limit": limit, "offset": offset}
+            for field_name, field_value in filters.items():
+                param_name = f"filter_{field_name}"
+                match_clause += f", {field_name}: ${param_name}"
+                params[param_name] = field_value
+
+            match_clause += "})"
+
+            # Build complete query
+            cypher_query = f"""
+            {match_clause}
+            RETURN n.id as id,
+                   n.user_id as user_id,
+                   n.memory_type as memory_type,
+                   n.created_at as created_at,
+                   n.updated_at as updated_at,
+                   n as node
+            ORDER BY n.created_at DESC
+            SKIP $offset
+            LIMIT $limit
+            """
+
+            return self.query(cypher_query, params)
+
+        except Exception as e:
+            raise DatabaseError(
+                "Failed to get nodes from Kuzu",
+                operation="get_nodes",
+                context={
+                    "user_id": user_id,
+                    "node_type": node_type,
+                    "filters": filters,
+                    "limit": limit,
+                    "offset": offset,
+                },
                 original_error=e,
             ) from e
 

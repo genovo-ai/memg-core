@@ -54,7 +54,12 @@ class MemgClient:
         return self._memory_service.add_memory(memory_type, payload, user_id)
 
     def search(
-        self, query: str, user_id: str, memory_type: str | None = None, limit: int = 10, **kwargs
+        self,
+        query: str,
+        user_id: str,
+        memory_type: str | None = None,
+        limit: int = 10,
+        **kwargs,
     ) -> list[SearchResult]:
         """Search memories.
 
@@ -94,6 +99,32 @@ class MemgClient:
             logger.warning(f"Delete memory failed for HRID {hrid}: {e}")
             return False
 
+    def update_memory(
+        self,
+        hrid: str,
+        payload_updates: dict[str, Any],
+        user_id: str,
+        memory_type: str | None = None,
+    ) -> bool:
+        """Update memory with partial payload changes (patch-style update).
+
+        Args:
+            hrid: Memory HRID to update.
+            payload_updates: Dictionary of fields to update (only changed fields).
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type hint (inferred from HRID if not provided).
+
+        Returns:
+            bool: True if update succeeded, False otherwise.
+        """
+        try:
+            return self._memory_service.update_memory(hrid, payload_updates, user_id, memory_type)
+        except (ProcessingError, DatabaseError, ValidationError) as e:
+            # Log the specific error but return False for API compatibility
+            logger = get_logger("memg_client")
+            logger.warning(f"Update memory failed for HRID {hrid}: {e}")
+            return False
+
     def add_relationship(
         self,
         from_memory_hrid: str,
@@ -124,6 +155,101 @@ class MemgClient:
             user_id,
             properties,
         )
+
+    def delete_relationship(
+        self,
+        from_memory_hrid: str,
+        to_memory_hrid: str,
+        relation_type: str,
+        from_memory_type: str | None = None,
+        to_memory_type: str | None = None,
+        user_id: str | None = None,
+    ) -> bool:
+        """Delete relationship between memories.
+
+        Args:
+            from_memory_hrid: Source memory HRID.
+            to_memory_hrid: Target memory HRID.
+            relation_type: Relationship type from YAML schema.
+            from_memory_type: Source memory entity type (inferred from HRID if not provided).
+            to_memory_type: Target memory entity type (inferred from HRID if not provided).
+            user_id: User ID for ownership verification (required).
+
+        Returns:
+            bool: True if deletion succeeded, False if relationship not found.
+        """
+        try:
+            return self._memory_service.delete_relationship(
+                from_memory_hrid,
+                to_memory_hrid,
+                relation_type,
+                from_memory_type,
+                to_memory_type,
+                user_id,
+            )
+        except (ProcessingError, DatabaseError, ValidationError) as e:
+            # Log the specific error but return False for API compatibility
+            logger = get_logger("memg_client")
+            logger.warning(f"Delete relationship failed: {e}")
+            return False
+
+    def get_memory(
+        self,
+        hrid: str,
+        user_id: str,
+        memory_type: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Get a single memory by HRID.
+
+        Args:
+            hrid: Human-readable identifier of the memory.
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type hint (inferred from HRID if not provided).
+
+        Returns:
+            dict[str, Any] | None: Memory data with full payload, or None if not found.
+        """
+        try:
+            return self._search_service.get_memory(hrid, user_id, memory_type)
+        except (ProcessingError, DatabaseError, ValidationError) as e:
+            # Log the specific error but return None for API compatibility
+            logger = get_logger("memg_client")
+            logger.warning(f"Get memory failed for HRID {hrid}: {e}")
+            return None
+
+    def get_memories(
+        self,
+        user_id: str,
+        memory_type: str | None = None,
+        filters: dict[str, Any] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        include_neighbors: bool = False,
+        hops: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Get multiple memories with filtering and optional graph expansion.
+
+        Args:
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type filter (e.g., "task", "note").
+            filters: Optional field filters (e.g., {"status": "open", "priority": "high"}).
+            limit: Maximum number of memories to return (default 50).
+            offset: Number of memories to skip for pagination (default 0).
+            include_neighbors: Whether to include neighbor nodes via graph traversal.
+            hops: Number of hops for neighbor expansion (default 1).
+
+        Returns:
+            list[dict[str, Any]]: List of memory data with full payloads.
+        """
+        try:
+            return self._search_service.get_memories(
+                user_id, memory_type, filters, limit, offset, include_neighbors, hops
+            )
+        except (ProcessingError, DatabaseError, ValidationError) as e:
+            # Log the specific error but return empty list for API compatibility
+            logger = get_logger("memg_client")
+            logger.warning(f"Get memories failed: {e}")
+            return []
 
     def close(self):
         """Close client and cleanup resources.
@@ -206,6 +332,26 @@ def delete_memory(hrid: str, user_id: str, memory_type: str | None = None) -> bo
     return _get_client().delete_memory(hrid, user_id, memory_type)
 
 
+def update_memory(
+    hrid: str,
+    payload_updates: dict[str, Any],
+    user_id: str,
+    memory_type: str | None = None,
+) -> bool:
+    """Update memory using environment-based client.
+
+    Args:
+        hrid: Memory HRID to update.
+        payload_updates: Dictionary of fields to update (only changed fields).
+        user_id: User ID for ownership verification.
+        memory_type: Optional memory type hint (inferred from HRID if not provided).
+
+    Returns:
+        bool: True if update succeeded, False otherwise.
+    """
+    return _get_client().update_memory(hrid, payload_updates, user_id, memory_type)
+
+
 def add_relationship(
     from_memory_hrid: str,
     to_memory_hrid: str,
@@ -234,6 +380,83 @@ def add_relationship(
         to_memory_type,
         user_id,
         properties,
+    )
+
+
+def delete_relationship(
+    from_memory_hrid: str,
+    to_memory_hrid: str,
+    relation_type: str,
+    from_memory_type: str | None = None,
+    to_memory_type: str | None = None,
+    user_id: str | None = None,
+) -> bool:
+    """Delete relationship using environment-based client.
+
+    Args:
+        from_memory_hrid: Source memory HRID.
+        to_memory_hrid: Target memory HRID.
+        relation_type: Relationship type from YAML schema.
+        from_memory_type: Source memory entity type (inferred from HRID if not provided).
+        to_memory_type: Target memory entity type (inferred from HRID if not provided).
+        user_id: User ID for ownership verification (required).
+
+    Returns:
+        bool: True if deletion succeeded, False if relationship not found.
+    """
+    return _get_client().delete_relationship(
+        from_memory_hrid,
+        to_memory_hrid,
+        relation_type,
+        from_memory_type,
+        to_memory_type,
+        user_id,
+    )
+
+
+def get_memory(
+    hrid: str,
+    user_id: str,
+    memory_type: str | None = None,
+) -> dict[str, Any] | None:
+    """Get memory using environment-based client.
+
+    Args:
+        hrid: Human-readable identifier of the memory.
+        user_id: User ID for ownership verification.
+        memory_type: Optional memory type hint (inferred from HRID if not provided).
+
+    Returns:
+        dict[str, Any] | None: Memory data with full payload, or None if not found.
+    """
+    return _get_client().get_memory(hrid, user_id, memory_type)
+
+
+def get_memories(
+    user_id: str,
+    memory_type: str | None = None,
+    filters: dict[str, Any] | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    include_neighbors: bool = False,
+    hops: int = 1,
+) -> list[dict[str, Any]]:
+    """Get memories using environment-based client.
+
+    Args:
+        user_id: User ID for ownership verification.
+        memory_type: Optional memory type filter (e.g., "task", "note").
+        filters: Optional field filters (e.g., {"status": "open", "priority": "high"}).
+        limit: Maximum number of memories to return (default 50).
+        offset: Number of memories to skip for pagination (default 0).
+        include_neighbors: Whether to include neighbor nodes via graph traversal.
+        hops: Number of hops for neighbor expansion (default 1).
+
+    Returns:
+        list[dict[str, Any]]: List of memory data with full payloads.
+    """
+    return _get_client().get_memories(
+        user_id, memory_type, filters, limit, offset, include_neighbors, hops
     )
 
 

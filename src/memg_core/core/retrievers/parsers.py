@@ -242,7 +242,7 @@ def build_memory_from_kuzu_row(row: dict[str, Any], hrid_tracker=None) -> Memory
         user_id=user_id or "",  # Ensure string type
         memory_type=memory_type or "",  # Ensure string type
         payload=entity_payload,
-        created_at=_parse_datetime(created_at_str) if created_at_str else datetime.now(),
-        updated_at=_parse_datetime(updated_at_str) if updated_at_str else datetime.now(),
+        created_at=(_parse_datetime(created_at_str) if created_at_str else datetime.now()),
+        updated_at=(_parse_datetime(updated_at_str) if updated_at_str else datetime.now()),
         hrid=memory_id if hrid_tracker else None,
     )
