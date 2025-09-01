@@ -136,6 +136,8 @@ def get_dynamic_docstring(tool_name: str) -> str:
             "delete_memory": "Delete a memory by HRID. Updated this to test the YAML docstring helper.",
             "update_memory": "Update memory with partial payload changes (patch-style update).",
             "search_memories": "Search memories using semantic vector search with graph expansion. Updated this to test the YAML docstring helper.",
+            "get_memory": "Get a single memory by HRID with full payload and metadata.",
+            "get_memories": "Get multiple memories with filtering, pagination, and optional graph expansion.",
             "add_relationship": "Add a relationship between two memories. Updated this to test the YAML docstring helper.",
             "delete_relationship": "Delete a relationship between two memories."
         }
@@ -154,6 +156,10 @@ def get_dynamic_docstring(tool_name: str) -> str:
             return docstring_helper.generate_add_relationship_docstring()
         elif tool_name == "delete_relationship":
             return "Delete a relationship between two memories. Provide HRIDs, relation_type, and user_id. Memory types are inferred from HRIDs."
+        elif tool_name == "get_memory":
+            return docstring_helper.generate_get_memory_docstring()
+        elif tool_name == "get_memories":
+            return docstring_helper.generate_get_memories_docstring()
         else:
             return f"Dynamic docstring for {tool_name} not implemented."
     except Exception as e:
@@ -476,7 +482,7 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
             return {
                 "system_type": "MEMG Core (Generic)",
                 "version": __version__,
-                "functions": ["add_memory", "delete_memory", "update_memory", "search_memories", "add_relationship", "delete_relationship", "get_system_info", "health_check"],
+                "functions": ["add_memory", "delete_memory", "update_memory", "search_memories", "get_memory", "get_memories", "add_relationship", "delete_relationship", "get_system_info", "health_check"],
                 "memory_types": entity_types,
                 "yaml_schema": yaml_schema,
                 "note": "Schema details depend on the loaded YAML configuration"

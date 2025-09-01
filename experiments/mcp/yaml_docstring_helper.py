@@ -60,6 +60,28 @@ Args:
 
 Returns: Dict with result message and deletion status, or error details"""
 
+GET_MEMORY_TEMPLATE = """Get a single memory by HRID.
+
+Args:
+  hrid: Memory HRID (human readable identifier)
+  user_id: User identifier (for ownership verification)
+  memory_type: Optional memory type hint (inferred from HRID if not provided)
+
+Returns: Dict with memory data including hrid, memory_type, payload, timestamps, or error details"""
+
+GET_MEMORIES_TEMPLATE = """Get multiple memories with filtering and optional graph expansion.
+
+Args:
+  user_id: User identifier (required for data isolation)
+  memory_type: Filter by type ({entity_types}, optional)
+  limit: Maximum results (default: 50)
+  offset: Skip first N results for pagination (default: 0)
+  include_neighbors: Include graph neighbors (default: false)
+  hops: Graph traversal depth when include_neighbors=true (default: 1)
+  filters: Additional field-based filters (optional)
+
+Returns: Dict with memories array, count, and query parameters"""
+
 
 class YamlDocstringHelper:
     """Helper to generate clean docstrings from YAML schema for MCP consumers."""
@@ -185,6 +207,17 @@ class YamlDocstringHelper:
         """Generate docstring for delete_memory tool."""
         return DELETE_MEMORY_TEMPLATE
 
+    def generate_get_memory_docstring(self) -> str:
+        """Generate docstring for get_memory tool."""
+        return GET_MEMORY_TEMPLATE
+
+    def generate_get_memories_docstring(self) -> str:
+        """Generate docstring for get_memories tool."""
+        entities = self.get_all_entities()
+        return GET_MEMORIES_TEMPLATE.format(
+            entity_types=', '.join(sorted(entities))
+        )
+
     def generate_entity_summary(self) -> str:
         """Generate a summary of all entities in the schema for debugging."""
         entities = self.get_all_entities()
@@ -223,6 +256,8 @@ def main():
             ("🔗 ADD_RELATIONSHIP", helper.generate_add_relationship_docstring),
             ("🔍 SEARCH_MEMORIES", helper.generate_search_memories_docstring),
             ("🗑️ DELETE_MEMORY", helper.generate_delete_memory_docstring),
+            ("📄 GET_MEMORY", helper.generate_get_memory_docstring),
+            ("📚 GET_MEMORIES", helper.generate_get_memories_docstring),
             ("📋 ENTITY SUMMARY", helper.generate_entity_summary),
         ]
 
