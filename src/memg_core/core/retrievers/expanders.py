@@ -6,9 +6,6 @@ related memories through vector similarity and graph relationships.
 
 from __future__ import annotations
 
-import re
-
-from ..exceptions import DatabaseError
 from ..interfaces import Embedder, KuzuInterface, QdrantInterface
 from ..models import SearchResult
 from ..yaml_translator import YamlTranslator
@@ -17,21 +14,6 @@ from . import (
     build_memory_from_flat_payload,
     build_memory_from_kuzu_row,
 )
-
-
-def _is_uuid_format(value: str) -> bool:
-    """Check if a string matches UUID format (8-4-4-4-12 hex digits).
-
-    Args:
-        value: String to check.
-
-    Returns:
-        bool: True if string matches UUID format.
-    """
-    uuid_pattern = re.compile(
-        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
-    )
-    return bool(uuid_pattern.match(value))
 
 
 def _find_semantic_expansion(
@@ -183,40 +165,23 @@ def _append_neighbors(
     """
     all_results: list[SearchResult] = list(seeds)  # Start with seeds
 
-    # Track processed nodes to avoid cycles
-    processed_ids: set[str] = set()
     current_hop_seeds = seeds
 
     for hop in range(hops):
         next_hop_results: list[SearchResult] = []
+        # Track processed nodes per hop to avoid cycles within the same hop
+        hop_processed_ids: set[str] = set()
 
         for seed in current_hop_seeds:
             memory = seed.memory
-            if not memory.id or memory.id in processed_ids:
+            if not memory.id or memory.id in hop_processed_ids:
                 continue
 
-            processed_ids.add(memory.id)
+            hop_processed_ids.add(memory.id)
 
             # Get neighbors from Kuzu - using entity-specific tables
-            # Determine if memory.id is HRID or UUID and convert appropriately
+            # memory.id should always be UUID - no guessing needed
             memory_uuid = memory.id
-            if hrid_tracker:
-                # Explicit detection: UUID format vs HRID format
-                if _is_uuid_format(memory.id):
-                    # Already a UUID, use as-is
-                    memory_uuid = memory.id
-                else:
-                    # Assume HRID format, translate to UUID
-                    memory_uuid = hrid_tracker.get_uuid(memory.id, user_id)
-                    if not memory_uuid:
-                        raise DatabaseError(
-                            f"Failed to resolve HRID {memory.id} to UUID for graph traversal",
-                            operation="hrid_to_uuid_translation",
-                            context={
-                                "hrid": memory.id,
-                                "memory_type": memory.memory_type,
-                            },
-                        )
 
             neighbor_rows = kuzu.neighbors(
                 node_label=memory.memory_type,  # Use entity-specific table (bug, task, etc.)
@@ -231,7 +196,7 @@ def _append_neighbors(
             for row in neighbor_rows:
                 # Extract neighbor memory from row
                 neighbor_id = row["id"]
-                if not neighbor_id or neighbor_id in processed_ids:
+                if not neighbor_id or neighbor_id in hop_processed_ids:
                     continue
 
                 # Build neighbor Memory object using centralized utility
