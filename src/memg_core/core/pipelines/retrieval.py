@@ -372,7 +372,7 @@ class SearchService:
             for search_result in search_results:
                 memory = search_result.memory
                 memory_data = {
-                    "uuid": (memory.id or memory.hrid),  # Handle UUID fallback
+                    "hrid": memory.hrid,  # Always return HRID for API consistency
                     "memory_type": memory.memory_type,
                     "user_id": memory.user_id,
                     "created_at": (memory.created_at.isoformat() if memory.created_at else None),

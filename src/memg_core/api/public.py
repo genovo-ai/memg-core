@@ -9,8 +9,6 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ..core.exceptions import DatabaseError, ProcessingError, ValidationError
-from ..core.logging import get_logger
 from ..core.models import SearchResult
 from ..core.pipelines.indexer import MemoryService, create_memory_service
 from ..core.pipelines.retrieval import SearchService, create_search_service
@@ -89,15 +87,9 @@ class MemgClient:
         Returns:
             bool: True if deletion succeeded, False otherwise.
         """
-        try:
-            if memory_type is None:
-                memory_type = hrid.split("_")[0].lower()
-            return self._memory_service.delete_memory(hrid, memory_type, user_id)
-        except (ProcessingError, DatabaseError, ValidationError) as e:
-            # Log the specific error but return False for API compatibility
-            logger = get_logger("memg_client")
-            logger.warning(f"Delete memory failed for HRID {hrid}: {e}")
-            return False
+        if memory_type is None:
+            memory_type = hrid.split("_")[0].lower()
+        return self._memory_service.delete_memory(hrid, memory_type, user_id)
 
     def update_memory(
         self,
@@ -117,13 +109,7 @@ class MemgClient:
         Returns:
             bool: True if update succeeded, False otherwise.
         """
-        try:
-            return self._memory_service.update_memory(hrid, payload_updates, user_id, memory_type)
-        except (ProcessingError, DatabaseError, ValidationError) as e:
-            # Log the specific error but return False for API compatibility
-            logger = get_logger("memg_client")
-            logger.warning(f"Update memory failed for HRID {hrid}: {e}")
-            return False
+        return self._memory_service.update_memory(hrid, payload_updates, user_id, memory_type)
 
     def add_relationship(
         self,
@@ -178,20 +164,14 @@ class MemgClient:
         Returns:
             bool: True if deletion succeeded, False if relationship not found.
         """
-        try:
-            return self._memory_service.delete_relationship(
-                from_memory_hrid,
-                to_memory_hrid,
-                relation_type,
-                from_memory_type,
-                to_memory_type,
-                user_id,
-            )
-        except (ProcessingError, DatabaseError, ValidationError) as e:
-            # Log the specific error but return False for API compatibility
-            logger = get_logger("memg_client")
-            logger.warning(f"Delete relationship failed: {e}")
-            return False
+        return self._memory_service.delete_relationship(
+            from_memory_hrid,
+            to_memory_hrid,
+            relation_type,
+            from_memory_type,
+            to_memory_type,
+            user_id,
+        )
 
     def get_memory(
         self,
@@ -209,13 +189,7 @@ class MemgClient:
         Returns:
             dict[str, Any] | None: Memory data with full payload, or None if not found.
         """
-        try:
-            return self._search_service.get_memory(hrid, user_id, memory_type)
-        except (ProcessingError, DatabaseError, ValidationError) as e:
-            # Log the specific error but return None for API compatibility
-            logger = get_logger("memg_client")
-            logger.warning(f"Get memory failed for HRID {hrid}: {e}")
-            return None
+        return self._search_service.get_memory(hrid, user_id, memory_type)
 
     def get_memories(
         self,
@@ -241,15 +215,9 @@ class MemgClient:
         Returns:
             list[dict[str, Any]]: List of memory data with full payloads.
         """
-        try:
-            return self._search_service.get_memories(
-                user_id, memory_type, filters, limit, offset, include_neighbors, hops
-            )
-        except (ProcessingError, DatabaseError, ValidationError) as e:
-            # Log the specific error but return empty list for API compatibility
-            logger = get_logger("memg_client")
-            logger.warning(f"Get memories failed: {e}")
-            return []
+        return self._search_service.get_memories(
+            user_id, memory_type, filters, limit, offset, include_neighbors, hops
+        )
 
     def close(self):
         """Close client and cleanup resources.

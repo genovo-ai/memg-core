@@ -100,11 +100,8 @@ def _sort_key(result: SearchResult) -> tuple:
         # Use a high index for UUIDs to sort them after proper HRIDs
         idx = 999999999
     else:
-        try:
-            idx = hrid_to_index(hrid)
-        except ValueError:
-            # If HRID parsing fails, use high index as fallback
-            idx = 999999999
+        # Parse HRID index - crash on invalid format to expose data quality issues
+        idx = hrid_to_index(hrid)
 
     return (-float(result.score), idx, memory.id)
 
@@ -135,32 +132,6 @@ SYSTEM_FIELD_NAMES = {
 }
 
 
-def translate_hrid(uuid: str, user_id: str, hrid_tracker) -> str:
-    """Translate UUID to HRID using tracker, with fallback to UUID.
-
-    Args:
-        uuid: Internal UUID to translate.
-        user_id: User ID for ownership verification.
-        hrid_tracker: HridTracker instance (can be None).
-
-    Returns:
-        str: HRID if tracker available and translation succeeds, UUID otherwise.
-
-    Note:
-        This centralizes the HRID translation logic that was duplicated
-        across retrieval.py and expanders.py.
-    """
-    if not hrid_tracker:
-        return uuid
-
-    try:
-        return hrid_tracker.get_hrid(uuid, user_id)
-    except Exception:
-        # If HRID lookup fails, fall back to UUID
-        # TODO: Consider logging this failure for debugging
-        return uuid
-
-
 def build_memory_from_flat_payload(
     point_id: str, payload: dict[str, Any], hrid_tracker=None
 ) -> Memory:
@@ -176,14 +147,14 @@ def build_memory_from_flat_payload(
     """
     # Get HRID from tracker if available (extract user_id from payload)
     user_id = payload.get("user_id", "")
-    memory_id = translate_hrid(point_id, user_id, hrid_tracker)
+    memory_hrid = hrid_tracker.get_hrid(point_id, user_id) if hrid_tracker else None
 
     # Extract entity fields (everything except system fields)
     entity_fields = {k: v for k, v in payload.items() if k not in SYSTEM_FIELD_NAMES}
 
-    # Build Memory object directly from flat payload
+    # Build Memory object with proper ID separation
     return Memory(
-        id=memory_id,  # HRID if tracker available, UUID otherwise
+        id=point_id,  # Always UUID for internal operations
         user_id=payload.get("user_id") or "",  # Ensure string type
         memory_type=payload.get("memory_type") or "",  # Ensure string type
         payload=entity_fields,
@@ -193,7 +164,7 @@ def build_memory_from_flat_payload(
         updated_at=(
             _parse_datetime(payload["updated_at"]) if payload.get("updated_at") else datetime.now()
         ),
-        hrid=memory_id if hrid_tracker else None,
+        hrid=memory_hrid,  # HRID for external API
     )
 
 
@@ -224,8 +195,8 @@ def build_memory_from_kuzu_row(row: dict[str, Any], hrid_tracker=None) -> Memory
         node_data = row
 
     # Get HRID from tracker if available (extract user_id from node_data)
-    user_id = node_data.get("user_id", "")
-    memory_id = translate_hrid(neighbor_id, user_id, hrid_tracker)
+    user_id_for_hrid = node_data.get("user_id", "")
+    memory_hrid = hrid_tracker.get_hrid(neighbor_id, user_id_for_hrid) if hrid_tracker else None
 
     # Extract system fields with fallback logic
     user_id = node_data.get("user_id") or row.get("user_id")
@@ -236,13 +207,13 @@ def build_memory_from_kuzu_row(row: dict[str, Any], hrid_tracker=None) -> Memory
     # Create entity payload by excluding system fields
     entity_payload = {k: v for k, v in node_data.items() if k not in SYSTEM_FIELD_NAMES}
 
-    # Build Memory object
+    # Build Memory object with proper ID separation
     return Memory(
-        id=memory_id,  # HRID if tracker available, UUID otherwise
+        id=neighbor_id,  # Always UUID for internal operations
         user_id=user_id or "",  # Ensure string type
         memory_type=memory_type or "",  # Ensure string type
         payload=entity_payload,
         created_at=(_parse_datetime(created_at_str) if created_at_str else datetime.now()),
         updated_at=(_parse_datetime(updated_at_str) if updated_at_str else datetime.now()),
-        hrid=memory_id if hrid_tracker else None,
+        hrid=memory_hrid,  # HRID for external API
     )
