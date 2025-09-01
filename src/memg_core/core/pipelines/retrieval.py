@@ -372,8 +372,7 @@ class SearchService:
             for search_result in search_results:
                 memory = search_result.memory
                 memory_data = {
-                    "hrid": memory.hrid or memory.id,
-                    "uuid": (memory.id if memory.hrid else memory.id),  # Handle UUID fallback
+                    "uuid": (memory.id or memory.hrid),  # Handle UUID fallback
                     "memory_type": memory.memory_type,
                     "user_id": memory.user_id,
                     "created_at": (memory.created_at.isoformat() if memory.created_at else None),
