@@ -20,7 +20,11 @@ This document consolidates the current status, known limitations, and future roa
 - ✅ **Enum Validation**: Runtime validation with clear error messages showing valid choices
 
 #### **Enhanced API & Architecture**
-- ✅ **MCP Tools**: All 8 core tools with dynamic docstrings and robust error handling
+- ✅ **MCP Tools**: All 10 core tools with dynamic docstrings and robust error handling
+  - `add_memory`, `delete_memory`, `update_memory`
+  - `search_memories`, `get_memory`, `get_memories`
+  - `add_relationship`, `delete_relationship`
+  - `get_system_info`, `health_check`
 - ✅ **Clean Architecture**: Proper separation between MemoryService (write) and SearchService (read)
 - ✅ **HRID System**: UUID mapping infrastructure with user isolation
 - ✅ **Schema Consistency**: `user_id` properly marked as `system: true` across all schemas
@@ -38,36 +42,71 @@ This document consolidates the current status, known limitations, and future roa
 
 ### **1. Partial Memory Creation on Schema Validation Failure** ⚠️ **ACTIVE**
 
-**Issue**: Memory creation is not atomic across Qdrant and Kuzu. Schema validation failures can leave orphaned records in Qdrant.
+**What Happens**: When you create a memory, it gets saved to Qdrant (vector database) first, then to Kuzu (graph database). If the Kuzu save fails due to schema validation errors, the memory remains in Qdrant but not in Kuzu.
 
-**Impact**: Data inconsistency, search pollution, potential duplicates
+**Real Example**:
+```python
+add_memory("task", {"statement": "test", "invalid_field": "bad"}, "user")
+# Result: Memory saved in Qdrant ✅, but Kuzu save fails ❌
+# Now you have orphaned data in Qdrant that shows up in searches
+```
 
-**Workaround**: Validate payloads before creation attempts
+**Why It's Bad**:
+- Search finds memories that don't exist in the graph
+- Data inconsistency between storage systems
+- Duplicate attempts create more orphaned records
 
-**Status**: Needs atomic transaction implementation
+**Current Workaround**: Always validate your payload matches the YAML schema before calling add_memory
+
+**Fix Needed**: Implement atomic transactions - if either storage fails, rollback both
 
 ### **2. YAML Schema Design Ambiguities** 🟡 **MINOR**
 
-**Issue**: The `directed` field is ambiguous when used with multiple predicates in relationship definitions.
+**What's Confusing**: In YAML relationship definitions, it's unclear if `directed: true` applies to all predicates in a list.
 
-**Example**:
+**Real Example from Schema**:
 ```yaml
 relations:
-  - predicates: [FIXES, ADDRESSES, RESOLVES]  # Multiple predicates
-    directed: true  # ← Applies to all predicates?
+  bug:
+    - name: bug_relationships
+      predicates: [FIXES, ADDRESSES, RESOLVES]  # Multiple predicates
+      directed: true  # ← Does this make ALL three predicates directed?
 ```
 
-**Impact**: Unclear relationship semantics, potential traversal issues
+**The Problem**:
+- Does `FIXES` work both ways (A fixes B, B fixed-by A)?
+- Or is it one-way only (A fixes B, but not B fixes A)?
+- Same confusion for `ADDRESSES` and `RESOLVES`
 
-**Status**: Needs specification clarification
+**Why It Matters**: Graph traversal and relationship queries depend on direction
+
+**Fix Needed**: Clarify in documentation whether `directed` applies to all predicates or needs individual specification
 
 ### **3. Relationship `name` Field Underutilization** 🟡 **MINOR**
 
-**Issue**: The `name` field in relationships appears decorative rather than functional.
+**What's the Issue**: Every relationship definition has a `name` field, but it's not clear what it's used for.
 
-**Impact**: Potential schema bloat, unclear naming conventions
+**Real Example from Schema**:
+```yaml
+relations:
+  task:
+    - name: task_blocks_task          # ← What is this name used for?
+      description: "Task blocking another task"
+      predicate: BLOCKS               # ← This is what actually matters
+      directed: true
+```
 
-**Status**: Needs usage clarification or removal
+**The Confusion**:
+- Is `name` just a comment/documentation?
+- Does the system use `name` for anything functional?
+- Should it match the `predicate` or can it be anything?
+
+**Why It's Annoying**:
+- Schema files get bloated with potentially useless names
+- Unclear naming conventions (snake_case vs camelCase vs whatever)
+- Maintenance burden - if you change predicate, do you change name?
+
+**Fix Needed**: Either make `name` functional (use it for something) or remove it entirely
 
 ---
 
@@ -267,10 +306,11 @@ relations:
 - Test update operations and relationship lifecycle
 
 **Edge Cases**:
-- Invalid enum values (currently accepted - known limitation)
-- Cross-user access attempts (should fail)
-- Schema validation failures
-- Relationship creation with non-existent memories
+- Invalid enum values (now properly rejected with clear error messages)
+- Cross-user access attempts (properly blocked)
+- Schema validation failures (graceful error handling)
+- Relationship creation with non-existent memories (proper validation)
+- Parameter validation (negative limits, empty user_ids, etc.)
 
 #### **3. Performance Testing**
 - **Query Performance**: Ensure get_memories scales with dataset size

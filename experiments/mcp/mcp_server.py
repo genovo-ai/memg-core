@@ -490,6 +490,89 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 "yaml_schema": os.getenv("MEMG_YAML_SCHEMA", "not configured")
             }
 
+    @app.tool("get_memory")
+    def get_memory_tool(hrid: str, user_id: str, memory_type: Optional[str] = None) -> Dict[str, Any]:
+        """Get a single memory by HRID."""
+        logger.info(f"=== GET_MEMORY TOOL CALLED ===")
+        logger.info(f"Getting memory {hrid} for user {user_id}")
+
+        try:
+            client = get_memg_client()
+            memory_data = client.get_memory(
+                hrid=hrid,
+                user_id=user_id,
+                memory_type=memory_type
+            )
+
+            if memory_data:
+                logger.info(f"✅ Successfully retrieved {hrid}")
+                return {
+                    "result": "Memory retrieved successfully",
+                    "memory": memory_data
+                }
+            else:
+                logger.warning(f"⚠️ Memory not found: {hrid}")
+                return {
+                    "result": "Memory not found",
+                    "hrid": hrid,
+                    "memory": None
+                }
+
+        except Exception as e:
+            logger.error(f"Error retrieving {hrid}: {e}")
+            return {
+                "error": f"Failed to retrieve {hrid}: {str(e)}",
+                "hrid": hrid,
+                "memory": None
+            }
+
+    @app.tool("get_memories")
+    def get_memories_tool(
+        user_id: str,
+        memory_type: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        include_neighbors: bool = False,
+        hops: int = 1,
+        filters: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Get multiple memories with filtering and optional graph expansion."""
+        logger.info(f"=== GET_MEMORIES TOOL CALLED ===")
+        logger.info(f"Getting memories for user {user_id}, type: {memory_type}, limit: {limit}")
+
+        try:
+            client = get_memg_client()
+            memories = client.get_memories(
+                user_id=user_id,
+                memory_type=memory_type,
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                include_neighbors=include_neighbors,
+                hops=hops
+            )
+
+            logger.info(f"✅ Successfully retrieved {len(memories)} memories")
+            return {
+                "result": f"Retrieved {len(memories)} memories",
+                "memories": memories,
+                "count": len(memories),
+                "query_params": {
+                    "memory_type": memory_type,
+                    "limit": limit,
+                    "offset": offset,
+                    "include_neighbors": include_neighbors,
+                    "filters": filters
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error retrieving memories: {e}")
+            return {
+                "error": f"Failed to retrieve memories: {str(e)}",
+                "memories": [],
+                "count": 0
+            }
 
 def create_app() -> FastMCP:
     """Create and configure the FastMCP app."""
