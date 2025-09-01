@@ -94,6 +94,32 @@ class MemgClient:
             logger.warning(f"Delete memory failed for HRID {hrid}: {e}")
             return False
 
+    def update_memory(
+        self,
+        hrid: str,
+        payload_updates: dict[str, Any],
+        user_id: str,
+        memory_type: str | None = None,
+    ) -> bool:
+        """Update memory with partial payload changes (patch-style update).
+
+        Args:
+            hrid: Memory HRID to update.
+            payload_updates: Dictionary of fields to update (only changed fields).
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type hint (inferred from HRID if not provided).
+
+        Returns:
+            bool: True if update succeeded, False otherwise.
+        """
+        try:
+            return self._memory_service.update_memory(hrid, payload_updates, user_id, memory_type)
+        except (ProcessingError, DatabaseError, ValidationError) as e:
+            # Log the specific error but return False for API compatibility
+            logger = get_logger("memg_client")
+            logger.warning(f"Update memory failed for HRID {hrid}: {e}")
+            return False
+
     def add_relationship(
         self,
         from_memory_hrid: str,
@@ -204,6 +230,23 @@ def delete_memory(hrid: str, user_id: str, memory_type: str | None = None) -> bo
         bool: True if deletion succeeded, False otherwise.
     """
     return _get_client().delete_memory(hrid, user_id, memory_type)
+
+
+def update_memory(
+    hrid: str, payload_updates: dict[str, Any], user_id: str, memory_type: str | None = None
+) -> bool:
+    """Update memory using environment-based client.
+
+    Args:
+        hrid: Memory HRID to update.
+        payload_updates: Dictionary of fields to update (only changed fields).
+        user_id: User ID for ownership verification.
+        memory_type: Optional memory type hint (inferred from HRID if not provided).
+
+    Returns:
+        bool: True if update succeeded, False otherwise.
+    """
+    return _get_client().update_memory(hrid, payload_updates, user_id, memory_type)
 
 
 def add_relationship(

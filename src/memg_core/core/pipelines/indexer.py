@@ -124,6 +124,7 @@ class MemoryService:
             # Add to Kuzu (graph storage) - use entity-specific table
             kuzu_data = {
                 "id": memory.id,
+                "hrid": hrid,  # Include HRID for complete backup capability
                 "user_id": memory.user_id,
                 "memory_type": memory.memory_type,
                 "created_at": memory.created_at.isoformat(),
@@ -144,6 +145,134 @@ class MemoryService:
                 "Failed to add memory",
                 operation="add_memory",
                 context={"memory_type": memory_type, "user_id": user_id},
+                original_error=e,
+            ) from e
+
+    def update_memory(
+        self,
+        hrid: str,
+        payload_updates: dict[str, Any],
+        user_id: str,
+        memory_type: str | None = None,
+        collection: str | None = None,
+    ) -> bool:
+        """Update memory with partial payload changes (patch-style update).
+
+        Args:
+            hrid: Memory HRID to update.
+            payload_updates: Dictionary of fields to update (only changed fields).
+            user_id: User ID for ownership verification.
+            memory_type: Optional memory type hint (inferred from HRID if not provided).
+            collection: Optional Qdrant collection override.
+
+        Returns:
+            bool: True if update succeeded.
+
+        Raises:
+            ProcessingError: If update fails or memory not found.
+        """
+        try:
+            # Infer memory type from HRID if not provided
+            if memory_type is None:
+                memory_type = hrid.split("_")[0].lower()
+
+            # Get existing UUID to preserve relationships
+            uuid = self.hrid_tracker.get_uuid(hrid, user_id)
+
+            # Get current memory data from Qdrant to merge with updates
+            current_point = self.qdrant.get_point(uuid, collection)
+            if not current_point:
+                raise ProcessingError(
+                    f"Memory not found for HRID {hrid}",
+                    operation="update_memory",
+                    context={"hrid": hrid, "user_id": user_id},
+                )
+
+            # Merge current payload with updates
+            current_payload = current_point.get("payload", {})
+            # Remove system fields from current payload to get user fields only
+            user_fields = {
+                k: v
+                for k, v in current_payload.items()
+                if k not in ("id", "user_id", "memory_type", "created_at", "updated_at", "hrid")
+            }
+
+            # Merge updates into user fields
+            updated_user_payload = {**user_fields, **payload_updates}
+
+            # Validate merged payload against YAML schema
+            memory = self.yaml_translator.create_memory_from_yaml(
+                memory_type, updated_user_payload, user_id
+            )
+            memory.id = uuid  # Preserve existing UUID for relationships
+
+            # Update timestamps - preserve created_at, update updated_at
+            from datetime import UTC, datetime
+
+            memory.created_at = datetime.fromisoformat(current_payload.get("created_at"))
+            memory.updated_at = datetime.now(UTC)
+
+            # Get anchor text for vector update
+            anchor_text = self.yaml_translator.build_anchor_text(memory)
+            if not anchor_text:
+                raise ProcessingError(
+                    f"Empty anchor text for memory type '{memory_type}'",
+                    operation="update_memory",
+                    context={"memory_id": memory.id, "memory_type": memory_type},
+                )
+
+            # Generate new embedding from updated anchor text
+            vector = self.embedder.get_embedding(anchor_text)
+
+            # Create updated flat payload for Qdrant
+            flat_payload = {
+                "user_id": memory.user_id,
+                "memory_type": memory.memory_type,
+                "created_at": memory.created_at.isoformat(),
+                "updated_at": memory.updated_at.isoformat(),
+                "hrid": hrid,  # Preserve HRID
+                **memory.payload,  # Updated and validated payload
+            }
+
+            # Update Qdrant point (upsert with same UUID)
+            success, _point_id = self.qdrant.add_point(
+                vector=vector,
+                payload=flat_payload,
+                point_id=memory.id,  # Same UUID preserves relationships
+                collection=collection,
+            )
+            if not success:
+                raise ProcessingError(
+                    "Failed to update memory in vector storage",
+                    operation="update_memory",
+                    context={"memory_id": memory.id, "hrid": hrid},
+                )
+
+            # Update Kuzu node (need to implement update_node method)
+            kuzu_data = {
+                "id": memory.id,
+                "hrid": hrid,
+                "user_id": memory.user_id,
+                "memory_type": memory.memory_type,
+                "created_at": memory.created_at.isoformat(),
+                "updated_at": memory.updated_at.isoformat(),
+                **memory.payload,
+            }
+
+            # For now, use delete + add pattern until update_node is implemented
+            # This preserves relationships since we use the same UUID
+            self.kuzu.delete_node(memory_type, uuid, user_id)
+            self.kuzu.add_node(memory_type, kuzu_data)
+
+            return True
+
+        except Exception as e:
+            if isinstance(e, ProcessingError):
+                raise
+            raise ProcessingError(
+                "Failed to update memory",
+                operation="update_memory",
+                context={"hrid": hrid, "user_id": user_id, "memory_type": memory_type},
                 original_error=e,
             ) from e
 
