@@ -3,6 +3,8 @@ System readiness test - demonstrates that MEMG Core is ready for production.
 This test validates the complete system end-to-end.
 """
 
+import pytest
+
 from memg_core.api.public import add_memory, delete_memory, search
 
 
@@ -18,7 +20,10 @@ class TestSystemReadiness:
         test_memories = [
             {
                 "type": "note",
-                "payload": {"statement": "Implement user authentication system", "project": "auth"},
+                "payload": {
+                    "statement": "Implement user authentication system",
+                    "project": "auth",
+                },
                 "user": "developer_001",
             },
             {
@@ -32,7 +37,10 @@ class TestSystemReadiness:
             },
             {
                 "type": "note",
-                "payload": {"statement": "Coffee machine needs repair", "project": "office"},
+                "payload": {
+                    "statement": "Coffee machine needs repair",
+                    "project": "office",
+                },
                 "user": "developer_002",  # Different user
             },
         ]
@@ -103,11 +111,17 @@ class TestSystemReadiness:
 
         # 4. Test memory type filtering
         note_results = search(
-            query="authentication", user_id="developer_001", memory_type="note", limit=10
+            query="authentication",
+            user_id="developer_001",
+            memory_type="note",
+            limit=10,
         )
 
         doc_results = search(
-            query="authentication", user_id="developer_001", memory_type="document", limit=10
+            query="authentication",
+            user_id="developer_001",
+            memory_type="document",
+            limit=10,
         )
 
         # Should find different results for different types
@@ -135,10 +149,12 @@ class TestSystemReadiness:
 
         print("✅ Memory deletion verified")
 
-        # 6. Test cross-user deletion protection
-        user2_delete_success = delete_memory(hrid=added_hrids[1], user_id="developer_002")
+        # 6. Test cross-user deletion protection - should raise exception
+        from memg_core.core.exceptions import ProcessingError
 
-        assert not user2_delete_success, "User 2 should not be able to delete user 1's memory"
+        with pytest.raises(ProcessingError, match="Failed to delete memory"):
+            delete_memory(hrid=added_hrids[1], user_id="developer_002")
+
         print("✅ Cross-user deletion protection verified")
 
         print("\n🎉 SYSTEM READY: All core functionality validated!")

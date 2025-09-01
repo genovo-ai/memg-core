@@ -52,12 +52,18 @@ class TestUserIsolation:
 
         # Add another memory for user1
         user1_hrid2 = add_memory(
-            memory_type="note", payload={"statement": "user1 second data"}, user_id="test_user_1"
+            memory_type="note",
+            payload={"statement": "user1 second data"},
+            user_id="test_user_1",
         )
 
-        # User2 should NOT be able to delete user1's memory
-        user2_delete_success = delete_memory(user1_hrid2, "test_user_2")
-        assert not user2_delete_success, "User should not be able to delete other user's memory"
+        # User2 should NOT be able to delete user1's memory - should raise exception
+        import pytest
+
+        from memg_core.core.exceptions import ProcessingError
+
+        with pytest.raises(ProcessingError, match="Failed to delete memory"):
+            delete_memory(user1_hrid2, "test_user_2")
 
         # Verify memory still exists for user1
         user1_results = search("user1 second data", "test_user_1", limit=10)
@@ -67,11 +73,15 @@ class TestUserIsolation:
         """Test that HRID mappings are properly scoped per user."""
         # Add memories for different users (may get same HRID - this is correct)
         add_memory(
-            memory_type="note", payload={"statement": "user1 note content"}, user_id="test_user_1"
+            memory_type="note",
+            payload={"statement": "user1 note content"},
+            user_id="test_user_1",
         )
 
         add_memory(
-            memory_type="note", payload={"statement": "user2 note content"}, user_id="test_user_2"
+            memory_type="note",
+            payload={"statement": "user2 note content"},
+            user_id="test_user_2",
         )
 
         # Each user should only see their own content
@@ -98,7 +108,10 @@ class TestUserIsolation:
 
         user1_doc = add_memory(
             memory_type="document",
-            payload={"statement": "user1 document about testing", "details": "detailed info"},
+            payload={
+                "statement": "user1 document about testing",
+                "details": "detailed info",
+            },
             user_id="test_user_1",
         )
 

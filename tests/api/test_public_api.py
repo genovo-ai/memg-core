@@ -152,12 +152,14 @@ class TestPublicAPIErrorHandling:
 
     @pytest.mark.unit
     def test_delete_nonexistent_memory(self, predictable_user_id: str):
-        """Test deleting non-existent memory returns False."""
-        success = delete_memory(
-            hrid="NOTE_XXX999",  # Non-existent HRID
-            user_id=predictable_user_id,
-        )
-        assert not success, "Deleting non-existent memory should return False"
+        """Test deleting non-existent memory raises ProcessingError."""
+        from memg_core.core.exceptions import ProcessingError
+
+        with pytest.raises(ProcessingError, match="Failed to delete memory"):
+            delete_memory(
+                hrid="NOTE_XXX999",  # Non-existent HRID
+                user_id=predictable_user_id,
+            )
 
     def test_delete_other_users_memory(self, sample_note_data: dict):
         """Test that users cannot delete other users' memories."""
@@ -167,9 +169,11 @@ class TestPublicAPIErrorHandling:
         # User 1 creates a memory
         hrid = add_memory(memory_type="note", payload=sample_note_data, user_id=user1)
 
-        # User 2 tries to delete it
-        success = delete_memory(hrid=hrid, user_id=user2)
-        assert not success, "User should not be able to delete other user's memory"
+        # User 2 tries to delete it - should raise exception
+        from memg_core.core.exceptions import ProcessingError
+
+        with pytest.raises(ProcessingError):
+            delete_memory(hrid=hrid, user_id=user2)
 
         # Memory should still exist for User 1
         results = search(query=sample_note_data["statement"], user_id=user1, limit=10)
@@ -207,7 +211,10 @@ class TestPublicAPISearchFiltering:
 
         # Search for notes only
         note_results = search(
-            query="authentication", user_id=predictable_user_id, memory_type="note", limit=10
+            query="authentication",
+            user_id=predictable_user_id,
+            memory_type="note",
+            limit=10,
         )
 
         note_hrids = [r.memory.hrid for r in note_results if hasattr(r.memory, "hrid")]
@@ -216,7 +223,10 @@ class TestPublicAPISearchFiltering:
 
         # Search for documents only
         doc_results = search(
-            query="authentication", user_id=predictable_user_id, memory_type="document", limit=10
+            query="authentication",
+            user_id=predictable_user_id,
+            memory_type="document",
+            limit=10,
         )
 
         doc_hrids = [r.memory.hrid for r in doc_results if hasattr(r.memory, "hrid")]
@@ -307,10 +317,10 @@ class TestNewAPIFunctionality:
         fake_hrid = "NOTE_XXX999"
         updates = {"statement": "This should fail"}
 
-        success = update_memory(
-            hrid=fake_hrid, payload_updates=updates, user_id=predictable_user_id
-        )
-        assert not success, "Update of non-existent memory should fail"
+        from memg_core.core.exceptions import ProcessingError
+
+        with pytest.raises(ProcessingError):
+            update_memory(hrid=fake_hrid, payload_updates=updates, user_id=predictable_user_id)
 
     def test_update_memory_wrong_user(self, sample_note_data: dict):
         """Test updating memory owned by different user."""
@@ -320,11 +330,12 @@ class TestNewAPIFunctionality:
         # User1 creates memory
         hrid = add_memory(memory_type="note", payload=sample_note_data, user_id=user1)
 
-        # User2 tries to update it
+        # User2 tries to update it - should raise exception
         updates = {"statement": "Unauthorized update"}
-        success = update_memory(hrid=hrid, payload_updates=updates, user_id=user2)
+        from memg_core.core.exceptions import ProcessingError
 
-        assert not success, "Update by different user should fail"
+        with pytest.raises(ProcessingError):
+            update_memory(hrid=hrid, payload_updates=updates, user_id=user2)
 
     def test_get_memory_basic(self, predictable_user_id: str, sample_note_data: dict, test_helpers):
         """Test basic get_memory functionality."""
@@ -442,10 +453,14 @@ class TestNewAPIFunctionality:
 
         # Each user creates memories
         add_memory(
-            memory_type="note", payload={"statement": "User1 note", "origin": "user"}, user_id=user1
+            memory_type="note",
+            payload={"statement": "User1 note", "origin": "user"},
+            user_id=user1,
         )
         add_memory(
-            memory_type="note", payload={"statement": "User2 note", "origin": "user"}, user_id=user2
+            memory_type="note",
+            payload={"statement": "User2 note", "origin": "user"},
+            user_id=user2,
         )
 
         # Each user should only see their own
@@ -465,7 +480,11 @@ class TestNewAPIFunctionality:
         # Create two memories using entities available in test schema
         task_hrid = add_memory(
             memory_type="task",
-            payload={"statement": "Implement feature", "status": "todo", "priority": "high"},
+            payload={
+                "statement": "Implement feature",
+                "status": "todo",
+                "priority": "high",
+            },
             user_id=predictable_user_id,
         )
         doc_hrid = add_memory(
@@ -553,7 +572,7 @@ class TestNewAPIFunctionality:
             user_id=predictable_user_id,
         )
 
-        # Try to delete non-existent relationship
+        # Try to delete non-existent relationship - should return False
         success = delete_relationship(
             from_memory_hrid=note1_hrid,
             to_memory_hrid=note2_hrid,
@@ -585,7 +604,9 @@ class TestNewAPIFunctionality:
 
         # User2 creates memory
         user2_note = add_memory(
-            memory_type="note", payload={"statement": "User2 note", "origin": "user"}, user_id=user2
+            memory_type="note",
+            payload={"statement": "User2 note", "origin": "user"},
+            user_id=user2,
         )
 
         # User2 should not be able to create relationship with User1's memories
