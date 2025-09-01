@@ -17,15 +17,14 @@ entities:
     description: "Base memory unit"
     fields:
       id:          { type: string, required: true, system: true } # uuid
-      user_id:     { type: string, required: true, system: true } # any string
+      user_id:     { type: string, required: true, system: true } # system: true = handled by API, not in user payload
       statement:   { type: string, required: true, max_length: 8000 }
       created_at:  { type: datetime, required: true, system: true }
       updated_at:  { type: datetime, system: true }
       vector:      { type: vector, anchored_to: statement, system: true }
     relations:
-      - name: memo_related
-        description: "Generic relation between memos"
-        directed: true
-        predicates: [RELATED_TO]
-        source: memo
-        target: memo
+      memo:
+        - name: memo_related
+          description: "Generic relation between memos"
+          predicate: RELATED_TO
+          directed: false

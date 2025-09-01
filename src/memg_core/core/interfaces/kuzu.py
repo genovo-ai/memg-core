@@ -279,7 +279,22 @@ class KuzuInterface:
                 directed=True,  # Direction affects semantics but not table naming for now
             )
 
-            # Delete the specific relationship
+            # First check if the relationship exists
+            check_rel_query = (
+                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}})"
+                f"-[r:{relationship_table_name}]->"
+                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
+                f"RETURN r"
+            )
+            check_rel_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id}
+
+            # Check if relationship exists
+            relationship_exists = self.query(check_rel_query, check_rel_params)
+            if not relationship_exists:
+                # Relationship doesn't exist - return False
+                return False
+
+            # Delete the specific relationship (we know it exists)
             delete_query = (
                 f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}})"
                 f"-[r:{relationship_table_name}]->"
@@ -288,11 +303,10 @@ class KuzuInterface:
             )
             delete_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id}
 
-            # Execute deletion - if no relationship exists, this will succeed but affect 0 rows
+            # Execute deletion
             self.conn.execute(delete_query, parameters=delete_params)
 
-            # For now, assume success since Kuzu doesn't provide affected row count easily
-            # In practice, the relationship either existed and was deleted, or didn't exist
+            # If we get here, deletion succeeded
             return True
 
         except Exception as e:

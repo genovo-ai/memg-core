@@ -2,34 +2,13 @@
 Test user isolation and data privacy in the memory system.
 """
 
-from pathlib import Path
-import tempfile
-
-import pytest
-
 from memg_core.api.public import add_memory, delete_memory, search
 
 
 class TestUserIsolation:
     """Test that users can only access their own data."""
 
-    @pytest.fixture(autouse=True)
-    def setup_isolated_test_env(self):
-        """Setup isolated test environment."""
-        self.test_dir = Path(tempfile.mkdtemp(prefix="user_isolation_test_"))
-
-        import os
-
-        os.environ["QDRANT_STORAGE_PATH"] = str(self.test_dir / "qdrant")
-        os.environ["KUZU_DB_PATH"] = str(self.test_dir / "kuzu" / "db")
-        os.environ["YAML_PATH"] = "config/core.test.yaml"
-
-        yield
-
-        import shutil
-
-        if self.test_dir.exists():
-            shutil.rmtree(self.test_dir, ignore_errors=True)
+    # Remove custom setup - use conftest.py fixtures instead
 
     def test_search_data_isolation(self):
         """Test that search results are properly isolated by user."""

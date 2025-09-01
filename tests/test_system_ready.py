@@ -3,36 +3,13 @@ System readiness test - demonstrates that MEMG Core is ready for production.
 This test validates the complete system end-to-end.
 """
 
-import os
-from pathlib import Path
-import tempfile
-
-import pytest
-
 from memg_core.api.public import add_memory, delete_memory, search
 
 
 class TestSystemReadiness:
     """Comprehensive system readiness validation."""
 
-    @pytest.fixture(autouse=True)
-    def setup_test_environment(self):
-        """Setup clean test environment for system test."""
-        # Create isolated test directory
-        self.test_dir = Path(tempfile.mkdtemp(prefix="memg_system_test_"))
-
-        # Set environment variables
-        os.environ["QDRANT_STORAGE_PATH"] = str(self.test_dir / "qdrant")
-        os.environ["KUZU_DB_PATH"] = str(self.test_dir / "kuzu")
-        os.environ["YAML_PATH"] = "config/core.test.yaml"
-
-        yield
-
-        # Cleanup
-        import shutil
-
-        if self.test_dir.exists():
-            shutil.rmtree(self.test_dir, ignore_errors=True)
+    # Remove custom setup - use conftest.py fixtures instead
 
     def test_complete_system_functionality(self):
         """Test complete system: YAML → Memory → Search → HRID → Delete."""

@@ -256,10 +256,9 @@ class SearchService:
             if payload.get("user_id") != user_id:
                 return None
 
-            # Build response with full memory information
+            # Build response with full memory information (HRID-only policy - no UUID exposure)
             memory_data = {
                 "hrid": hrid,
-                "uuid": uuid,
                 "memory_type": payload.get("memory_type", memory_type),
                 "user_id": user_id,
                 "created_at": payload.get("created_at"),

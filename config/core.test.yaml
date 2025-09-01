@@ -17,32 +17,40 @@ entities:
     description: "Base memory unit"
     fields:
       id:          { type: string, required: true, system: true } # uuid
-      user_id:     { type: string, required: true, system: true } # any string
+      user_id:     { type: string, required: true, system: true } # system: true = handled by API, not in user payload
       statement:   { type: string, required: true, max_length: 8000 }
       created_at:  { type: datetime, required: true, system: true }
       updated_at:  { type: datetime, system: true }
       vector:      { type: vector, anchored_to: statement, system: true }
     relations:
-      - name: memo_related
-        description: "Generic relation between memos"
-        directed: true
-        predicates: [RELATED_TO]
-        source: memo
-        target: memo
+      memo:
+        - name: memo_related
+          description: "Generic relation between memos"
+          predicate: RELATED_TO
+          directed: false
 
   - name: note
     parent: memo
     description: "General note or observation to memorize"
     fields:
       project: { type: string }  # Optional project namespace for filtering
-      origin: { type: enum, choices: [system, user], default: system } # source of the note - optional
+      origin: { type: enum, choices: [system, user], default: system } # source of the note
     relations:
-      - name: note_document
-        description: "Note providing context to a document"
-        directed: true
-        predicates: [ANNOTATES]
-        source: note
-        target: document
+      note:
+        - name: note_related_to_note
+          description: "Generic relation between notes"
+          predicate: RELATED_TO
+          directed: false
+      document:
+        - name: note_annotates_document
+          description: "Note providing context to a document"
+          predicate: ANNOTATES
+          directed: true
+      task:
+        - name: note_annotates_task
+          description: "Note associated with a task"
+          predicate: ANNOTATES
+          directed: true
 
   - name: document
     parent: memo
@@ -52,15 +60,43 @@ entities:
       details: { type: string, required: true }
       url:     { type: string }  # Reference URL for external docs
     relations:
-      - name: document_note
-        description: "Document referenced by a note"
-        directed: false
-        predicates: [REFERENCED_BY]
-        source: document
-        target: note
-      - name: task_document
-        description: "Document providing details or requirements for a task"
-        directed: true
-        predicates: [SUPPORTS]
-        source: document
-        target: note
+      note:
+        - name: document_referenced_by_note
+          description: "Document referenced by a note"
+          predicate: REFERENCED_BY
+          directed: true
+      task:
+        - name: document_supports_task
+          description: "Document providing details or requirements for a task"
+          predicate: SUPPORTS
+          directed: true
+
+  - name: task
+    parent: memo
+    description: "Test task or work item"
+    fields:
+      project:     { type: string }  # Optional project namespace for filtering
+      details:     { type: string }
+      status:      { type: enum, choices: [todo, in_progress, done, cancelled], default: todo }
+      priority:    { type: enum, choices: [low, medium, high, urgent], default: medium }
+      assignee:    { type: string }  # Optional assignee
+    relations:
+      task:
+        - name: task_blocks_task
+          description: "Task blocking another task"
+          predicate: BLOCKS
+          directed: true
+        - name: task_depends_on_task
+          description: "Task depending on another task"
+          predicate: DEPENDS_ON
+          directed: true
+      document:
+        - name: task_references_document
+          description: "Task references a document for context"
+          predicate: REFERENCES
+          directed: true
+      note:
+        - name: task_relates_to_note
+          description: "Task is related to a note"
+          predicate: RELATES_TO
+          directed: true
