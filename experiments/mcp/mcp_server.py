@@ -11,23 +11,25 @@ This is a generic MCP server that expects:
 import logging
 import os
 import time
-from dotenv import load_dotenv
 from typing import Any, Dict, Optional
+
+from dotenv import load_dotenv
 
 # Load .env from current directory - allow .env to override
 load_dotenv(override=True)  # Allow .env file to override environment variables
 
-from fastmcp import FastMCP
 from fastapi.responses import JSONResponse
-from memg_core import __version__
+from fastmcp import FastMCP
+# Import our YAML docstring helper for dynamic tool descriptions
+from yaml_docstring_helper import YamlDocstringHelper
 
+from memg_core import __version__
 # Import the current API from the installed library
 from memg_core.api.public import MemgClient
+
 # from memg_core.core.exceptions import ValidationError, DatabaseError
 # from memg_core.core.models import SearchResult
 
-# Import our YAML docstring helper for dynamic tool descriptions
-from yaml_docstring_helper import YamlDocstringHelper
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

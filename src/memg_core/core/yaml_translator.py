@@ -420,11 +420,14 @@ class YamlTranslator:
             opt = [str(x) for x in fields.get("optional", [])]
             return req, opt
 
+        # Resolve all fields including inherited ones
+        all_fields = self._resolve_inherited_fields(spec)
+
         # Parse individual field definitions for required flag
         required_fields = []
         optional_fields = []
 
-        for field_name, field_def in fields.items():
+        for field_name, field_def in all_fields.items():
             if isinstance(field_def, dict) and field_def.get("required", False):
                 # Skip system fields - they're handled by the system
                 if not field_def.get("system", False):
@@ -435,6 +438,37 @@ class YamlTranslator:
                 optional_fields.append(field_name)
 
         return required_fields, optional_fields
+
+    def _resolve_inherited_fields(self, spec: dict[str, Any]) -> dict[str, Any]:
+        """Resolve all fields including inherited ones from parent entities."""
+        all_fields = {}
+        entities_map = self._entities_map()
+
+        # If entity has a parent, resolve parent fields first
+        parent_name = spec.get("parent")
+        if parent_name:
+            parent_spec = entities_map.get(parent_name.lower())
+            if parent_spec:
+                # Recursively resolve parent fields
+                parent_fields = self._resolve_inherited_fields(parent_spec)
+                all_fields.update(parent_fields)
+
+        # Add/override with current entity's fields
+        current_fields = spec.get("fields") or {}
+        all_fields.update(current_fields)
+
+        return all_fields
+
+    def _get_system_fields(self, spec: dict[str, Any]) -> set[str]:
+        """Extract system fields from YAML schema (fields marked with system: true)."""
+        system_fields = set()
+        all_fields = self._resolve_inherited_fields(spec)
+
+        for field_name, field_def in all_fields.items():
+            if isinstance(field_def, dict) and field_def.get("system", False):
+                system_fields.add(field_name)
+
+        return system_fields
 
     def _validate_enum_fields(self, memory_type: str, payload: dict[str, Any]) -> None:
         """Validate enum fields against YAML schema choices.
@@ -506,9 +540,24 @@ class YamlTranslator:
         # Validate enum fields against YAML schema choices
         self._validate_enum_fields(memory_type, payload)
 
+        # Validate that all fields are defined in YAML schema
+        req, opt = self._fields_contract(spec)
+        valid_fields = set(req + opt)
+        system_fields = self._get_system_fields(spec)
+        invalid_fields = set(payload.keys()) - valid_fields - system_fields
+        if invalid_fields:
+            raise YamlTranslatorError(
+                f"Invalid fields not defined in schema: {sorted(invalid_fields)}",
+                context={
+                    "memory_type": memory_type,
+                    "valid_fields": sorted(valid_fields),
+                    "invalid_fields": sorted(invalid_fields),
+                },
+            )
+
         # Strip system-reserved fields if present
         cleaned = dict(payload)
-        for syskey in ("id", "user_id", "created_at", "updated_at", "vector"):
+        for syskey in system_fields:
             cleaned.pop(syskey, None)
         return cleaned
 

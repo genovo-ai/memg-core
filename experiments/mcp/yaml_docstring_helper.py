@@ -6,9 +6,9 @@ Generates clean, schema-aware documentation from YAML schemas for MCP tool consu
 Filters out system-managed fields and provides comprehensive relationship information.
 """
 
-from typing import Dict, List, Any, Optional
-from memg_core.core.yaml_translator import YamlTranslator
+from typing import Any, Dict, List, Optional
 
+from memg_core.core.yaml_translator import YamlTranslator
 
 # ========================= DOCSTRING TEMPLATES =========================
 
