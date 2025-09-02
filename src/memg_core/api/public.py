@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ..core.models import SearchResult
+from ..core.models import EnhancedSearchResult, SearchResult
 from ..core.pipelines.indexer import MemoryService, create_memory_service
 from ..core.pipelines.retrieval import SearchService, create_search_service
 from ..core.yaml_translator import YamlTranslator
@@ -74,6 +74,41 @@ class MemgClient:
         clean_query = query.strip() if query else ""
         return self._search_service.search(
             clean_query, user_id, memory_type=memory_type, limit=limit, **kwargs
+        )
+
+    def search_enhanced(
+        self,
+        query: str,
+        user_id: str,
+        memory_type: str | None = None,
+        limit: int = 5,
+        score_threshold: float | None = None,
+        decay_threshold: float | None = None,
+        **kwargs,
+    ) -> EnhancedSearchResult:
+        """Enhanced search with explicit seed/neighbor separation.
+
+        Args:
+            query: Text to search for.
+            user_id: User ID for filtering results.
+            memory_type: Optional memory type filter.
+            limit: Maximum number of seeds to return (neighbors separate).
+            score_threshold: Minimum similarity score threshold (0.0-1.0).
+            decay_threshold: Minimum neighbor relevance threshold (0.0-1.0).
+            **kwargs: Additional search parameters.
+
+        Returns:
+            EnhancedSearchResult: Result with explicit seeds and neighbors structure.
+        """
+        clean_query = query.strip() if query else ""
+        return self._search_service.search_enhanced(
+            clean_query,
+            user_id,
+            memory_type=memory_type,
+            limit=limit,
+            score_threshold=score_threshold,
+            decay_threshold=decay_threshold,
+            **kwargs,
         )
 
     def delete_memory(self, hrid: str, user_id: str, memory_type: str | None = None) -> bool:
@@ -284,6 +319,34 @@ def search(
         list[SearchResult]: List of search results with scores and metadata.
     """
     return _get_client().search(query, user_id, memory_type, limit, **kwargs)
+
+
+def search_enhanced(
+    query: str,
+    user_id: str,
+    memory_type: str | None = None,
+    limit: int = 5,
+    score_threshold: float | None = None,
+    decay_threshold: float | None = None,
+    **kwargs,
+) -> EnhancedSearchResult:
+    """Enhanced search with explicit seed/neighbor separation using environment-based client.
+
+    Args:
+        query: Text to search for.
+        user_id: User ID for filtering results.
+        memory_type: Optional memory type filter.
+        limit: Maximum number of seeds to return (neighbors separate).
+        score_threshold: Minimum similarity score threshold (0.0-1.0).
+        decay_threshold: Minimum neighbor relevance threshold (0.0-1.0).
+        **kwargs: Additional search parameters.
+
+    Returns:
+        EnhancedSearchResult: Result with explicit seeds and neighbors structure.
+    """
+    return _get_client().search_enhanced(
+        query, user_id, memory_type, limit, score_threshold, decay_threshold, **kwargs
+    )
 
 
 def delete_memory(hrid: str, user_id: str, memory_type: str | None = None) -> bool:

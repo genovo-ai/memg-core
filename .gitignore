@@ -259,3 +259,9 @@ integration*
 scripts/*
 experiments/**/local_*
 experiments/job*
+
+# this is not filtering the actual test suite
+test_*
+!tests/*
+
+.DS_Store

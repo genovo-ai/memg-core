@@ -213,20 +213,96 @@ class MemoryPoint(BaseModel):
         return v
 
 
+class RelationshipInfo(BaseModel):
+    """Relationship information between memories.
+
+    Attributes:
+        relation_type: Type of relationship (e.g., FIXES, ADDRESSES).
+        target_hrid: HRID of the target memory.
+        scores: Scoring information for the relationship.
+    """
+
+    relation_type: str = Field(..., description="Relationship type from YAML schema")
+    target_hrid: str = Field(..., description="HRID of target memory")
+    scores: dict[str, float] = Field(default_factory=dict, description="Relationship scores")
+
+
+class MemorySeed(BaseModel):
+    """Memory seed with full payload and explicit relationships.
+
+    Attributes:
+        hrid: Human-readable identifier.
+        memory_type: Entity type from YAML schema.
+        payload: Full entity payload.
+        score: Vector similarity score to query.
+        relationships: List of relationships to other memories.
+    """
+
+    hrid: str = Field(..., description="Human-readable identifier")
+    memory_type: str = Field(..., description="Entity type from YAML schema")
+    payload: dict[str, Any] = Field(..., description="Full entity payload")
+    score: float = Field(
+        ..., ge=0.0, le=1.0 + _MAX_SCORE_TOLERANCE, description="Vector similarity score"
+    )
+    relationships: list[RelationshipInfo] = Field(
+        default_factory=list, description="Relationships to other memories"
+    )
+
+    @field_validator("score")
+    @classmethod
+    def normalize_score(cls, v: float) -> float:
+        """Normalize similarity scores to handle floating-point precision errors."""
+        if v < 0.0:
+            raise ValueError(f"Similarity score cannot be negative: {v}")
+        if v > 1.001:
+            raise ValueError(f"Similarity score too high (indicates calculation error): {v}")
+        return min(v, 1.0)
+
+
+class MemoryNeighbor(BaseModel):
+    """Memory neighbor with anchor-only payload.
+
+    Attributes:
+        hrid: Human-readable identifier.
+        memory_type: Entity type from YAML schema.
+        payload: Anchor-only payload (statement field only).
+    """
+
+    hrid: str = Field(..., description="Human-readable identifier")
+    memory_type: str = Field(..., description="Entity type from YAML schema")
+    payload: dict[str, Any] = Field(..., description="Anchor-only payload")
+
+
+class EnhancedSearchResult(BaseModel):
+    """Enhanced search result with explicit seed/neighbor separation.
+
+    Attributes:
+        memories: List of memory seeds with full payloads and relationships.
+        neighbors: List of memory neighbors with anchor-only payloads.
+    """
+
+    memories: list[MemorySeed] = Field(
+        default_factory=list, description="Memory seeds with full payloads"
+    )
+    neighbors: list[MemoryNeighbor] = Field(
+        default_factory=list, description="Memory neighbors with anchor payloads"
+    )
+
+
 class SearchResult(BaseModel):
-    """Search result from vector/graph search.
+    """Legacy search result from vector/graph search - kept for backward compatibility.
 
     Attributes:
         memory: Memory instance.
         score: Similarity score (0.0-1.0).
-        distance: Vector distance.
+        distance: Vector distance (deprecated).
         source: Search source (qdrant/kuzu/hybrid).
         metadata: Additional metadata.
     """
 
     memory: Memory
     score: float = Field(..., ge=0.0, le=1.0 + _MAX_SCORE_TOLERANCE, description="Similarity score")
-    distance: float | None = Field(None, description="Vector distance")
+    distance: float | None = Field(None, description="Vector distance (deprecated)")
     source: str = Field(..., description="Search source (qdrant/kuzu/hybrid)")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
