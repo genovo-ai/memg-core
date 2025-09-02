@@ -75,3 +75,17 @@ All tools include schema-aware documentation and validation.
 - **Port Isolation**: Multiple projects can run simultaneously on different ports
 - **Auto Backups**: Automatic backups before destructive operations
 - **Smart Defaults**: Never destroys data accidentally
+
+
+## Cursor integration
+To use as Cursor AI memory add this to cursor mcp.json file. Adjust the port if needed.
+```
+{
+  "mcpServers": {
+    "memg_core_mcp": {
+      "url": "localhost:8228/sse",
+      "description": "Memory Service for AI."
+    }
+  }
+}
+```
