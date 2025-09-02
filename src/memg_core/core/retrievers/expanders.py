@@ -7,7 +7,7 @@ related memories through vector similarity and graph relationships.
 from __future__ import annotations
 
 from ..interfaces import Embedder, KuzuInterface, QdrantInterface
-from ..models import SearchResult
+from ..models import MemoryNeighbor, MemorySeed
 from ..yaml_translator import YamlTranslator
 from . import (
     _project_payload,
@@ -17,14 +17,14 @@ from . import (
 
 
 def _find_semantic_expansion(
-    seeds: list[SearchResult],
+    seeds: list[MemorySeed],
     qdrant: QdrantInterface,
     embedder: Embedder,
     user_id: str,
     projection: dict[str, list[str]] | None = None,
     hrid_tracker=None,
     yaml_translator: YamlTranslator | None = None,
-) -> list[SearchResult]:
+) -> list[MemoryNeighbor]:
     """Type-specific semantic expansion using seed anchor text.
 
     For seeds with see_also configuration in YAML:
@@ -44,17 +44,15 @@ def _find_semantic_expansion(
         yaml_translator: Optional YAML translator.
 
     Returns:
-        list[SearchResult]: List of semantically related results.
+        list[MemoryNeighbor]: List of semantically related neighbors.
     """
-    see_also_results: list[SearchResult] = []
+    see_also_results: list[MemoryNeighbor] = []
 
     for seed in seeds:
-        memory = seed.memory
-
         # Get see_also config for this memory type from YAML
         if not yaml_translator:
             yaml_translator = YamlTranslator()
-        see_also_config = yaml_translator.get_see_also_config(memory.memory_type)
+        see_also_config = yaml_translator.get_see_also_config(seed.memory_type)
         if not see_also_config or not see_also_config.get("enabled"):
             continue
 
@@ -66,6 +64,16 @@ def _find_semantic_expansion(
             continue
 
         # Extract anchor text from seed memory - crash if fails
+        # Create a Memory object from the MemorySeed for anchor text extraction
+        from ..models import Memory
+
+        memory = Memory(
+            id=seed.hrid,  # Use HRID as ID for anchor text
+            user_id=user_id,
+            memory_type=seed.memory_type,
+            payload=seed.payload,
+            hrid=seed.hrid,
+        )
         anchor_text = yaml_translator.build_anchor_text(memory)
 
         # Create embedding from anchor text
@@ -118,26 +126,21 @@ def _find_semantic_expansion(
                 yaml_translator=yaml_translator,
             )
 
-            # Add to results with see_also source marking
-            search_result = SearchResult(
-                memory=similar_memory,
-                score=score,
-                distance=None,
-                source=f"see_also_{point_memory_type}",
-                metadata={
-                    "see_also_source": memory.memory_type,
-                    "see_also_anchor": anchor_text,  # DO NOT TRUNCATE
-                },
+            # Add to results as MemoryNeighbor
+            neighbor = MemoryNeighbor(
+                hrid=similar_memory.hrid or similar_memory.id,
+                memory_type=similar_memory.memory_type,
+                payload=similar_memory.payload,  # Already projected to anchor-only
             )
 
-            see_also_results.append(search_result)
-            results_by_type[point_memory_type].append(search_result)
+            see_also_results.append(neighbor)
+            results_by_type[point_memory_type].append(neighbor)
 
     return see_also_results
 
 
 def _append_neighbors(
-    seeds: list[SearchResult],
+    seeds: list[MemorySeed],
     kuzu: KuzuInterface,
     user_id: str,
     relation_names: list[str] | None,
@@ -147,7 +150,7 @@ def _append_neighbors(
     hrid_tracker=None,
     yaml_translator: YamlTranslator | None = None,
     decay_rate: float = 0.9,
-) -> list[SearchResult]:
+) -> list[MemoryNeighbor]:
     """Expand neighbors from Kuzu graph with progressive score decay.
 
     Args:
@@ -163,32 +166,29 @@ def _append_neighbors(
         decay_rate: Score decay rate per hop.
 
     Returns:
-        list[SearchResult]: Combined list of seeds + neighbors with
-        anchor-only payloads for neighbors.
+        list[MemoryNeighbor]: List of neighbor memories with anchor-only payloads.
     """
-    all_results: list[SearchResult] = list(seeds)  # Start with seeds
+    all_neighbors: list[MemoryNeighbor] = []  # Collect all neighbors
 
     current_hop_seeds = seeds
 
     for hop in range(hops):
-        next_hop_results: list[SearchResult] = []
+        next_hop_results: list[MemoryNeighbor] = []
         # Track processed nodes per hop to avoid cycles within the same hop
         hop_processed_ids: set[str] = set()
 
         for seed in current_hop_seeds:
-            memory = seed.memory
-            if not memory.id or memory.id in hop_processed_ids:
+            # Get UUID from HRID for Kuzu queries
+            seed_uuid = hrid_tracker.get_uuid(seed.hrid, user_id) if hrid_tracker else None
+            if not seed_uuid or seed_uuid in hop_processed_ids:
                 continue
 
-            hop_processed_ids.add(memory.id)
+            hop_processed_ids.add(seed_uuid)
 
             # Get neighbors from Kuzu - using entity-specific tables
-            # memory.id should always be UUID - no guessing needed
-            memory_uuid = memory.id
-
             neighbor_rows = kuzu.neighbors(
-                node_label=memory.memory_type,  # Use entity-specific table (bug, task, etc.)
-                node_uuid=memory_uuid,  # Use UUID, not HRID
+                node_label=seed.memory_type,  # Use entity-specific table (bug, task, etc.)
+                node_uuid=seed_uuid,  # Use UUID for Kuzu queries
                 user_id=user_id,  # CRITICAL: User isolation
                 rel_types=relation_names,  # None means all relations
                 direction="any",
@@ -219,28 +219,36 @@ def _append_neighbors(
                 # Calculate score with progressive decay: seed_score * decay_rate^hop
                 neighbor_score = seed.score * (decay_rate ** (hop + 1))
 
-                neighbor_result = SearchResult(
-                    memory=neighbor_memory,
-                    score=neighbor_score,
-                    distance=None,
-                    source="graph_neighbor",
-                    metadata={
-                        "from_seed": memory.id,
-                        "hop": hop + 1,
-                        "relation_type": row["rel_type"],
-                    },
+                # Create MemoryNeighbor object
+                neighbor_result = MemoryNeighbor(
+                    hrid=neighbor_memory.hrid or neighbor_memory.id,
+                    memory_type=neighbor_memory.memory_type,
+                    payload=neighbor_memory.payload,  # Already projected to anchor-only
                 )
 
                 next_hop_results.append(neighbor_result)
 
-        # Add this hop's results to all results
-        all_results.extend(next_hop_results)
+        # Add this hop's results to all neighbors
+        all_neighbors.extend(next_hop_results)
 
-        # Prepare for next hop (if any)
-        current_hop_seeds = next_hop_results
+        # Prepare for next hop (if any) - convert neighbors back to seeds for next iteration
+        # For multi-hop, we need to treat current neighbors as seeds for the next hop
+        next_hop_seeds = []
+        for neighbor in next_hop_results:
+            # Convert MemoryNeighbor back to MemorySeed for next hop expansion
+            seed_for_next_hop = MemorySeed(
+                hrid=neighbor.hrid,
+                memory_type=neighbor.memory_type,
+                payload=neighbor.payload,
+                score=neighbor_score,  # Use the decayed score
+                relationships=[],  # No relationships needed for expansion
+            )
+            next_hop_seeds.append(seed_for_next_hop)
+
+        current_hop_seeds = next_hop_seeds
 
         # Stop if no more neighbors found
         if not next_hop_results:
             break
 
-    return all_results
+    return all_neighbors

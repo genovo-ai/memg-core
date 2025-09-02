@@ -19,11 +19,9 @@ from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
 from ..config import get_config
 from ..exceptions import ProcessingError
-from ..models import EnhancedSearchResult, SearchResult
-from ..retrievers.composer import compose_enhanced_result, separate_seeds_and_neighbors
+from ..models import MemoryNeighbor, MemorySeed, SearchResult
 from ..retrievers.expanders import _append_neighbors, _find_semantic_expansion
 from ..retrievers.parsers import (
-    _dedupe_and_sort,
     _project_payload,
     build_memory_from_flat_payload,
 )
@@ -76,9 +74,8 @@ class SearchService:
         filters: dict[str, Any] | None = None,
         projection: dict[str, list[str]] | None = None,
         score_threshold: float | None = None,
-        enhanced_format: bool = False,
         decay_threshold: float | None = None,
-    ) -> list[SearchResult] | EnhancedSearchResult:
+    ) -> SearchResult:
         """GraphRAG search: vector seeds → graph expansion → semantic enhancement.
 
         This method encapsulates the graph_rag_search logic as a class method,
@@ -98,17 +95,13 @@ class SearchService:
             filters: Custom field-based filtering (e.g., {"project": "memg-core"}).
             projection: Control which fields to return per memory type.
             score_threshold: Minimum similarity score threshold (0.0-1.0).
-            enhanced_format: Return EnhancedSearchResult with explicit seed/neighbor
-                separation (default: False).
-            decay_threshold: Minimum neighbor relevance threshold when
-                enhanced_format=True (0.0-1.0).
+            decay_threshold: Minimum neighbor relevance threshold (0.0-1.0).
 
         Returns:
-            list[SearchResult] | EnhancedSearchResult: Legacy format or enhanced format
-                based on enhanced_format parameter.
+            SearchResult: Search result with explicit seed/neighbor separation.
         """
         if not query or not query.strip():
-            return EnhancedSearchResult() if enhanced_format else []
+            return SearchResult()
 
         # 1. Get seeds from Qdrant vector search
         query_vector = self.embedder.get_embedding(query)
@@ -130,7 +123,7 @@ class SearchService:
         )
 
         # Convert Qdrant points to SearchResult seeds
-        seeds: list[SearchResult] = []
+        seeds: list[MemorySeed] = []
         for point in vector_points:
             payload = point["payload"]
             point_id = point["id"]
@@ -147,39 +140,39 @@ class SearchService:
                 yaml_translator=self.yaml_translator,
             )
 
-            seed_result = SearchResult(
-                memory=memory,
+            seed_result = MemorySeed(
+                hrid=memory.hrid or memory.id,
+                memory_type=memory.memory_type,
+                payload=memory.payload,
                 score=float(point["score"]),
-                distance=None,
-                source="qdrant",
-                metadata={},
+                relationships=[],  # Will be populated by graph expansion
             )
 
             seeds.append(seed_result)
 
         if not seeds:
-            return []
+            return SearchResult()
 
         # 2. Graph expansion (neighbors with anchor-only payloads)
-        results = _append_neighbors(
-            seeds=seeds,
-            kuzu=self.kuzu,
-            user_id=user_id,
-            relation_names=relation_names,
-            neighbor_limit=neighbor_limit,
-            hops=hops,
-            projection=projection,
-            hrid_tracker=self.hrid_tracker,
-            yaml_translator=self.yaml_translator,
-            decay_rate=self.config.memg.decay_rate,
-        )
+        neighbors: list[MemoryNeighbor] = []
+        if hops > 0:
+            graph_neighbors = _append_neighbors(
+                seeds=seeds,
+                kuzu=self.kuzu,
+                user_id=user_id,
+                relation_names=relation_names,
+                neighbor_limit=neighbor_limit,
+                hops=hops,
+                projection=projection,
+                hrid_tracker=self.hrid_tracker,
+                yaml_translator=self.yaml_translator,
+                decay_rate=self.config.memg.decay_rate,
+            )
+            neighbors.extend(graph_neighbors)
 
         # 3. Semantic expansion (optional, type-specific "see also")
-        # "See also" finds semantically related memories (not graph neighbors)
-        # e.g., if looking at a bug, find solutions that are semantically similar
-        # to the bug's anchor text, even if not directly connected in the graph
         if include_semantic:
-            semantic_results = _find_semantic_expansion(
+            semantic_neighbors = _find_semantic_expansion(
                 seeds=seeds,  # Only expand from original seeds, not neighbors
                 qdrant=self.qdrant,
                 embedder=self.embedder,
@@ -188,32 +181,13 @@ class SearchService:
                 hrid_tracker=self.hrid_tracker,
                 yaml_translator=self.yaml_translator,
             )
-            results.extend(semantic_results)
+            neighbors.extend(semantic_neighbors)
 
-        # 4. Dedupe by ID and sort deterministically
-        results = _dedupe_and_sort(results)
-
-        # Handle enhanced format if requested
-        if enhanced_format:
-            # Use more results for better seed/neighbor separation
-            all_results = results[: limit * 3] if len(results) > limit else results
-
-            # Separate seeds and neighbors based on new semantics
-            seeds, neighbors = separate_seeds_and_neighbors(all_results, limit)
-
-            # Compose enhanced result with explicit relationships
-            return compose_enhanced_result(
-                seeds=seeds,
-                neighbors=neighbors,
-                yaml_translator=self.yaml_translator,
-                query=query,
-                embedder=self.embedder,
-                decay_threshold=decay_threshold or self.config.memg.decay_threshold,
-                decay_rate=self.config.memg.decay_rate,
-            )
-
-        # Legacy format
-        return results[:limit]
+        # Compose final SearchResult with seeds and neighbors
+        return SearchResult(
+            memories=seeds,
+            neighbors=neighbors,
+        )
 
     def _build_qdrant_filters(
         self,
@@ -353,8 +327,8 @@ class SearchService:
                 offset=offset,
             )
 
-            # Convert Kuzu results to SearchResult objects for expansion
-            search_results = []
+            # Convert Kuzu results directly to memory data
+            memories = []
             for result in results:
                 node_data = result.get("node", {})
 
@@ -365,65 +339,28 @@ class SearchService:
                 if not hrid:
                     continue
 
-                # Build Memory object using existing utility
-                memory = build_memory_from_flat_payload(
-                    point_id=uuid,
-                    payload={
-                        **node_data,
-                        "user_id": user_id,
-                        "memory_type": result.get("memory_type"),
-                        "created_at": result.get("created_at"),
-                        "updated_at": result.get("updated_at"),
-                    },
-                    hrid_tracker=self.hrid_tracker,
-                )
-
-                # Create SearchResult with score 1.0 (not from vector search)
-                search_result = SearchResult(
-                    memory=memory,
-                    score=1.0,
-                    distance=None,
-                    source="kuzu_query",
-                    metadata={"query_type": "get_memories"},
-                )
-                search_results.append(search_result)
-
-            # Apply graph expansion if requested using existing utilities
-            if include_neighbors and hops > 0:
-                expanded_results = _append_neighbors(
-                    seeds=search_results,
-                    kuzu=self.kuzu,
-                    user_id=user_id,
-                    relation_names=None,  # All relations
-                    neighbor_limit=10,  # Reasonable limit per seed
-                    hops=hops,
-                    projection=None,
-                    hrid_tracker=self.hrid_tracker,
-                    yaml_translator=self.yaml_translator,
-                    decay_rate=self.config.memg.decay_rate,
-                )
-                search_results = expanded_results
-
-            # Convert SearchResult objects back to memory data format
-            memories = []
-            for search_result in search_results:
-                memory = search_result.memory
-                memory_data = {
-                    "hrid": memory.hrid,  # Always return HRID for API consistency
-                    "memory_type": memory.memory_type,
-                    "user_id": memory.user_id,
-                    "created_at": (memory.created_at.isoformat() if memory.created_at else None),
-                    "updated_at": (memory.updated_at.isoformat() if memory.updated_at else None),
-                    "payload": memory.payload,
-                    "score": search_result.score,
-                    "source": search_result.source,
+                # Filter out UUID fields from payload (consumers should only see HRIDs)
+                filtered_payload = {
+                    k: v for k, v in node_data.items() if k not in ["id", "_id", "uuid"]
                 }
 
-                # Add metadata if from neighbor expansion
-                if search_result.metadata:
-                    memory_data["metadata"] = search_result.metadata
+                # Build memory data directly
+                memory_data = {
+                    "hrid": hrid,
+                    "memory_type": result.get("memory_type"),
+                    "user_id": user_id,
+                    "created_at": result.get("created_at"),
+                    "updated_at": result.get("updated_at"),
+                    "payload": filtered_payload,
+                    "score": 1.0,  # Not from vector search
+                    "source": "kuzu_query",
+                    "metadata": {"query_type": "get_memories"},
+                }
 
                 memories.append(memory_data)
+
+            # TODO: Apply graph expansion if requested
+            # For now, just return the basic memories without expansion
 
             return memories
 
