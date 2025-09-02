@@ -21,6 +21,7 @@ def compose_enhanced_result(
     query: str | None = None,
     embedder: Embedder | None = None,
     decay_threshold: float | None = None,
+    decay_rate: float = 0.9,
 ) -> EnhancedSearchResult:
     """Compose enhanced search result with explicit seed/neighbor separation.
 
@@ -31,6 +32,7 @@ def compose_enhanced_result(
         query: Original search query for neighbor scoring.
         embedder: Embedder for calculating neighbor-to-query relevance.
         decay_threshold: Minimum threshold for neighbor relevance.
+        decay_rate: Graph traversal decay rate per hop.
 
     Returns:
         EnhancedSearchResult: Composed result with explicit structure.
@@ -46,13 +48,13 @@ def compose_enhanced_result(
     for seed in seeds:
         memory = seed.memory
         relationships = _extract_relationships(
-            seed_id=memory.id,
             seed_score=seed.score,
             neighbors=seed_neighbors_map.get(memory.id, []),
             yaml_translator=yaml_translator,
             query=query,
             embedder=embedder,
             decay_threshold=decay_threshold,
+            decay_rate=decay_rate,
         )
 
         memory_seed = MemorySeed(
@@ -108,24 +110,24 @@ def _build_seed_neighbors_map(neighbors: list[SearchResult]) -> dict[str, list[S
 
 
 def _extract_relationships(
-    seed_id: str,
     seed_score: float,
     neighbors: list[SearchResult],
     yaml_translator: YamlTranslator,
     query: str | None = None,
     embedder: Embedder | None = None,
     decay_threshold: float | None = None,
+    decay_rate: float = 0.9,
 ) -> list[RelationshipInfo]:
     """Extract relationship information from neighbors.
 
     Args:
-        seed_id: ID of the seed memory.
         seed_score: Score of the seed memory.
         neighbors: List of neighbor results for this seed.
         yaml_translator: YAML translator for relationship info.
         query: Original search query for neighbor scoring.
         embedder: Embedder for calculating neighbor-to-query relevance.
         decay_threshold: Minimum threshold for neighbor relevance.
+        decay_rate: Graph traversal decay rate per hop.
 
     Returns:
         list[RelationshipInfo]: List of relationship information.
@@ -150,6 +152,7 @@ def _extract_relationships(
                     seed_score=seed_score,
                     hop=hop,
                     embedder=embedder,
+                    decay_rate=decay_rate,
                 )
 
                 # Apply decay threshold filtering
@@ -158,8 +161,8 @@ def _extract_relationships(
             else:
                 # Fallback to decay-based scoring if no anchor text
                 scores = {
-                    "to_query": seed_score * (0.9**hop),
-                    "to_neighbor": seed_score * (0.9**hop),
+                    "to_query": seed_score * (decay_rate**hop),
+                    "to_neighbor": seed_score * (decay_rate**hop),
                 }
         else:
             # Fallback for Phase 1 compatibility or missing components

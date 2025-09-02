@@ -145,6 +145,7 @@ def _append_neighbors(
     projection: dict[str, list[str]] | None = None,
     hrid_tracker=None,
     yaml_translator: YamlTranslator | None = None,
+    decay_rate: float = 0.9,
 ) -> list[SearchResult]:
     """Expand neighbors from Kuzu graph with progressive score decay.
 
@@ -158,6 +159,7 @@ def _append_neighbors(
         projection: Optional field projection.
         hrid_tracker: Optional HRID tracker.
         yaml_translator: Optional YAML translator.
+        decay_rate: Score decay rate per hop.
 
     Returns:
         list[SearchResult]: Combined list of seeds + neighbors with
@@ -213,8 +215,8 @@ def _append_neighbors(
                     yaml_translator=yaml_translator,
                 )
 
-                # Calculate score with progressive decay: seed_score * 0.9^hop
-                neighbor_score = seed.score * (0.9 ** (hop + 1))
+                # Calculate score with progressive decay: seed_score * decay_rate^hop
+                neighbor_score = seed.score * (decay_rate ** (hop + 1))
 
                 neighbor_result = SearchResult(
                     memory=neighbor_memory,
