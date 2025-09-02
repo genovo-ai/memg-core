@@ -150,6 +150,7 @@ class SearchService:
             seed_result = SearchResult(
                 memory=memory,
                 score=float(point["score"]),
+                distance=None,
                 source="qdrant",
                 metadata={},
             )

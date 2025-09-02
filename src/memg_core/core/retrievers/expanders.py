@@ -122,6 +122,7 @@ def _find_semantic_expansion(
             search_result = SearchResult(
                 memory=similar_memory,
                 score=score,
+                distance=None,
                 source=f"see_also_{point_memory_type}",
                 metadata={
                     "see_also_source": memory.memory_type,
@@ -221,6 +222,7 @@ def _append_neighbors(
                 neighbor_result = SearchResult(
                     memory=neighbor_memory,
                     score=neighbor_score,
+                    distance=None,
                     source="graph_neighbor",
                     metadata={
                         "from_seed": memory.id,
