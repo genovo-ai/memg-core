@@ -93,6 +93,7 @@ class QdrantInterface:
         limit: int = 5,
         collection: str | None = None,
         filters: dict[str, Any] | None = None,
+        score_threshold: float | None = None,
     ) -> list[dict[str, Any]]:
         """Search for similar points with mandatory user isolation - pure CRUD operation.
 
@@ -101,6 +102,7 @@ class QdrantInterface:
             limit: Maximum number of results.
             collection: Optional collection name override.
             filters: Search filters (must include user_id for security).
+            score_threshold: Minimum similarity score threshold (0.0-1.0).
 
         Returns:
             list[dict[str, Any]]: List of search results with id, score, and payload.
@@ -165,11 +167,10 @@ class QdrantInterface:
                 query=vector,
                 limit=limit,
                 query_filter=query_filter,
+                score_threshold=score_threshold,
             ).points
 
-            # print("Qdrant results", results)
-
-            # Convert to simplified results
+            # Convert to simplified results (score_threshold already applied by Qdrant)
             return [
                 {
                     "id": str(result.id),

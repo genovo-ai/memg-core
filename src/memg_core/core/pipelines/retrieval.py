@@ -17,8 +17,10 @@ from typing import Any
 from ...core.exceptions import DatabaseError
 from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
+from ..config import get_config
 from ..exceptions import ProcessingError
-from ..models import SearchResult
+from ..models import EnhancedSearchResult, SearchResult
+from ..retrievers.composer import compose_enhanced_result, separate_seeds_and_neighbors
 from ..retrievers.expanders import _append_neighbors, _find_semantic_expansion
 from ..retrievers.parsers import (
     _dedupe_and_sort,
@@ -56,6 +58,7 @@ class SearchService:
         self.embedder = db_clients.get_embedder()
         self.yaml_translator = db_clients.get_yaml_translator()
         self.hrid_tracker = HridTracker(self.kuzu)
+        self.config = get_config()
 
     def search(
         self,
@@ -72,7 +75,10 @@ class SearchService:
         modified_within_days: int | None = None,
         filters: dict[str, Any] | None = None,
         projection: dict[str, list[str]] | None = None,
-    ) -> list[SearchResult]:
+        score_threshold: float | None = None,
+        enhanced_format: bool = False,
+        decay_threshold: float | None = None,
+    ) -> list[SearchResult] | EnhancedSearchResult:
         """GraphRAG search: vector seeds → graph expansion → semantic enhancement.
 
         This method encapsulates the graph_rag_search logic as a class method,
@@ -81,7 +87,7 @@ class SearchService:
         Args:
             query: Search query text (required).
             user_id: User ID for filtering (required).
-            limit: Maximum results to return (default: 20).
+            limit: Maximum results to return (default: 5).
             memory_type: Optional memory type filter.
             relation_names: Specific relations to expand (None = all relations).
             neighbor_limit: Max neighbors per seed (default: 5).
@@ -91,12 +97,18 @@ class SearchService:
             modified_within_days: Filter by recency (e.g., last 7 days).
             filters: Custom field-based filtering (e.g., {"project": "memg-core"}).
             projection: Control which fields to return per memory type.
+            score_threshold: Minimum similarity score threshold (0.0-1.0).
+            enhanced_format: Return EnhancedSearchResult with explicit seed/neighbor
+                separation (default: False).
+            decay_threshold: Minimum neighbor relevance threshold when
+                enhanced_format=True (0.0-1.0).
 
         Returns:
-            list[SearchResult]: List of SearchResult objects with HRIDs, deduplicated and sorted.
+            list[SearchResult] | EnhancedSearchResult: Legacy format or enhanced format
+                based on enhanced_format parameter.
         """
         if not query or not query.strip():
-            return []
+            return EnhancedSearchResult() if enhanced_format else []
 
         # 1. Get seeds from Qdrant vector search
         query_vector = self.embedder.get_embedding(query)
@@ -114,6 +126,7 @@ class SearchService:
             vector=query_vector,
             limit=limit,
             filters=qdrant_filters,  # user_id already included by _build_qdrant_filters
+            score_threshold=score_threshold,
         )
 
         # Convert Qdrant points to SearchResult seeds
@@ -137,7 +150,6 @@ class SearchService:
             seed_result = SearchResult(
                 memory=memory,
                 score=float(point["score"]),
-                distance=None,
                 source="qdrant",
                 metadata={},
             )
@@ -158,6 +170,7 @@ class SearchService:
             projection=projection,
             hrid_tracker=self.hrid_tracker,
             yaml_translator=self.yaml_translator,
+            decay_rate=self.config.memg.decay_rate,
         )
 
         # 3. Semantic expansion (optional, type-specific "see also")
@@ -179,6 +192,26 @@ class SearchService:
         # 4. Dedupe by ID and sort deterministically
         results = _dedupe_and_sort(results)
 
+        # Handle enhanced format if requested
+        if enhanced_format:
+            # Use more results for better seed/neighbor separation
+            all_results = results[: limit * 3] if len(results) > limit else results
+
+            # Separate seeds and neighbors based on new semantics
+            seeds, neighbors = separate_seeds_and_neighbors(all_results, limit)
+
+            # Compose enhanced result with explicit relationships
+            return compose_enhanced_result(
+                seeds=seeds,
+                neighbors=neighbors,
+                yaml_translator=self.yaml_translator,
+                query=query,
+                embedder=self.embedder,
+                decay_threshold=decay_threshold or self.config.memg.decay_threshold,
+                decay_rate=self.config.memg.decay_rate,
+            )
+
+        # Legacy format
         return results[:limit]
 
     def _build_qdrant_filters(
@@ -366,6 +399,7 @@ class SearchService:
                     projection=None,
                     hrid_tracker=self.hrid_tracker,
                     yaml_translator=self.yaml_translator,
+                    decay_rate=self.config.memg.decay_rate,
                 )
                 search_results = expanded_results
 

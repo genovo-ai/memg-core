@@ -13,6 +13,8 @@ class MemGConfig:
         similarity_threshold: Threshold for conflict detection (0.0-1.0).
         score_threshold: Minimum score for search results (0.0-1.0).
         high_similarity_threshold: Threshold for duplicate detection (0.0-1.0).
+        decay_rate: Graph traversal decay rate per hop (0.0-1.0).
+        decay_threshold: Minimum neighbor relevance threshold (0.0-1.0).
         enable_ai_type_verification: Enable AI-based type detection.
         enable_temporal_reasoning: Enable temporal reasoning.
         vector_dimension: Embedding dimension size.
@@ -27,6 +29,8 @@ class MemGConfig:
     similarity_threshold: float = 0.7  # For conflict detection
     score_threshold: float = 0.3  # Minimum score for search results
     high_similarity_threshold: float = 0.9  # For duplicate detection
+    decay_rate: float = 0.9  # Graph traversal decay rate per hop
+    decay_threshold: float = 0.1  # Minimum neighbor relevance threshold
 
     # Processing settings
     enable_ai_type_verification: bool = True  # AI-based type detection
@@ -56,6 +60,10 @@ class MemGConfig:
             raise ValueError("score_threshold must be between 0.0 and 1.0")
         if not 0.0 <= self.high_similarity_threshold <= 1.0:
             raise ValueError("high_similarity_threshold must be between 0.0 and 1.0")
+        if not 0.0 <= self.decay_rate <= 1.0:
+            raise ValueError("decay_rate must be between 0.0 and 1.0")
+        if not 0.0 <= self.decay_threshold <= 1.0:
+            raise ValueError("decay_threshold must be between 0.0 and 1.0")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary.
@@ -67,6 +75,8 @@ class MemGConfig:
             "similarity_threshold": self.similarity_threshold,
             "score_threshold": self.score_threshold,
             "high_similarity_threshold": self.high_similarity_threshold,
+            "decay_rate": self.decay_rate,
+            "decay_threshold": self.decay_threshold,
             "enable_ai_type_verification": self.enable_ai_type_verification,
             "vector_dimension": self.vector_dimension,
             "batch_processing_size": self.batch_processing_size,
@@ -102,6 +112,8 @@ class MemGConfig:
             similarity_threshold=float(os.getenv("MEMG_SIMILARITY_THRESHOLD", "0.7")),
             score_threshold=float(os.getenv("MEMG_SCORE_THRESHOLD", "0.3")),
             high_similarity_threshold=float(os.getenv("MEMG_HIGH_SIMILARITY_THRESHOLD", "0.9")),
+            decay_rate=float(os.getenv("MEMG_DECAY_RATE", "0.9")),
+            decay_threshold=float(os.getenv("MEMG_DECAY_THRESHOLD", "0.1")),
             enable_ai_type_verification=os.getenv(
                 "MEMG_ENABLE_AI_TYPE_VERIFICATION", "true"
             ).lower()
