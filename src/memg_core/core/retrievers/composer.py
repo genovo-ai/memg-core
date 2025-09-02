@@ -193,8 +193,8 @@ def separate_seeds_and_neighbors(
     Returns:
         tuple: (seeds, neighbors) where seeds are limited and neighbors are the rest.
     """
-    seeds = []
-    neighbors = []
+    seeds: list[SearchResult] = []
+    neighbors: list[SearchResult] = []
 
     for result in results:
         if result.source == "qdrant" and len(seeds) < limit:
