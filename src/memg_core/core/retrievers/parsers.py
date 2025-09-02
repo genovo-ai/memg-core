@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-import re
 from typing import Any
 
-from ...utils.hrid import hrid_to_index
-from ..models import Memory, SearchResult
+from ..models import Memory
 from ..yaml_translator import YamlTranslator
 
 
@@ -56,55 +54,7 @@ def _project_payload(
     return result_payload
 
 
-def _dedupe_and_sort(results: list[SearchResult]) -> list[SearchResult]:
-    """Merge results by ID, keep highest score, then sort deterministically.
-
-    Sort order: score DESC, then hrid index ASC, then id ASC.
-
-    Args:
-        results: List of search results to deduplicate and sort.
-
-    Returns:
-        list[SearchResult]: Deduplicated and sorted results.
-    """
-    # Dedupe by memory ID, keeping highest score
-    by_id: dict[str, SearchResult] = {}
-    for result in results:
-        memory_id = result.memory.id
-        if memory_id not in by_id or result.score > by_id[memory_id].score:
-            by_id[memory_id] = result
-
-    # Sort deterministically
-    deduped = list(by_id.values())
-    deduped.sort(key=_sort_key)
-    return deduped
-
-
-def _sort_key(result: SearchResult) -> tuple:
-    """Stable ordering: score DESC, then hrid index ASC, then id ASC.
-
-    Args:
-        result: Search result to generate sort key for.
-
-    Returns:
-        tuple: Sort key components.
-    """
-    memory = result.memory
-    hrid = getattr(memory, "hrid", None) or "ZZZ_ZZZ999"
-
-    # Handle case where hrid is actually a UUID (fallback for compatibility)
-    uuid_pattern = re.compile(
-        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
-    )
-    if uuid_pattern.match(hrid):
-        # Use a high index for UUIDs to sort them after proper HRIDs
-        idx = 999999999
-    else:
-        # Parse HRID index. Raises ValueError if format is invalid,
-        # intentionally crashing to expose data quality issues early.
-        idx = hrid_to_index(hrid)
-
-    return (-float(result.score), idx, memory.id)
+# Unused functions removed - not needed in consolidated search pipeline
 
 
 def _parse_datetime(date_str: str) -> datetime:
