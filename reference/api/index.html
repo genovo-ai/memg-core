@@ -11834,7 +11834,8 @@ Eliminates the need to pass interfaces as function parameters.</p>
 <span class="normal">466</span>
 <span class="normal">467</span>
 <span class="normal">468</span>
-<span class="normal">469</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SearchService</span><span class="p">:</span>
+<span class="normal">469</span>
+<span class="normal">470</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SearchService</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Unified search service - handles all search and retrieval operations.</span>
 
 <span class="sd">    Provides GraphRAG search functionality using DatabaseClients for interface access.</span>
@@ -11955,6 +11956,7 @@ Eliminates the need to pass interfaces as function parameters.</p>
             <span class="n">seed_result</span> <span class="o">=</span> <span class="n">SearchResult</span><span class="p">(</span>
                 <span class="n">memory</span><span class="o">=</span><span class="n">memory</span><span class="p">,</span>
                 <span class="n">score</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">point</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">]),</span>
+                <span class="n">distance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
                 <span class="n">source</span><span class="o">=</span><span class="s2">&quot;qdrant&quot;</span><span class="p">,</span>
                 <span class="n">metadata</span><span class="o">=</span><span class="p">{},</span>
             <span class="p">)</span>
@@ -12537,8 +12539,7 @@ Eliminates the need to pass interfaces as function parameters.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">321</span>
-<span class="normal">322</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">322</span>
 <span class="normal">323</span>
 <span class="normal">324</span>
 <span class="normal">325</span>
@@ -12646,7 +12647,8 @@ Eliminates the need to pass interfaces as function parameters.</p>
 <span class="normal">427</span>
 <span class="normal">428</span>
 <span class="normal">429</span>
-<span class="normal">430</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memories</span><span class="p">(</span>
+<span class="normal">430</span>
+<span class="normal">431</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memories</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">memory_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -12880,8 +12882,7 @@ Eliminates the need to pass interfaces as function parameters.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">256</span>
-<span class="normal">257</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">257</span>
 <span class="normal">258</span>
 <span class="normal">259</span>
 <span class="normal">260</span>
@@ -12943,7 +12944,8 @@ Eliminates the need to pass interfaces as function parameters.</p>
 <span class="normal">316</span>
 <span class="normal">317</span>
 <span class="normal">318</span>
-<span class="normal">319</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memory</span><span class="p">(</span>
+<span class="normal">319</span>
+<span class="normal">320</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memory</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">hrid</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -13163,8 +13165,7 @@ Eliminates the need to pass interfaces as function parameters.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">432</span>
-<span class="normal">433</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">433</span>
 <span class="normal">434</span>
 <span class="normal">435</span>
 <span class="normal">436</span>
@@ -13200,7 +13201,8 @@ Eliminates the need to pass interfaces as function parameters.</p>
 <span class="normal">466</span>
 <span class="normal">467</span>
 <span class="normal">468</span>
-<span class="normal">469</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memory_neighbors</span><span class="p">(</span>
+<span class="normal">469</span>
+<span class="normal">470</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memory_neighbors</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">memory_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">memory_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -13695,7 +13697,8 @@ based on enhanced_format parameter.</p>
 <span class="normal">212</span>
 <span class="normal">213</span>
 <span class="normal">214</span>
-<span class="normal">215</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span>
+<span class="normal">215</span>
+<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -13785,6 +13788,7 @@ based on enhanced_format parameter.</p>
         <span class="n">seed_result</span> <span class="o">=</span> <span class="n">SearchResult</span><span class="p">(</span>
             <span class="n">memory</span><span class="o">=</span><span class="n">memory</span><span class="p">,</span>
             <span class="n">score</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">point</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">]),</span>
+            <span class="n">distance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">source</span><span class="o">=</span><span class="s2">&quot;qdrant&quot;</span><span class="p">,</span>
             <span class="n">metadata</span><span class="o">=</span><span class="p">{},</span>
         <span class="p">)</span>
@@ -17029,8 +17033,7 @@ Canonicalization for undirected pairs can be added here later if decided.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">472</span>
-<span class="normal">473</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">473</span>
 <span class="normal">474</span>
 <span class="normal">475</span>
 <span class="normal">476</span>
@@ -17038,7 +17041,8 @@ Canonicalization for undirected pairs can be added here later if decided.</p>
 <span class="normal">478</span>
 <span class="normal">479</span>
 <span class="normal">480</span>
-<span class="normal">481</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_search_service</span><span class="p">(</span><span class="n">db_clients</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SearchService</span><span class="p">:</span>
+<span class="normal">481</span>
+<span class="normal">482</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_search_service</span><span class="p">(</span><span class="n">db_clients</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SearchService</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory function to create a SearchService instance.</span>
 
 <span class="sd">    Args:</span>
