@@ -195,7 +195,8 @@ class QdrantInterface:
             collection: Optional collection name override.
 
         Returns:
-            dict[str, Any] | None: Point data including id, vector, and payload, or None if not found.
+            dict[str, Any] | None: Point data including id, vector, and payload,
+                or None if not found.
 
         Raises:
             DatabaseError: If retrieval fails.
@@ -278,7 +279,8 @@ class QdrantInterface:
             collection: Optional collection name override.
 
         Returns:
-            dict[str, Any]: Collection information including existence, vector count, point count, and config.
+            dict[str, Any]: Collection information including existence, vector count,
+                point count, and config.
 
         Raises:
             DatabaseError: If collection info retrieval fails.

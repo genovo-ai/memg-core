@@ -20,10 +20,12 @@ load_dotenv(override=True)  # Allow .env file to override environment variables
 
 from fastapi.responses import JSONResponse
 from fastmcp import FastMCP
+
 # Import our YAML docstring helper for dynamic tool descriptions
 from yaml_docstring_helper import YamlDocstringHelper
 
 from memg_core import __version__
+
 # Import the current API from the installed library
 from memg_core.api.public import MemgClient
 
@@ -42,6 +44,7 @@ memg_client: Optional[MemgClient] = None
 # Global docstring helper instance
 docstring_helper: Optional[YamlDocstringHelper] = None
 
+
 def initialize_client() -> None:
     """Initialize the global MemgClient instance and docstring helper during startup."""
     global memg_client, docstring_helper
@@ -54,7 +57,9 @@ def initialize_client() -> None:
     # Get YAML schema from environment - this is required for generic server
     yaml_path = os.getenv("MEMG_YAML_SCHEMA")
     if not yaml_path:
-        raise RuntimeError("MEMG_YAML_SCHEMA environment variable is required for generic MCP server")
+        raise RuntimeError(
+            "MEMG_YAML_SCHEMA environment variable is required for generic MCP server"
+        )
 
     logger.info(f"📋 Using YAML schema: {yaml_path}")
 
@@ -82,9 +87,13 @@ def initialize_client() -> None:
         if os.path.exists(kuzu_link) and not os.path.islink(kuzu_link):
             os.rmdir(kuzu_link)
         if not os.path.exists(kuzu_link):
-            os.symlink(os.path.dirname(kuzu_path), kuzu_link)  # kuzu_path includes db name
+            os.symlink(
+                os.path.dirname(kuzu_path), kuzu_link
+            )  # kuzu_path includes db name
 
-        logger.info(f"🔧 Using mounted volumes via symlinks - qdrant: {qdrant_path} -> {qdrant_link}, kuzu: {kuzu_path} -> {kuzu_link}")
+        logger.info(
+            f"🔧 Using mounted volumes via symlinks - qdrant: {qdrant_path} -> {qdrant_link}, kuzu: {kuzu_path} -> {kuzu_link}"
+        )
     else:
         # Fallback to tmp directory for non-mounted usage
         db_path = "tmp"
@@ -120,12 +129,14 @@ def initialize_client() -> None:
         logger.error(f"❌ Failed to initialize MemgClient: {e}", exc_info=True)
         raise RuntimeError(f"MemgClient initialization failed: {e}")
 
+
 def get_memg_client() -> MemgClient:
     """Get the global MemgClient instance (must be initialized first)."""
     global memg_client
     if memg_client is None:
         raise RuntimeError("MemgClient not initialized - server startup failed")
     return memg_client
+
 
 def get_dynamic_docstring(tool_name: str) -> str:
     """Get dynamic docstring from YAML helper or fallback to static."""
@@ -141,7 +152,7 @@ def get_dynamic_docstring(tool_name: str) -> str:
             "get_memory": "Get a single memory by HRID with full payload and metadata.",
             "get_memories": "Get multiple memories with filtering, pagination, and optional graph expansion.",
             "add_relationship": "Add a relationship between two memories. Updated this to test the YAML docstring helper.",
-            "delete_relationship": "Delete a relationship between two memories."
+            "delete_relationship": "Delete a relationship between two memories.",
         }
         return fallback_docstrings.get(tool_name, "Tool description not available.")
 
@@ -168,6 +179,7 @@ def get_dynamic_docstring(tool_name: str) -> str:
         logger.warning(f"⚠️ Failed to generate dynamic docstring for {tool_name}: {e}")
         return f"Error generating docstring for {tool_name}."
 
+
 def shutdown_client():
     """Shutdown the global MemgClient instance."""
     global memg_client
@@ -192,7 +204,7 @@ def setup_health_endpoints(app: FastMCP) -> None:
             "version": __version__,
             "memg_client": client_status,
             "yaml_schema": os.getenv("MEMG_YAML_SCHEMA", "not configured"),
-            "status": "healthy"
+            "status": "healthy",
         }
         return JSONResponse(status, status_code=200)
 
@@ -201,7 +213,9 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
     """Register MCP tools."""
 
     @app.tool("add_memory", description=get_dynamic_docstring("add_memory"))
-    def add_memory_tool(memory_type: str, user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def add_memory_tool(
+        memory_type: str, user_id: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
         logger.info(f"=== ADD_MEMORY TOOL CALLED ===")
         logger.info(f"Adding {memory_type} for user {user_id}")
         logger.info(f"Payload: {payload}")
@@ -209,39 +223,30 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
         try:
             client = get_memg_client()
             hrid = client.add_memory(
-                memory_type=memory_type,
-                payload=payload,
-                user_id=user_id
+                memory_type=memory_type, payload=payload, user_id=user_id
             )
             logger.info(f"✅ Successfully added {memory_type} with HRID: {hrid}")
 
-            return {
-                "result": f"{memory_type.title()} added",
-                "hrid": hrid
-            }
+            return {"result": f"{memory_type.title()} added", "hrid": hrid}
 
         except Exception as e:
             logger.error(f"❌ Error adding {memory_type}: {e}")
             return {
                 "error": f"Failed to add {memory_type}: {str(e)}",
                 "memory_type": memory_type,
-                "user_id": user_id
+                "user_id": user_id,
             }
-
 
     @app.tool("delete_memory", description=get_dynamic_docstring("delete_memory"))
     def delete_memory_tool(memory_id: str, user_id: str) -> Dict[str, Any]:
         try:
             client = get_memg_client()
-            success = client.delete_memory(
-                hrid=memory_id,
-                user_id=user_id
-            )
+            success = client.delete_memory(hrid=memory_id, user_id=user_id)
 
             return {
                 "result": "Memory deleted" if success else "Delete failed",
                 "hrid": memory_id,
-                "deleted": success
+                "deleted": success,
             }
 
         except Exception as e:
@@ -249,12 +254,16 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
             return {
                 "error": f"Failed to delete {memory_id}: {str(e)}",
                 "hrid": memory_id,
-                "deleted": False
+                "deleted": False,
             }
 
-
     @app.tool("update_memory", description=get_dynamic_docstring("update_memory"))
-    def update_memory_tool(hrid: str, payload_updates: Dict[str, Any], user_id: str, memory_type: Optional[str] = None) -> Dict[str, Any]:
+    def update_memory_tool(
+        hrid: str,
+        payload_updates: Dict[str, Any],
+        user_id: str,
+        memory_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
         logger.info(f"=== UPDATE_MEMORY TOOL CALLED ===")
         logger.info(f"Updating {hrid} for user {user_id}")
         logger.info(f"Updates: {payload_updates}")
@@ -265,7 +274,7 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 hrid=hrid,
                 payload_updates=payload_updates,
                 user_id=user_id,
-                memory_type=memory_type
+                memory_type=memory_type,
             )
 
             if success:
@@ -273,24 +282,19 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 return {
                     "result": "Memory updated successfully",
                     "hrid": hrid,
-                    "updated": True
+                    "updated": True,
                 }
             else:
                 logger.warning(f"⚠️ Update failed for {hrid}")
-                return {
-                    "result": "Update failed",
-                    "hrid": hrid,
-                    "updated": False
-                }
+                return {"result": "Update failed", "hrid": hrid, "updated": False}
 
         except Exception as e:
             logger.error(f"Error updating {hrid}: {e}")
             return {
                 "error": f"Failed to update {hrid}: {str(e)}",
                 "hrid": hrid,
-                "updated": False
+                "updated": False,
             }
-
 
     @app.tool("search_memories", description=get_dynamic_docstring("search_memories"))
     def search_memories_tool(
@@ -300,14 +304,16 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
         memory_type: Optional[str] = None,
         neighbor_limit: int = 5,
         hops: int = 1,
-        include_semantic: bool = True
+        include_semantic: bool = True,
     ) -> Dict[str, Any]:
         logger.info(f"=== SEARCH_MEMORIES TOOL CALLED ===")
         logger.info(f"Query: {query}")
         logger.info(f"User ID: {user_id}")
         logger.info(f"Limit: {limit}")
         logger.info(f"Memory type (raw): {memory_type}")
-        logger.info(f"Neighbor limit: {neighbor_limit}, Hops: {hops}, Include semantic: {include_semantic}")
+        logger.info(
+            f"Neighbor limit: {neighbor_limit}, Hops: {hops}, Include semantic: {include_semantic}"
+        )
 
         # Normalize memory_type input - handle string only, make case-insensitive
         memory_type_filter = None
@@ -319,10 +325,7 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
         # Validate inputs
         if not query.strip():
             logger.warning("Empty query provided")
-            return {
-                "error": "Query cannot be empty",
-                "memories": []
-            }
+            return {"error": "Query cannot be empty", "memories": []}
 
         if limit > 50:
             limit = 50  # Cap at reasonable limit
@@ -336,25 +339,16 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
             limit=limit,
             neighbor_limit=neighbor_limit,
             hops=hops,
-            include_semantic=include_semantic
+            include_semantic=include_semantic,
         )
 
-        logger.info(f"Search API completed, found {len(results)} results")
+        # Search now always returns EnhancedSearchResult
+        logger.info(f"Search API completed - seeds: {len(results.memories)}, neighbors: {len(results.neighbors)}")
 
-        # Include full SearchResult information
-        memories = [{
-            "hrid": r.memory.hrid,
-            "memory_type": r.memory.memory_type,
-            "payload": r.memory.payload,
-            "score": r.score,
-            "source": r.source,
-            "distance": r.distance,
-            "neighbor": r.metadata
-        } for r in results]
-
+        # Convert to dict to ensure JSON serialization
         return {
-            "result": f"Found {len(memories)} memories",
-            "memories": memories,
+            "result": f"Found {len(results.memories)} seeds and {len(results.neighbors)} neighbors",
+            "enhanced_result": results.model_dump(),  # Complete EnhancedSearchResult as dict
             "query": query,
             "user_id": user_id,
             "search_params": {
@@ -362,10 +356,9 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 "memory_type": memory_type_filter,
                 "neighbor_limit": neighbor_limit,
                 "hops": hops,
-                "include_semantic": include_semantic
-            }
+                "include_semantic": include_semantic,
+            },
         }
-
 
     @app.tool("add_relationship", description=get_dynamic_docstring("add_relationship"))
     def add_relationship_tool(
@@ -375,10 +368,12 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
         from_memory_type: str,
         to_memory_type: str,
         user_id: str,
-        properties: Optional[Dict[str, Any]] = None
+        properties: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         logger.info(f"=== ADD_RELATIONSHIP TOOL CALLED ===")
-        logger.info(f"From: {from_memory_hrid} ({from_memory_type}) -> To: {to_memory_hrid} ({to_memory_type})")
+        logger.info(
+            f"From: {from_memory_hrid} ({from_memory_type}) -> To: {to_memory_hrid} ({to_memory_type})"
+        )
         logger.info(f"Relation: {relation_type}, User: {user_id}")
 
         try:
@@ -390,14 +385,14 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 from_memory_type=from_memory_type,
                 to_memory_type=to_memory_type,
                 user_id=user_id,
-                properties=properties
+                properties=properties,
             )
 
             return {
                 "result": "Relationship added successfully",
                 "from_hrid": from_memory_hrid,
                 "to_hrid": to_memory_hrid,
-                "relation_type": relation_type
+                "relation_type": relation_type,
             }
 
         except Exception as e:
@@ -406,21 +401,24 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 "error": f"Failed to add relationship: {str(e)}",
                 "from_hrid": from_memory_hrid,
                 "to_hrid": to_memory_hrid,
-                "relation_type": relation_type
+                "relation_type": relation_type,
             }
 
-
-    @app.tool("delete_relationship", description=get_dynamic_docstring("delete_relationship"))
+    @app.tool(
+        "delete_relationship", description=get_dynamic_docstring("delete_relationship")
+    )
     def delete_relationship_tool(
         from_memory_hrid: str,
         to_memory_hrid: str,
         relation_type: str,
         user_id: str,
         from_memory_type: Optional[str] = None,
-        to_memory_type: Optional[str] = None
+        to_memory_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         logger.info(f"=== DELETE_RELATIONSHIP TOOL CALLED ===")
-        logger.info(f"Deleting: {from_memory_hrid} -[{relation_type}]-> {to_memory_hrid}")
+        logger.info(
+            f"Deleting: {from_memory_hrid} -[{relation_type}]-> {to_memory_hrid}"
+        )
         logger.info(f"User: {user_id}")
 
         try:
@@ -431,7 +429,7 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 relation_type=relation_type,
                 from_memory_type=from_memory_type,
                 to_memory_type=to_memory_type,
-                user_id=user_id
+                user_id=user_id,
             )
 
             if success:
@@ -441,7 +439,7 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                     "from_hrid": from_memory_hrid,
                     "to_hrid": to_memory_hrid,
                     "relation_type": relation_type,
-                    "deleted": True
+                    "deleted": True,
                 }
             else:
                 logger.warning(f"⚠️ Relationship not found or delete failed")
@@ -450,7 +448,7 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                     "from_hrid": from_memory_hrid,
                     "to_hrid": to_memory_hrid,
                     "relation_type": relation_type,
-                    "deleted": False
+                    "deleted": False,
                 }
 
         except Exception as e:
@@ -460,9 +458,8 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 "from_hrid": from_memory_hrid,
                 "to_hrid": to_memory_hrid,
                 "relation_type": relation_type,
-                "deleted": False
+                "deleted": False,
             }
-
 
     @app.tool("get_system_info")
     def get_system_info_tool(random_string: str = "") -> Dict[str, Any]:
@@ -484,10 +481,21 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
             return {
                 "system_type": "MEMG Core (Generic)",
                 "version": __version__,
-                "functions": ["add_memory", "delete_memory", "update_memory", "search_memories", "get_memory", "get_memories", "add_relationship", "delete_relationship", "get_system_info", "health_check"],
+                "functions": [
+                    "add_memory",
+                    "delete_memory",
+                    "update_memory",
+                    "search_memories",
+                    "get_memory",
+                    "get_memories",
+                    "add_relationship",
+                    "delete_relationship",
+                    "get_system_info",
+                    "health_check",
+                ],
                 "memory_types": entity_types,
                 "yaml_schema": yaml_schema,
-                "note": "Schema details depend on the loaded YAML configuration"
+                "note": "Schema details depend on the loaded YAML configuration",
             }
         except Exception as e:
             logger.error(f"Error getting system info: {e}")
@@ -495,11 +503,13 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 "system_type": "MEMG Core (Generic)",
                 "version": __version__,
                 "error": f"Failed to get schema info: {str(e)}",
-                "yaml_schema": os.getenv("MEMG_YAML_SCHEMA", "not configured")
+                "yaml_schema": os.getenv("MEMG_YAML_SCHEMA", "not configured"),
             }
 
     @app.tool("get_memory")
-    def get_memory_tool(hrid: str, user_id: str, memory_type: Optional[str] = None) -> Dict[str, Any]:
+    def get_memory_tool(
+        hrid: str, user_id: str, memory_type: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Get a single memory by HRID."""
         logger.info(f"=== GET_MEMORY TOOL CALLED ===")
         logger.info(f"Getting memory {hrid} for user {user_id}")
@@ -507,31 +517,25 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
         try:
             client = get_memg_client()
             memory_data = client.get_memory(
-                hrid=hrid,
-                user_id=user_id,
-                memory_type=memory_type
+                hrid=hrid, user_id=user_id, memory_type=memory_type
             )
 
             if memory_data:
                 logger.info(f"✅ Successfully retrieved {hrid}")
                 return {
                     "result": "Memory retrieved successfully",
-                    "memory": memory_data
+                    "memory": memory_data,
                 }
             else:
                 logger.warning(f"⚠️ Memory not found: {hrid}")
-                return {
-                    "result": "Memory not found",
-                    "hrid": hrid,
-                    "memory": None
-                }
+                return {"result": "Memory not found", "hrid": hrid, "memory": None}
 
         except Exception as e:
             logger.error(f"Error retrieving {hrid}: {e}")
             return {
                 "error": f"Failed to retrieve {hrid}: {str(e)}",
                 "hrid": hrid,
-                "memory": None
+                "memory": None,
             }
 
     @app.tool("get_memories")
@@ -542,11 +546,13 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
         offset: int = 0,
         include_neighbors: bool = False,
         hops: int = 1,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Get multiple memories with filtering and optional graph expansion."""
         logger.info(f"=== GET_MEMORIES TOOL CALLED ===")
-        logger.info(f"Getting memories for user {user_id}, type: {memory_type}, limit: {limit}")
+        logger.info(
+            f"Getting memories for user {user_id}, type: {memory_type}, limit: {limit}"
+        )
 
         try:
             client = get_memg_client()
@@ -557,7 +563,7 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 limit=limit,
                 offset=offset,
                 include_neighbors=include_neighbors,
-                hops=hops
+                hops=hops,
             )
 
             logger.info(f"✅ Successfully retrieved {len(memories)} memories")
@@ -570,8 +576,8 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                     "limit": limit,
                     "offset": offset,
                     "include_neighbors": include_neighbors,
-                    "filters": filters
-                }
+                    "filters": filters,
+                },
             }
 
         except Exception as e:
@@ -579,8 +585,9 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
             return {
                 "error": f"Failed to retrieve memories: {str(e)}",
                 "memories": [],
-                "count": 0
+                "count": 0,
             }
+
 
 def create_app() -> FastMCP:
     """Create and configure the FastMCP app."""
@@ -607,13 +614,18 @@ def create_app() -> FastMCP:
             "service": "MEMG Core MCP Server (Generic)",
             "version": __version__,
             "memg_client": client_status,
-            "database_path": os.getenv("QDRANT_STORAGE_PATH", "tmp") if os.getenv("QDRANT_STORAGE_PATH") else "tmp",
+            "database_path": (
+                os.getenv("QDRANT_STORAGE_PATH", "tmp")
+                if os.getenv("QDRANT_STORAGE_PATH")
+                else "tmp"
+            ),
             "yaml_schema": os.getenv("MEMG_YAML_SCHEMA", "not configured"),
-            "storage_type": "mounted_volumes" if os.getenv("QDRANT_STORAGE_PATH") else "internal"
+            "storage_type": (
+                "mounted_volumes" if os.getenv("QDRANT_STORAGE_PATH") else "internal"
+            ),
         }
 
     return app
-
 
 
 # Create the app instance
@@ -628,7 +640,9 @@ if __name__ == "__main__":
     host = os.getenv("MEMORY_SYSTEM_MCP_HOST", "127.0.0.1")
 
     print(f"🚀 MEMG Core MCP Server (Generic) v{__version__} on {host}:{port}")
-    print(f"📋 Using YAML: {os.getenv('MEMG_YAML_SCHEMA', 'NOT CONFIGURED - REQUIRED!')}")
+    print(
+        f"📋 Using YAML: {os.getenv('MEMG_YAML_SCHEMA', 'NOT CONFIGURED - REQUIRED!')}"
+    )
     print(f"💾 Using DB path: {os.getenv('QDRANT_STORAGE_PATH', 'tmp')}")
     print(f"🏥 Health check available at /health")
 

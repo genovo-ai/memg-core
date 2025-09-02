@@ -17,6 +17,7 @@ from memg_core.api.public import (
     search,
     update_memory,
 )
+from memg_core.core.models import SearchResult
 
 
 class TestPublicAPIInterface:
@@ -66,16 +67,22 @@ class TestPublicAPIInterface:
         # Search for it
         results = search(query="test", user_id=predictable_user_id, limit=10)
 
-        assert len(results) > 0, "Should find the added memory"
+        assert len(results.memories) > 0, "Should find the added memory"
 
-        # Check that results contain no UUIDs
-        for result in results:
-            test_helpers.assert_no_uuid_exposure(result)
+        # Check that results contain no UUIDs - check both seeds and neighbors
+        for memory_seed in results.memories:
+            test_helpers.assert_no_uuid_exposure(memory_seed)
 
             # Should have HRID in result
-            assert hasattr(result, "memory"), "Result should have memory attribute"
-            assert hasattr(result.memory, "hrid"), "Memory should have HRID"
-            test_helpers.assert_hrid_format(result.memory.hrid, "note")
+            assert hasattr(memory_seed, "hrid"), "MemorySeed should have HRID"
+            test_helpers.assert_hrid_format(memory_seed.hrid, "note")
+
+        for memory_neighbor in results.neighbors:
+            test_helpers.assert_no_uuid_exposure(memory_neighbor)
+
+            # Should have HRID in result
+            assert hasattr(memory_neighbor, "hrid"), "MemoryNeighbor should have HRID"
+            test_helpers.assert_hrid_format(memory_neighbor.hrid, "note")
 
     def test_delete_memory_accepts_hrid(self, predictable_user_id: str, sample_note_data: dict):
         """Test that delete_memory accepts HRID and works correctly."""
@@ -90,7 +97,7 @@ class TestPublicAPIInterface:
         results = search(query=sample_note_data["statement"], user_id=predictable_user_id, limit=10)
 
         # Should not find the deleted memory
-        found_hrids = [r.memory.hrid for r in results if hasattr(r.memory, "hrid")]
+        found_hrids = [m.hrid for m in results.memories] + [n.hrid for n in results.neighbors]
         assert hrid not in found_hrids, "Deleted memory should not be found in search"
 
     def test_user_isolation_in_api(self, sample_note_data: dict):
@@ -104,13 +111,17 @@ class TestPublicAPIInterface:
         # User 2 should not see User 1's memory
         user2_results = search(query=sample_note_data["statement"], user_id=user2, limit=10)
 
-        user2_hrids = [r.memory.hrid for r in user2_results if hasattr(r.memory, "hrid")]
+        user2_hrids = [m.hrid for m in user2_results.memories] + [
+            n.hrid for n in user2_results.neighbors
+        ]
         assert hrid1 not in user2_hrids, "User 2 should not see User 1's memories"
 
         # User 1 should see their own memory
         user1_results = search(query=sample_note_data["statement"], user_id=user1, limit=10)
 
-        user1_hrids = [r.memory.hrid for r in user1_results if hasattr(r.memory, "hrid")]
+        user1_hrids = [m.hrid for m in user1_results.memories] + [
+            n.hrid for n in user1_results.neighbors
+        ]
         assert hrid1 in user1_hrids, "User 1 should see their own memories"
 
 
@@ -177,7 +188,7 @@ class TestPublicAPIErrorHandling:
 
         # Memory should still exist for User 1
         results = search(query=sample_note_data["statement"], user_id=user1, limit=10)
-        found_hrids = [r.memory.hrid for r in results if hasattr(r.memory, "hrid")]
+        found_hrids = [m.hrid for m in results.memories] + [n.hrid for n in results.neighbors]
         assert hrid in found_hrids, "Memory should still exist after failed deletion"
 
 
@@ -217,7 +228,9 @@ class TestPublicAPISearchFiltering:
             limit=10,
         )
 
-        note_hrids = [r.memory.hrid for r in note_results if hasattr(r.memory, "hrid")]
+        note_hrids = [m.hrid for m in note_results.memories] + [
+            n.hrid for n in note_results.neighbors
+        ]
         assert note_hrid in note_hrids, "Should find note"
         assert doc_hrid not in note_hrids, "Should not find document when filtering for notes"
 
@@ -229,7 +242,7 @@ class TestPublicAPISearchFiltering:
             limit=10,
         )
 
-        doc_hrids = [r.memory.hrid for r in doc_results if hasattr(r.memory, "hrid")]
+        doc_hrids = [m.hrid for m in doc_results.memories] + [n.hrid for n in doc_results.neighbors]
         assert doc_hrid in doc_hrids, "Should find document"
         assert note_hrid not in doc_hrids, "Should not find note when filtering for documents"
 
@@ -248,8 +261,9 @@ class TestPublicAPISearchFiltering:
         # Search with limit
         results = search(query="test note", user_id=predictable_user_id, limit=3)
 
-        assert len(results) <= 3, f"Should return at most 3 results, got {len(results)}"
-        assert len(results) > 0, "Should return some results"
+        total_results = len(results.memories) + len(results.neighbors)
+        assert total_results <= 3, f"Should return at most 3 results, got {total_results}"
+        assert total_results > 0, "Should return some results"
 
     def test_empty_search_query(self, predictable_user_id: str, sample_note_data: dict):
         """Test behavior with empty search query."""
@@ -260,7 +274,9 @@ class TestPublicAPISearchFiltering:
         results = search(query="", user_id=predictable_user_id, limit=10)
 
         # Should handle empty query gracefully (implementation dependent)
-        assert isinstance(results, list), "Should return a list even with empty query"
+        assert isinstance(results, SearchResult), (
+            "Should return a SearchResult even with empty query"
+        )
 
 
 class TestNewAPIFunctionality:
@@ -281,9 +297,10 @@ class TestNewAPIFunctionality:
 
         # Verify the update by searching
         results = search(query="Updated note", user_id=predictable_user_id, limit=5)
-        assert len(results) > 0, "Should find updated memory"
+        total_results = len(results.memories) + len(results.neighbors)
+        assert total_results > 0, "Should find updated memory"
 
-        updated_memory = results[0].memory
+        updated_memory = results.memories[0]
         assert updated_memory.payload["statement"] == "Updated note statement"
         assert updated_memory.payload["project"] == "updated-project"
         # Original fields should be preserved if not updated
@@ -307,7 +324,7 @@ class TestNewAPIFunctionality:
 
         # Verify other fields are preserved
         results = search(query="Original statement", user_id=predictable_user_id, limit=5)
-        updated_memory = results[0].memory
+        updated_memory = results.memories[0]
         assert updated_memory.payload["statement"] == "Original statement"  # Unchanged
         assert updated_memory.payload["project"] == "new-project"  # Updated
         assert updated_memory.payload["origin"] == "user"  # Unchanged

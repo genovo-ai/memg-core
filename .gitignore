@@ -265,3 +265,4 @@ test_*
 !tests/*
 
 .DS_Store
+fastapi*

@@ -1,10 +1,10 @@
-"""Result composition utilities for enhanced search results."""
+"""Result composition utilities for search results."""
 
 from __future__ import annotations
 
 from ..interfaces import Embedder
 from ..models import (
-    EnhancedSearchResult,
+    Memory,
     MemoryNeighbor,
     MemorySeed,
     RelationshipInfo,
@@ -14,20 +14,20 @@ from ..yaml_translator import YamlTranslator
 from .scoring import calculate_neighbor_scores, filter_by_decay_threshold
 
 
-def compose_enhanced_result(
-    seeds: list[SearchResult],
-    neighbors: list[SearchResult],
+def compose_search_result(
+    seed_memories: list[tuple[Memory, float, dict]],  # (memory, score, metadata)
+    neighbor_memories: list[tuple[Memory, float, dict]],  # (memory, score, metadata)
     yaml_translator: YamlTranslator | None = None,
     query: str | None = None,
     embedder: Embedder | None = None,
     decay_threshold: float | None = None,
     decay_rate: float = 0.9,
-) -> EnhancedSearchResult:
-    """Compose enhanced search result with explicit seed/neighbor separation.
+) -> SearchResult:
+    """Compose search result with explicit seed/neighbor separation.
 
     Args:
-        seeds: List of seed search results with full payloads.
-        neighbors: List of neighbor search results with anchor payloads.
+        seed_memories: List of (memory, score, metadata) tuples for seeds.
+        neighbor_memories: List of (memory, score, metadata) tuples for neighbors.
         yaml_translator: YAML translator for relationship info.
         query: Original search query for neighbor scoring.
         embedder: Embedder for calculating neighbor-to-query relevance.
@@ -35,21 +35,23 @@ def compose_enhanced_result(
         decay_rate: Graph traversal decay rate per hop.
 
     Returns:
-        EnhancedSearchResult: Composed result with explicit structure.
+        SearchResult: Composed result with explicit structure.
     """
     if not yaml_translator:
         yaml_translator = YamlTranslator()
 
     # Build seed-to-neighbors mapping for relationships
-    seed_neighbors_map = _build_seed_neighbors_map(neighbors)
+    seed_neighbors_map = _build_seed_neighbors_map(neighbor_memories)
 
-    # Convert seeds to MemorySeed objects with relationships
+    # Convert seeds to MemorySeed with relationships
     memory_seeds = []
-    for seed in seeds:
-        memory = seed.memory
+    for memory, score, _ in seed_memories:
+        # Get neighbors for this seed
+        seed_neighbors = seed_neighbors_map.get(memory.id, [])
+        # Extract relationships with scoring
         relationships = _extract_relationships(
-            seed_score=seed.score,
-            neighbors=seed_neighbors_map.get(memory.id, []),
+            seed_score=score,
+            neighbors=seed_neighbors,
             yaml_translator=yaml_translator,
             query=query,
             embedder=embedder,
@@ -61,57 +63,54 @@ def compose_enhanced_result(
             hrid=memory.hrid or memory.id,
             memory_type=memory.memory_type,
             payload=memory.payload,
-            score=seed.score,
+            score=score,
             relationships=relationships,
         )
         memory_seeds.append(memory_seed)
 
-    # Convert neighbors to MemoryNeighbor objects (deduplicated)
+    # Convert neighbors to MemoryNeighbor (anchor-only payload)
     memory_neighbors = []
-    seen_neighbor_ids = set()
+    for memory, _, _ in neighbor_memories:
+        # Get anchor field for this memory type
+        anchor_field = yaml_translator.get_anchor_field(memory.memory_type)
+        anchor_payload = {anchor_field: memory.payload.get(anchor_field, "")}
+        memory_neighbor = MemoryNeighbor(
+            hrid=memory.hrid or memory.id,
+            memory_type=memory.memory_type,
+            payload=anchor_payload,
+        )
+        memory_neighbors.append(memory_neighbor)
 
-    for neighbor in neighbors:
-        memory = neighbor.memory
-        if memory.id not in seen_neighbor_ids:
-            memory_neighbor = MemoryNeighbor(
-                hrid=memory.hrid or memory.id,
-                memory_type=memory.memory_type,
-                payload=memory.payload,  # Already projected to anchor-only
-            )
-            memory_neighbors.append(memory_neighbor)
-            seen_neighbor_ids.add(memory.id)
-
-    return EnhancedSearchResult(
+    return SearchResult(
         memories=memory_seeds,
         neighbors=memory_neighbors,
     )
 
 
-def _build_seed_neighbors_map(neighbors: list[SearchResult]) -> dict[str, list[SearchResult]]:
-    """Build mapping from seed IDs to their neighbors.
+def _build_seed_neighbors_map(
+    neighbor_memories: list[tuple[Memory, float, dict]],
+) -> dict[str, list[tuple[Memory, float, dict]]]:
+    """Build mapping from seed ID to its neighbors.
 
     Args:
-        neighbors: List of neighbor search results.
+        neighbor_memories: List of neighbor memory tuples.
 
     Returns:
-        dict: Mapping from seed ID to list of neighbor results.
+        dict: Mapping from seed ID to list of neighbor tuples.
     """
-    seed_neighbors_map: dict[str, list[SearchResult]] = {}
-
-    for neighbor in neighbors:
-        # Extract seed ID from metadata
-        from_seed = neighbor.metadata.get("from_seed")
-        if from_seed:
-            if from_seed not in seed_neighbors_map:
-                seed_neighbors_map[from_seed] = []
-            seed_neighbors_map[from_seed].append(neighbor)
-
+    seed_neighbors_map: dict[str, list[tuple[Memory, float, dict]]] = {}
+    for memory, score, metadata in neighbor_memories:
+        seed_id = metadata.get("seed_id")
+        if seed_id:
+            if seed_id not in seed_neighbors_map:
+                seed_neighbors_map[seed_id] = []
+            seed_neighbors_map[seed_id].append((memory, score, metadata))
     return seed_neighbors_map
 
 
 def _extract_relationships(
     seed_score: float,
-    neighbors: list[SearchResult],
+    neighbors: list[tuple[Memory, float, dict]],
     yaml_translator: YamlTranslator,
     query: str | None = None,
     embedder: Embedder | None = None,
@@ -122,29 +121,24 @@ def _extract_relationships(
 
     Args:
         seed_score: Score of the seed memory.
-        neighbors: List of neighbor results for this seed.
-        yaml_translator: YAML translator for relationship info.
-        query: Original search query for neighbor scoring.
-        embedder: Embedder for calculating neighbor-to-query relevance.
-        decay_threshold: Minimum threshold for neighbor relevance.
-        decay_rate: Graph traversal decay rate per hop.
+        neighbors: List of neighbor memory tuples.
+        yaml_translator: YAML translator for anchor fields.
+        query: Original query for scoring.
+        embedder: Embedder for neighbor-to-query scoring.
+        decay_threshold: Minimum relevance threshold.
+        decay_rate: Decay rate for fallback scoring.
 
     Returns:
         list[RelationshipInfo]: List of relationship information.
     """
     relationships = []
+    for memory, _, metadata in neighbors:
+        relation_type = metadata.get("relation_type", "RELATED_TO")
+        hop = metadata.get("hop", 1)
 
-    for neighbor in neighbors:
-        memory = neighbor.memory
-        relation_type = neighbor.metadata.get("relation_type", "RELATED_TO")
-        hop = neighbor.metadata.get("hop", 1)
-
-        # Calculate dual scores if we have the necessary components
         if query and embedder and memory.payload:
-            # Get anchor text from neighbor payload
             anchor_field = yaml_translator.get_anchor_field(memory.memory_type)
             neighbor_anchor = memory.payload.get(anchor_field, "")
-
             if neighbor_anchor:
                 scores = calculate_neighbor_scores(
                     neighbor_anchor=neighbor_anchor,
@@ -154,10 +148,8 @@ def _extract_relationships(
                     embedder=embedder,
                     decay_rate=decay_rate,
                 )
-
-                # Apply decay threshold filtering
                 if not filter_by_decay_threshold(scores, decay_threshold):
-                    continue  # Skip this neighbor if it doesn't meet threshold
+                    continue
             else:
                 # Fallback to decay-based scoring if no anchor text
                 scores = {
@@ -165,7 +157,7 @@ def _extract_relationships(
                     "to_neighbor": seed_score * (decay_rate**hop),
                 }
         else:
-            # Fallback for Phase 1 compatibility or missing components
+            # Fallback for missing components
             scores = {}
 
         relationship = RelationshipInfo(
@@ -174,37 +166,28 @@ def _extract_relationships(
             scores=scores,
         )
         relationships.append(relationship)
-
     return relationships
 
 
 def separate_seeds_and_neighbors(
-    results: list[SearchResult],
+    all_memories: list[tuple[Memory, float, dict]],
     limit: int,
-) -> tuple[list[SearchResult], list[SearchResult]]:
-    """Separate search results into seeds and neighbors based on limit.
-
-    This implements the new semantics where limit=N means N seeds.
+) -> tuple[list[tuple[Memory, float, dict]], list[tuple[Memory, float, dict]]]:
+    """Separate memory tuples into seeds and neighbors based on limit.
 
     Args:
-        results: Combined list of search results.
-        limit: Number of seeds to return.
+        all_memories: All memory tuples from search.
+        limit: Maximum number of seeds.
 
     Returns:
-        tuple: (seeds, neighbors) where seeds are limited and neighbors are the rest.
+        tuple: (seeds, neighbors) as memory tuple lists.
     """
-    seeds: list[SearchResult] = []
-    neighbors: list[SearchResult] = []
-
-    for result in results:
-        if result.source == "qdrant" and len(seeds) < limit:
-            # This is a vector seed and we haven't reached the limit
-            seeds.append(result)
-        elif result.source in ("graph_neighbor", "see_also") or result.source.startswith(
-            "see_also_"
-        ):
-            # This is a neighbor or semantic expansion
-            neighbors.append(result)
-        # Skip additional seeds beyond the limit
+    seeds: list[tuple[Memory, float, dict]] = []
+    neighbors: list[tuple[Memory, float, dict]] = []
+    for memory_tuple in all_memories:
+        if len(seeds) < limit:
+            seeds.append(memory_tuple)
+        else:
+            neighbors.append(memory_tuple)
 
     return seeds, neighbors

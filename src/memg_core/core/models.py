@@ -273,8 +273,8 @@ class MemoryNeighbor(BaseModel):
     payload: dict[str, Any] = Field(..., description="Anchor-only payload")
 
 
-class EnhancedSearchResult(BaseModel):
-    """Enhanced search result with explicit seed/neighbor separation.
+class SearchResult(BaseModel):
+    """Search result with explicit seed/neighbor separation.
 
     Attributes:
         memories: List of memory seeds with full payloads and relationships.
@@ -287,57 +287,6 @@ class EnhancedSearchResult(BaseModel):
     neighbors: list[MemoryNeighbor] = Field(
         default_factory=list, description="Memory neighbors with anchor payloads"
     )
-
-
-class SearchResult(BaseModel):
-    """Legacy search result from vector/graph search - kept for backward compatibility.
-
-    Attributes:
-        memory: Memory instance.
-        score: Similarity score (0.0-1.0).
-        distance: Vector distance (deprecated).
-        source: Search source (qdrant/kuzu/hybrid).
-        metadata: Additional metadata.
-    """
-
-    memory: Memory
-    score: float = Field(..., ge=0.0, le=1.0 + _MAX_SCORE_TOLERANCE, description="Similarity score")
-    distance: float | None = Field(None, description="Vector distance (deprecated)")
-    source: str = Field(..., description="Search source (qdrant/kuzu/hybrid)")
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @field_validator("score")
-    @classmethod
-    def normalize_score(cls, v: float) -> float:
-        """Normalize similarity scores to handle floating-point precision errors.
-
-        Cosine similarity should be in [0, 1] range, but floating-point arithmetic
-        can produce values slightly above 1.0 (e.g., 1.0000000025725408).
-
-        This validator:
-        - Caps scores > 1.0 to exactly 1.0 (for small floating-point errors)
-        - Raises error for scores significantly > 1.0 (indicates real problems)
-        - Ensures scores >= 0.0
-
-        Args:
-            v: Raw similarity score.
-
-        Returns:
-            float: Normalized similarity score.
-
-        Raises:
-            ValueError: If score is negative or significantly above 1.0.
-        """
-        if v < 0.0:
-            raise ValueError(f"Similarity score cannot be negative: {v}")
-
-        if v > 1.001:  # Allow small floating-point errors, but catch real issues
-            raise ValueError(f"Similarity score too high (indicates calculation error): {v}")
-
-        # Cap to 1.0 for small floating-point precision errors
-        return min(v, 1.0)
 
 
 class ProcessingResult(BaseModel):

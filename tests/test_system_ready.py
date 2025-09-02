@@ -68,19 +68,20 @@ class TestSystemReadiness:
         # 2. Test search functionality
         auth_results = search(query="authentication", user_id="developer_001", limit=10)
 
-        assert len(auth_results) >= 2, "Should find authentication-related memories"
+        total_auth_results = len(auth_results.memories) + len(auth_results.neighbors)
+        assert total_auth_results >= 2, "Should find authentication-related memories"
 
         # Validate search results contain HRIDs, not UUIDs
-        for result in auth_results:
-            assert hasattr(result, "memory"), "Result should have memory attribute"
-            assert hasattr(result.memory, "hrid"), "Memory should have HRID"
+        all_memories = auth_results.memories + auth_results.neighbors
+        for memory in all_memories:
+            assert hasattr(memory, "hrid"), "Memory should have HRID"
 
             # Ensure no UUID exposure
-            result_str = str(result.__dict__)
+            memory_str = str(memory.__dict__)
             import uuid
 
             # Check that no UUID-like strings are present
-            words = result_str.split()
+            words = memory_str.split()
             for word in words:
                 try:
                     uuid.UUID(word.strip("',\"(){}[]"))
@@ -88,12 +89,15 @@ class TestSystemReadiness:
                 except (ValueError, AttributeError):
                     pass  # Good, not a UUID
 
-        print(f"✅ Found {len(auth_results)} authentication results")
+        total_auth_results = len(auth_results.memories) + len(auth_results.neighbors)
+        print(f"✅ Found {total_auth_results} authentication results")
 
         # 3. Test user isolation (HRID collision is CORRECT behavior)
         user2_results = search(query="authentication", user_id="developer_002", limit=10)
 
-        user2_hrids = [r.memory.hrid for r in user2_results]
+        user2_hrids = [m.hrid for m in user2_results.memories] + [
+            n.hrid for n in user2_results.neighbors
+        ]
         user1_hrids = [added_hrids[0], added_hrids[1]]  # First two belong to user 1
 
         # Users should NOT see each other's memories (even with same HRIDs)
@@ -101,10 +105,13 @@ class TestSystemReadiness:
         for user1_hrid in user1_hrids:
             if user1_hrid in user2_hrids:
                 # Check if it's actually the same memory by checking content
-                for r in user2_results:
-                    if r.memory.hrid == user1_hrid and "developer_001" in str(r.memory.payload):
-                        cross_contamination = True
-                        break
+                for _r in user2_results:
+                    # Check both memories and neighbors for the user1_hrid
+                    all_memories = auth_results.memories + auth_results.neighbors
+                    for memory in all_memories:
+                        if memory.hrid == user1_hrid and "developer_001" in str(memory.payload):
+                            cross_contamination = True
+                            break
 
         assert not cross_contamination, "User 2 should not see user 1's memories"
         print("✅ User isolation verified (same HRIDs across users is correct)")
@@ -125,8 +132,10 @@ class TestSystemReadiness:
         )
 
         # Should find different results for different types
-        note_hrids = [r.memory.hrid for r in note_results]
-        doc_hrids = [r.memory.hrid for r in doc_results]
+        note_hrids = [m.hrid for m in note_results.memories] + [
+            n.hrid for n in note_results.neighbors
+        ]
+        doc_hrids = [m.hrid for m in doc_results.memories] + [n.hrid for n in doc_results.neighbors]
 
         assert added_hrids[0] in note_hrids, "Should find note when filtering for notes"
         assert added_hrids[1] in doc_hrids, "Should find document when filtering for documents"
@@ -143,7 +152,9 @@ class TestSystemReadiness:
         # Verify deletion
         post_delete_results = search(query="authentication", user_id="developer_001", limit=10)
 
-        post_delete_hrids = [r.memory.hrid for r in post_delete_results]
+        post_delete_hrids = [m.hrid for m in post_delete_results.memories] + [
+            n.hrid for n in post_delete_results.neighbors
+        ]
         assert added_hrids[0] not in post_delete_hrids, "Deleted memory should not be found"
         assert added_hrids[1] in post_delete_hrids, "Other memory should still exist"
 
@@ -201,10 +212,12 @@ class TestSystemReadiness:
         results = search(query="Performance test", user_id=user_id, limit=20)
         search_time = time.time() - start_time
 
-        print(f"📊 Search performance: {search_time:.3f}s for {len(results)} results")
+        total_results = len(results.memories) + len(results.neighbors)
+        print(f"📊 Search performance: {search_time:.3f}s for {total_results} results")
         assert search_time < 3.0, (
             f"Search operation too slow: {search_time:.3f}s"
         )  # More reasonable for CI
-        assert len(results) >= 5, "Should find multiple performance test memories"
+        total_results = len(results.memories) + len(results.neighbors)
+        assert total_results >= 5, "Should find multiple performance test memories"
 
         print("✅ Performance baseline established")
