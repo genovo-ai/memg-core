@@ -264,4 +264,7 @@ experiments/job*
 test_*
 !tests/*
 
+# FastAPI testing files
+fastapi*
+
 .DS_Store

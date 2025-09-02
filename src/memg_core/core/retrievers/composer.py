@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from ..interfaces import Embedder
 from ..models import (
-    EnhancedSearchResult,
     MemoryNeighbor,
     MemorySeed,
     RelationshipInfo,
@@ -22,7 +21,7 @@ def compose_enhanced_result(
     embedder: Embedder | None = None,
     decay_threshold: float | None = None,
     decay_rate: float = 0.9,
-) -> EnhancedSearchResult:
+) -> SearchResult:
     """Compose enhanced search result with explicit seed/neighbor separation.
 
     Args:
@@ -81,7 +80,7 @@ def compose_enhanced_result(
             memory_neighbors.append(memory_neighbor)
             seen_neighbor_ids.add(memory.id)
 
-    return EnhancedSearchResult(
+    return SearchResult(
         memories=memory_seeds,
         neighbors=memory_neighbors,
     )

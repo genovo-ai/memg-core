@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ..core.models import EnhancedSearchResult, SearchResult
+from ..core.models import SearchResult
 from ..core.pipelines.indexer import MemoryService, create_memory_service
 from ..core.pipelines.retrieval import SearchService, create_search_service
 from ..core.yaml_translator import YamlTranslator
@@ -57,26 +57,24 @@ class MemgClient:
         user_id: str,
         memory_type: str | None = None,
         limit: int = 10,
-        enhanced_format: bool = False,
         score_threshold: float | None = None,
         decay_threshold: float | None = None,
         **kwargs,
-    ) -> list[SearchResult] | EnhancedSearchResult:
-        """Search memories.
+    ) -> SearchResult:
+        """Search memories with explicit seed/neighbor separation.
 
         Args:
             query: Text to search for.
             user_id: User ID for filtering results.
             memory_type: Optional memory type filter.
             limit: Maximum number of results to return.
-            enhanced_format: Return EnhancedSearchResult with explicit seed/neighbor separation (default: False).
             score_threshold: Minimum similarity score threshold (0.0-1.0).
-            decay_threshold: Minimum neighbor relevance threshold when enhanced_format=True (0.0-1.0).
+            decay_threshold: Minimum neighbor relevance threshold (0.0-1.0).
             **kwargs: Additional search parameters.
 
         Returns:
-            list[SearchResult] | EnhancedSearchResult: Legacy format or enhanced format
-                based on enhanced_format parameter.
+            SearchResult: Search result with explicit seed/neighbor separation,
+                including full payloads for seeds and relationships.
         """
         clean_query = query.strip() if query else ""
         return self._search_service.search(
@@ -84,7 +82,6 @@ class MemgClient:
             user_id,
             memory_type=memory_type,
             limit=limit,
-            enhanced_format=enhanced_format,
             score_threshold=score_threshold,
             decay_threshold=decay_threshold,
             **kwargs,
@@ -287,11 +284,10 @@ def search(
     user_id: str,
     memory_type: str | None = None,
     limit: int = 10,
-    enhanced_format: bool = False,
     score_threshold: float | None = None,
     decay_threshold: float | None = None,
     **kwargs,
-) -> list[SearchResult] | EnhancedSearchResult:
+) -> SearchResult:
     """Search memories using environment-based client.
 
     Args:
@@ -299,22 +295,19 @@ def search(
         user_id: User ID for filtering results.
         memory_type: Optional memory type filter.
         limit: Maximum number of results to return.
-        enhanced_format: Return EnhancedSearchResult with explicit seed/neighbor
-            separation (default: False).
         score_threshold: Minimum similarity score threshold (0.0-1.0).
-        decay_threshold: Minimum neighbor relevance threshold when
-            enhanced_format=True (0.0-1.0).
+        decay_threshold: Minimum neighbor relevance threshold (0.0-1.0).
         **kwargs: Additional search parameters.
 
     Returns:
-        list[SearchResult] | EnhancedSearchResult: Legacy format or enhanced format based on enhanced_format parameter.
+        SearchResult: Search result with explicit seed/neighbor separation,
+            including full payloads for seeds and relationships.
     """
     return _get_client().search(
         query,
         user_id,
         memory_type,
         limit,
-        enhanced_format=enhanced_format,
         score_threshold=score_threshold,
         decay_threshold=decay_threshold,
         **kwargs,

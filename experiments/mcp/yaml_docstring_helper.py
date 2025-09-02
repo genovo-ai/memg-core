@@ -244,7 +244,7 @@ def main():
     print("=" * 70)
 
     # Get YAML path from command line or use default
-    yaml_path = sys.argv[1] if len(sys.argv) > 1 else "../software_developer/software_dev.yaml"
+    yaml_path = sys.argv[1] if len(sys.argv) > 1 else "../software_developer/software_dev_schema.yaml"
     print(f"Using YAML file: {yaml_path}")
 
     try:
