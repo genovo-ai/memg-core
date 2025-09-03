@@ -339,22 +339,39 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
             include_semantic=include_semantic
         )
 
-        logger.info(f"Search API completed, found {len(results)} results")
+        logger.info(f"Search API completed, found {len(results.memories)} seeds and {len(results.neighbors)} neighbors")
 
-        # Include full SearchResult information
-        memories = [{
-            "hrid": r.memory.hrid,
-            "memory_type": r.memory.memory_type,
-            "payload": r.memory.payload,
-            "score": r.score,
-            "source": r.source,
-            "distance": r.distance,
-            "neighbor": r.metadata
-        } for r in results]
+        # Convert new SearchResult format to MCP response
+        memories = []
+
+        # Add seed memories (full payloads with scores and relationships)
+        for seed in results.memories:
+            memories.append({
+                "hrid": seed.hrid,
+                "memory_type": seed.memory_type,
+                "payload": seed.payload,
+                "score": seed.score,
+                "source": "seed",
+                "relationships": seed.relationships
+            })
+
+        # Add neighbor memories (anchor-only payloads)
+        for neighbor in results.neighbors:
+            memories.append({
+                "hrid": neighbor.hrid,
+                "memory_type": neighbor.memory_type,
+                "payload": neighbor.payload,
+                "score": None,  # Neighbors don't have direct scores
+                "source": "neighbor",
+                "relationships": []
+            })
 
         return {
-            "result": f"Found {len(memories)} memories",
+            "result": f"Found {len(results.memories)} seeds and {len(results.neighbors)} neighbors ({len(memories)} total)",
             "memories": memories,
+            "seeds_count": len(results.memories),
+            "neighbors_count": len(results.neighbors),
+            "total_count": len(memories),
             "query": query,
             "user_id": user_id,
             "search_params": {

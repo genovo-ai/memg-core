@@ -19,7 +19,7 @@ from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
 from ..config import get_config
 from ..exceptions import ProcessingError
-from ..models import Memory, MemoryNeighbor, MemorySeed, SearchResult
+from ..models import MemoryNeighbor, MemorySeed, SearchResult
 from ..retrievers.expanders import _append_neighbors, _find_semantic_expansion
 from ..retrievers.parsers import (
     _project_payload,
@@ -366,27 +366,15 @@ class SearchService:
                     # Convert to MemorySeed objects for graph expansion
                     memory_seeds = []
                     for memory_data in memories:
-                        # Get UUID from HRID for proper Memory object creation
+                        # Create MemorySeed directly from memory_data
                         hrid = memory_data["hrid"]
-                        uuid = self.hrid_tracker.get_uuid(hrid, user_id)
-
-                        # Create Memory object with proper UUID as id
-                        memory = Memory(
-                            id=uuid,  # Use UUID for internal operations
-                            user_id=memory_data["user_id"],
-                            memory_type=memory_data["memory_type"],
-                            payload=memory_data["payload"],
-                            created_at=memory_data["created_at"],
-                            updated_at=memory_data["updated_at"],
-                            hrid=hrid,  # HRID as separate field
-                        )
 
                         # Create MemorySeed
                         seed = MemorySeed(
-                            memory=memory,
+                            hrid=hrid,
+                            memory_type=memory_data["memory_type"],
+                            payload=memory_data["payload"],
                             score=memory_data["score"],
-                            source=memory_data["source"],
-                            metadata=memory_data["metadata"],
                             relationships=[],  # Will be populated by graph expansion
                         )
                         memory_seeds.append(seed)
@@ -409,15 +397,15 @@ class SearchService:
                     expanded_memories = []
                     for seed in expanded_result.memories:
                         memory_data = {
-                            "hrid": seed.memory.hrid,
-                            "memory_type": seed.memory.memory_type,
-                            "user_id": seed.memory.user_id,
-                            "created_at": seed.memory.created_at,
-                            "updated_at": seed.memory.updated_at,
-                            "payload": seed.memory.payload,
+                            "hrid": seed.hrid,
+                            "memory_type": seed.memory_type,
+                            "user_id": user_id,  # Use the user_id parameter
+                            "created_at": None,  # Not available in MemorySeed
+                            "updated_at": None,  # Not available in MemorySeed
+                            "payload": seed.payload,
                             "score": seed.score,
-                            "source": seed.source,
-                            "metadata": seed.metadata,
+                            "source": "kuzu_query_expanded",
+                            "metadata": {"query_type": "get_memories_expanded"},
                             "relationships": [
                                 {
                                     "relation_type": rel.relation_type,
@@ -433,15 +421,22 @@ class SearchService:
 
                 except Exception as e:
                     # If graph expansion fails, fall back to basic memories
-                    # Log the error but don't fail the entire operation
+                    # Log the actual error with full details for debugging
                     import logging
 
-                    logging.warning(f"Graph expansion failed in get_memories(): {e}")
+                    logging.error(
+                        f"Graph expansion failed in get_memories(): {type(e).__name__}: {e}",
+                        exc_info=True,
+                    )
                     # Fall through to return basic memories
 
             return memories
 
-        except (DatabaseError, ValueError, KeyError):
+        except (DatabaseError, ValueError, KeyError) as e:
+            # Log the error instead of silently failing
+            import logging
+
+            logging.error(f"get_memories() failed: {type(e).__name__}: {e}", exc_info=True)
             return []
 
     def get_memory_neighbors(
