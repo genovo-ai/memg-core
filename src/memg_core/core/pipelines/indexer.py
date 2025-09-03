@@ -8,16 +8,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-import warnings
 
 from ...utils import generate_hrid
 from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
 from ..exceptions import ProcessingError
-from ..interfaces.embedder import Embedder
-from ..interfaces.kuzu import KuzuInterface
-from ..interfaces.qdrant import QdrantInterface
-from ..yaml_translator import YamlTranslator
 
 
 class MemoryService:
@@ -449,43 +444,3 @@ def create_memory_service(db_clients) -> MemoryService:
         MemoryService: Configured MemoryService instance.
     """
     return MemoryService(db_clients)
-
-
-# Legacy compatibility (DEPRECATED)
-def create_memory_store(
-    kuzu_interface: KuzuInterface,
-    qdrant_interface: QdrantInterface,
-    embedder: Embedder,
-    yaml_translator: YamlTranslator,
-) -> MemoryService:
-    """DEPRECATED: Use create_memory_service(db_clients) instead.
-
-    This function is kept for backward compatibility but will be removed.
-    """
-    warnings.warn(
-        "create_memory_store() is deprecated. Use create_memory_service(db_clients) instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    # Create a temporary wrapper for legacy compatibility
-    class LegacyWrapper:
-        """Temporary wrapper for backward compatibility with legacy interface access."""
-
-        def get_qdrant_interface(self):
-            """Get Qdrant interface instance."""
-            return qdrant_interface
-
-        def get_kuzu_interface(self):
-            """Get Kuzu interface instance."""
-            return kuzu_interface
-
-        def get_embedder(self):
-            """Get embedder interface instance."""
-            return embedder
-
-        def get_yaml_translator(self):
-            """Get YAML translator instance."""
-            return yaml_translator
-
-    return MemoryService(LegacyWrapper())
