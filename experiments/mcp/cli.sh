@@ -216,9 +216,6 @@ main() {
     # Set TARGET_PATH for docker-compose
     export TARGET_PATH="$([[ "$TARGET_DIR" == /* ]] && echo "$TARGET_DIR" || echo "./$TARGET_DIR")"
 
-    # Set YAML path for Docker build (resolve relative to TARGET_DIR)
-    export MEMG_YAML_SCHEMA="$TARGET_DIR/$MEMG_YAML_SCHEMA"
-
     if [ "$STOP_ONLY" = true ]; then
         docker-compose --project-name "$PROJECT_NAME" down || echo -e "${YELLOW}⚠️  Nothing to stop${NC}"
     elif [ "$BACKUP_ONLY" = true ]; then
