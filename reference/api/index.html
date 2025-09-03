@@ -11337,12 +11337,7 @@ Eliminates the need to pass interfaces as function parameters.</p>
 <span class="normal">476</span>
 <span class="normal">477</span>
 <span class="normal">478</span>
-<span class="normal">479</span>
-<span class="normal">480</span>
-<span class="normal">481</span>
-<span class="normal">482</span>
-<span class="normal">483</span>
-<span class="normal">484</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SearchService</span><span class="p">:</span>
+<span class="normal">479</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SearchService</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Unified search service - handles all search and retrieval operations.</span>
 
 <span class="sd">    Provides GraphRAG search functionality using DatabaseClients for interface access.</span>
@@ -11681,27 +11676,15 @@ Eliminates the need to pass interfaces as function parameters.</p>
                     <span class="c1"># Convert to MemorySeed objects for graph expansion</span>
                     <span class="n">memory_seeds</span> <span class="o">=</span> <span class="p">[]</span>
                     <span class="k">for</span> <span class="n">memory_data</span> <span class="ow">in</span> <span class="n">memories</span><span class="p">:</span>
-                        <span class="c1"># Get UUID from HRID for proper Memory object creation</span>
+                        <span class="c1"># Create MemorySeed directly from memory_data</span>
                         <span class="n">hrid</span> <span class="o">=</span> <span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;hrid&quot;</span><span class="p">]</span>
-                        <span class="n">uuid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hrid_tracker</span><span class="o">.</span><span class="n">get_uuid</span><span class="p">(</span><span class="n">hrid</span><span class="p">,</span> <span class="n">user_id</span><span class="p">)</span>
-
-                        <span class="c1"># Create Memory object with proper UUID as id</span>
-                        <span class="n">memory</span> <span class="o">=</span> <span class="n">Memory</span><span class="p">(</span>
-                            <span class="nb">id</span><span class="o">=</span><span class="n">uuid</span><span class="p">,</span>  <span class="c1"># Use UUID for internal operations</span>
-                            <span class="n">user_id</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;user_id&quot;</span><span class="p">],</span>
-                            <span class="n">memory_type</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;memory_type&quot;</span><span class="p">],</span>
-                            <span class="n">payload</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span>
-                            <span class="n">created_at</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;created_at&quot;</span><span class="p">],</span>
-                            <span class="n">updated_at</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;updated_at&quot;</span><span class="p">],</span>
-                            <span class="n">hrid</span><span class="o">=</span><span class="n">hrid</span><span class="p">,</span>  <span class="c1"># HRID as separate field</span>
-                        <span class="p">)</span>
 
                         <span class="c1"># Create MemorySeed</span>
                         <span class="n">seed</span> <span class="o">=</span> <span class="n">MemorySeed</span><span class="p">(</span>
-                            <span class="n">memory</span><span class="o">=</span><span class="n">memory</span><span class="p">,</span>
+                            <span class="n">hrid</span><span class="o">=</span><span class="n">hrid</span><span class="p">,</span>
+                            <span class="n">memory_type</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;memory_type&quot;</span><span class="p">],</span>
+                            <span class="n">payload</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span>
                             <span class="n">score</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">],</span>
-                            <span class="n">source</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">],</span>
-                            <span class="n">metadata</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">],</span>
                             <span class="n">relationships</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># Will be populated by graph expansion</span>
                         <span class="p">)</span>
                         <span class="n">memory_seeds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
@@ -11724,15 +11707,15 @@ Eliminates the need to pass interfaces as function parameters.</p>
                     <span class="n">expanded_memories</span> <span class="o">=</span> <span class="p">[]</span>
                     <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">expanded_result</span><span class="o">.</span><span class="n">memories</span><span class="p">:</span>
                         <span class="n">memory_data</span> <span class="o">=</span> <span class="p">{</span>
-                            <span class="s2">&quot;hrid&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">hrid</span><span class="p">,</span>
-                            <span class="s2">&quot;memory_type&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">memory_type</span><span class="p">,</span>
-                            <span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">user_id</span><span class="p">,</span>
-                            <span class="s2">&quot;created_at&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">created_at</span><span class="p">,</span>
-                            <span class="s2">&quot;updated_at&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">updated_at</span><span class="p">,</span>
-                            <span class="s2">&quot;payload&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">payload</span><span class="p">,</span>
+                            <span class="s2">&quot;hrid&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">hrid</span><span class="p">,</span>
+                            <span class="s2">&quot;memory_type&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory_type</span><span class="p">,</span>
+                            <span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span>  <span class="c1"># Use the user_id parameter</span>
+                            <span class="s2">&quot;created_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
+                            <span class="s2">&quot;updated_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
+                            <span class="s2">&quot;payload&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">payload</span><span class="p">,</span>
                             <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
-                            <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">source</span><span class="p">,</span>
-                            <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">metadata</span><span class="p">,</span>
+                            <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;kuzu_query_expanded&quot;</span><span class="p">,</span>
+                            <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;query_type&quot;</span><span class="p">:</span> <span class="s2">&quot;get_memories_expanded&quot;</span><span class="p">},</span>
                             <span class="s2">&quot;relationships&quot;</span><span class="p">:</span> <span class="p">[</span>
                                 <span class="p">{</span>
                                     <span class="s2">&quot;relation_type&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">relation_type</span><span class="p">,</span>
@@ -11748,15 +11731,22 @@ Eliminates the need to pass interfaces as function parameters.</p>
 
                 <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                     <span class="c1"># If graph expansion fails, fall back to basic memories</span>
-                    <span class="c1"># Log the error but don&#39;t fail the entire operation</span>
+                    <span class="c1"># Log the actual error with full details for debugging</span>
                     <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 
-                    <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Graph expansion failed in get_memories(): </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Graph expansion failed in get_memories(): </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="p">)</span>
                     <span class="c1"># Fall through to return basic memories</span>
 
             <span class="k">return</span> <span class="n">memories</span>
 
-        <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">):</span>
+        <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># Log the error instead of silently failing</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+            <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;get_memories() failed: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="k">return</span> <span class="p">[]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_memory_neighbors</span><span class="p">(</span>
@@ -12205,12 +12195,7 @@ Eliminates the need to pass interfaces as function parameters.</p>
 <span class="normal">437</span>
 <span class="normal">438</span>
 <span class="normal">439</span>
-<span class="normal">440</span>
-<span class="normal">441</span>
-<span class="normal">442</span>
-<span class="normal">443</span>
-<span class="normal">444</span>
-<span class="normal">445</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memories</span><span class="p">(</span>
+<span class="normal">440</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memories</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">memory_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -12282,27 +12267,15 @@ Eliminates the need to pass interfaces as function parameters.</p>
                 <span class="c1"># Convert to MemorySeed objects for graph expansion</span>
                 <span class="n">memory_seeds</span> <span class="o">=</span> <span class="p">[]</span>
                 <span class="k">for</span> <span class="n">memory_data</span> <span class="ow">in</span> <span class="n">memories</span><span class="p">:</span>
-                    <span class="c1"># Get UUID from HRID for proper Memory object creation</span>
+                    <span class="c1"># Create MemorySeed directly from memory_data</span>
                     <span class="n">hrid</span> <span class="o">=</span> <span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;hrid&quot;</span><span class="p">]</span>
-                    <span class="n">uuid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hrid_tracker</span><span class="o">.</span><span class="n">get_uuid</span><span class="p">(</span><span class="n">hrid</span><span class="p">,</span> <span class="n">user_id</span><span class="p">)</span>
-
-                    <span class="c1"># Create Memory object with proper UUID as id</span>
-                    <span class="n">memory</span> <span class="o">=</span> <span class="n">Memory</span><span class="p">(</span>
-                        <span class="nb">id</span><span class="o">=</span><span class="n">uuid</span><span class="p">,</span>  <span class="c1"># Use UUID for internal operations</span>
-                        <span class="n">user_id</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;user_id&quot;</span><span class="p">],</span>
-                        <span class="n">memory_type</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;memory_type&quot;</span><span class="p">],</span>
-                        <span class="n">payload</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span>
-                        <span class="n">created_at</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;created_at&quot;</span><span class="p">],</span>
-                        <span class="n">updated_at</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;updated_at&quot;</span><span class="p">],</span>
-                        <span class="n">hrid</span><span class="o">=</span><span class="n">hrid</span><span class="p">,</span>  <span class="c1"># HRID as separate field</span>
-                    <span class="p">)</span>
 
                     <span class="c1"># Create MemorySeed</span>
                     <span class="n">seed</span> <span class="o">=</span> <span class="n">MemorySeed</span><span class="p">(</span>
-                        <span class="n">memory</span><span class="o">=</span><span class="n">memory</span><span class="p">,</span>
+                        <span class="n">hrid</span><span class="o">=</span><span class="n">hrid</span><span class="p">,</span>
+                        <span class="n">memory_type</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;memory_type&quot;</span><span class="p">],</span>
+                        <span class="n">payload</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span>
                         <span class="n">score</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">],</span>
-                        <span class="n">source</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">],</span>
-                        <span class="n">metadata</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">],</span>
                         <span class="n">relationships</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># Will be populated by graph expansion</span>
                     <span class="p">)</span>
                     <span class="n">memory_seeds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
@@ -12325,15 +12298,15 @@ Eliminates the need to pass interfaces as function parameters.</p>
                 <span class="n">expanded_memories</span> <span class="o">=</span> <span class="p">[]</span>
                 <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">expanded_result</span><span class="o">.</span><span class="n">memories</span><span class="p">:</span>
                     <span class="n">memory_data</span> <span class="o">=</span> <span class="p">{</span>
-                        <span class="s2">&quot;hrid&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">hrid</span><span class="p">,</span>
-                        <span class="s2">&quot;memory_type&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">memory_type</span><span class="p">,</span>
-                        <span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">user_id</span><span class="p">,</span>
-                        <span class="s2">&quot;created_at&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">created_at</span><span class="p">,</span>
-                        <span class="s2">&quot;updated_at&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">updated_at</span><span class="p">,</span>
-                        <span class="s2">&quot;payload&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">payload</span><span class="p">,</span>
+                        <span class="s2">&quot;hrid&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">hrid</span><span class="p">,</span>
+                        <span class="s2">&quot;memory_type&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory_type</span><span class="p">,</span>
+                        <span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span>  <span class="c1"># Use the user_id parameter</span>
+                        <span class="s2">&quot;created_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
+                        <span class="s2">&quot;updated_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
+                        <span class="s2">&quot;payload&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">payload</span><span class="p">,</span>
                         <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
-                        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">source</span><span class="p">,</span>
-                        <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">metadata</span><span class="p">,</span>
+                        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;kuzu_query_expanded&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;query_type&quot;</span><span class="p">:</span> <span class="s2">&quot;get_memories_expanded&quot;</span><span class="p">},</span>
                         <span class="s2">&quot;relationships&quot;</span><span class="p">:</span> <span class="p">[</span>
                             <span class="p">{</span>
                                 <span class="s2">&quot;relation_type&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">relation_type</span><span class="p">,</span>
@@ -12349,15 +12322,22 @@ Eliminates the need to pass interfaces as function parameters.</p>
 
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                 <span class="c1"># If graph expansion fails, fall back to basic memories</span>
-                <span class="c1"># Log the error but don&#39;t fail the entire operation</span>
+                <span class="c1"># Log the actual error with full details for debugging</span>
                 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 
-                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Graph expansion failed in get_memories(): </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Graph expansion failed in get_memories(): </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
                 <span class="c1"># Fall through to return basic memories</span>
 
         <span class="k">return</span> <span class="n">memories</span>
 
-    <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">):</span>
+    <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="c1"># Log the error instead of silently failing</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;get_memories() failed: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">[]</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -12766,7 +12746,12 @@ Eliminates the need to pass interfaces as function parameters.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">447</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
 <span class="normal">448</span>
 <span class="normal">449</span>
 <span class="normal">450</span>
@@ -12798,12 +12783,7 @@ Eliminates the need to pass interfaces as function parameters.</p>
 <span class="normal">476</span>
 <span class="normal">477</span>
 <span class="normal">478</span>
-<span class="normal">479</span>
-<span class="normal">480</span>
-<span class="normal">481</span>
-<span class="normal">482</span>
-<span class="normal">483</span>
-<span class="normal">484</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memory_neighbors</span><span class="p">(</span>
+<span class="normal">479</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memory_neighbors</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">memory_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">memory_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -16569,16 +16549,16 @@ Canonicalization for undirected pairs can be added here later if decided.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">487</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
 <span class="normal">488</span>
 <span class="normal">489</span>
 <span class="normal">490</span>
-<span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_search_service</span><span class="p">(</span><span class="n">db_clients</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SearchService</span><span class="p">:</span>
+<span class="normal">491</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_search_service</span><span class="p">(</span><span class="n">db_clients</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SearchService</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory function to create a SearchService instance.</span>
 
 <span class="sd">    Args:</span>
