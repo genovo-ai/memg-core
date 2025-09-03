@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Accept build arguments (for validation only - files will be mounted at runtime)
+# Accept build arguments
 ARG TARGET_PATH
 ARG MEMG_YAML_SCHEMA
 RUN test -n "$TARGET_PATH" || (echo "ERROR: TARGET_PATH build argument is required" && exit 1)
@@ -26,16 +26,17 @@ RUN pip install --no-cache-dir -r requirements_mcp.txt
 
 # Return to app directory and create directories for persistent storage
 WORKDIR /app
-RUN mkdir -p /qdrant /kuzu /target
+RUN mkdir -p /qdrant /kuzu
 
 # Copy MCP server files from current directory
 COPY mcp_server.py /app/
 COPY yaml_docstring_helper.py /app/
 
-# Note: YAML schema and .env files will be mounted at runtime in /target/
+# Copy YAML schema file during build (no need to mount it)
+COPY ${MEMG_YAML_SCHEMA} /app/schema.yaml
 
 # Set proper ownership for non-root user
-RUN chown -R memg:memg /app /qdrant /kuzu /target
+RUN chown -R memg:memg /app /qdrant /kuzu
 
 # Keep curl for health checks, but clean up other packages
 RUN apt-get autoremove -y && apt-get clean
@@ -44,8 +45,9 @@ RUN apt-get autoremove -y && apt-get clean
 USER memg
 
 # Set default environment (can be overridden by docker-compose)
-ENV MEMORY_SYSTEM_MCP_HOST=0.0.0.0
-ENV MEMORY_SYSTEM_MCP_PORT=8888
+# ENV MEMORY_SYSTEM_MCP_HOST=0.0.0.0
+# ENV MEMORY_SYSTEM_MCP_PORT=8888
+# ENV MEMG_YAML_SCHEMA=/app/schema.yaml
 
 # Expose the port from .env (default 8888)
 EXPOSE 8888
