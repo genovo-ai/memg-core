@@ -7,7 +7,7 @@ related memories through vector similarity and graph relationships.
 from __future__ import annotations
 
 from ..interfaces import Embedder, KuzuInterface, QdrantInterface
-from ..models import MemoryNeighbor, MemorySeed
+from ..models import MemoryNeighbor, MemorySeed, RelationshipInfo, SearchResult
 from ..yaml_translator import YamlTranslator
 from . import (
     _project_payload,
@@ -150,7 +150,7 @@ def _append_neighbors(
     hrid_tracker=None,
     yaml_translator: YamlTranslator | None = None,
     decay_rate: float = 0.9,
-) -> list[MemoryNeighbor]:
+) -> SearchResult:
     """Expand neighbors from Kuzu graph with progressive score decay.
 
     Args:
@@ -166,7 +166,7 @@ def _append_neighbors(
         decay_rate: Score decay rate per hop.
 
     Returns:
-        list[MemoryNeighbor]: List of neighbor memories with anchor-only payloads.
+        SearchResult: Seeds with populated relationships and neighbors with anchor-only payloads.
     """
     all_neighbors: list[MemoryNeighbor] = []  # Collect all neighbors
 
@@ -219,6 +219,19 @@ def _append_neighbors(
                 # Calculate score with progressive decay: seed_score * decay_rate^hop
                 neighbor_score = seed.score * (decay_rate ** (hop + 1))
 
+                # Extract relationship info and add to seed's relationships
+                rel_type = row.get("rel_type")
+                target_hrid = neighbor_memory.hrid or neighbor_memory.id
+
+                if rel_type and target_hrid:
+                    # Create RelationshipInfo and add to seed
+                    relationship_info = RelationshipInfo(
+                        relation_type=rel_type,
+                        target_hrid=target_hrid,
+                        scores={},  # Empty scores dict - not about scores!
+                    )
+                    seed.relationships.append(relationship_info)
+
                 # Create MemoryNeighbor object
                 neighbor_result = MemoryNeighbor(
                     hrid=neighbor_memory.hrid or neighbor_memory.id,
@@ -251,4 +264,8 @@ def _append_neighbors(
         if not next_hop_results:
             break
 
-    return all_neighbors
+    # Return SearchResult with seeds (with relationships) and unique neighbors
+    return SearchResult(
+        memories=seeds,  # Seeds now have populated relationships
+        neighbors=all_neighbors,  # Neighbors with anchor-only payloads
+    )

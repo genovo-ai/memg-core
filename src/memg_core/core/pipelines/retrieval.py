@@ -19,7 +19,7 @@ from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
 from ..config import get_config
 from ..exceptions import ProcessingError
-from ..models import MemoryNeighbor, MemorySeed, SearchResult
+from ..models import Memory, MemoryNeighbor, MemorySeed, SearchResult
 from ..retrievers.expanders import _append_neighbors, _find_semantic_expansion
 from ..retrievers.parsers import (
     _project_payload,
@@ -156,7 +156,7 @@ class SearchService:
         # 2. Graph expansion (neighbors with anchor-only payloads)
         neighbors: list[MemoryNeighbor] = []
         if hops > 0:
-            graph_neighbors = _append_neighbors(
+            graph_result = _append_neighbors(
                 seeds=seeds,
                 kuzu=self.kuzu,
                 user_id=user_id,
@@ -168,7 +168,8 @@ class SearchService:
                 yaml_translator=self.yaml_translator,
                 decay_rate=self.config.memg.decay_rate,
             )
-            neighbors.extend(graph_neighbors)
+            # Seeds are now modified with relationships, neighbors are in graph_result.neighbors
+            neighbors.extend(graph_result.neighbors)
 
         # 3. Semantic expansion (optional, type-specific "see also")
         if include_semantic:
@@ -359,8 +360,84 @@ class SearchService:
 
                 memories.append(memory_data)
 
-            # TODO: Apply graph expansion if requested
-            # For now, just return the basic memories without expansion
+            # Apply graph expansion if requested
+            if include_neighbors and memories:
+                try:
+                    # Convert to MemorySeed objects for graph expansion
+                    memory_seeds = []
+                    for memory_data in memories:
+                        # Get UUID from HRID for proper Memory object creation
+                        hrid = memory_data["hrid"]
+                        uuid = self.hrid_tracker.get_uuid(hrid, user_id)
+
+                        # Create Memory object with proper UUID as id
+                        memory = Memory(
+                            id=uuid,  # Use UUID for internal operations
+                            user_id=memory_data["user_id"],
+                            memory_type=memory_data["memory_type"],
+                            payload=memory_data["payload"],
+                            created_at=memory_data["created_at"],
+                            updated_at=memory_data["updated_at"],
+                            hrid=hrid,  # HRID as separate field
+                        )
+
+                        # Create MemorySeed
+                        seed = MemorySeed(
+                            memory=memory,
+                            score=memory_data["score"],
+                            source=memory_data["source"],
+                            metadata=memory_data["metadata"],
+                            relationships=[],  # Will be populated by graph expansion
+                        )
+                        memory_seeds.append(seed)
+
+                    # Apply graph expansion
+                    expanded_result = _append_neighbors(
+                        seeds=memory_seeds,
+                        kuzu=self.kuzu,
+                        user_id=user_id,
+                        relation_names=None,  # All relations
+                        neighbor_limit=5,  # Default limit
+                        hops=hops,
+                        projection=None,
+                        hrid_tracker=self.hrid_tracker,
+                        yaml_translator=self.yaml_translator,
+                        decay_rate=self.config.memg.decay_rate,
+                    )
+
+                    # Convert back to dict format for API compatibility
+                    expanded_memories = []
+                    for seed in expanded_result.memories:
+                        memory_data = {
+                            "hrid": seed.memory.hrid,
+                            "memory_type": seed.memory.memory_type,
+                            "user_id": seed.memory.user_id,
+                            "created_at": seed.memory.created_at,
+                            "updated_at": seed.memory.updated_at,
+                            "payload": seed.memory.payload,
+                            "score": seed.score,
+                            "source": seed.source,
+                            "metadata": seed.metadata,
+                            "relationships": [
+                                {
+                                    "relation_type": rel.relation_type,
+                                    "target_hrid": rel.target_hrid,
+                                    "scores": rel.scores,
+                                }
+                                for rel in seed.relationships
+                            ],
+                        }
+                        expanded_memories.append(memory_data)
+
+                    return expanded_memories
+
+                except Exception as e:
+                    # If graph expansion fails, fall back to basic memories
+                    # Log the error but don't fail the entire operation
+                    import logging
+
+                    logging.warning(f"Graph expansion failed in get_memories(): {e}")
+                    # Fall through to return basic memories
 
             return memories
 
