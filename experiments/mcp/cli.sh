@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# MEMG Core MCP Server - Clean CLI
-# Smart defaults with automatic backups
+# MEMG Core MCP Server - Simplified CLI
+# Usage: ./cli.sh path/to/schema.yaml [options]
 
 set -e
 
@@ -13,15 +13,18 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Parse arguments
-TARGET_PATH=""
+YAML_FILE=""
+PORT=""
+DATABASE_PATH=""
 FRESH=false
 STOP_ONLY=false
 BACKUP_ONLY=false
 SHOW_HELP=false
 FORCE=false
+NO_MOUNT=false
 
 if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
-    TARGET_PATH="$1"
+    YAML_FILE="$1"
     shift
 fi
 
@@ -31,6 +34,9 @@ while [[ $# -gt 0 ]]; do
         --stop) STOP_ONLY=true; shift ;;
         --backup) BACKUP_ONLY=true; shift ;;
         --force) FORCE=true; shift ;;
+        --no-mount) NO_MOUNT=true; shift ;;
+        --port|-p) PORT="$2"; shift 2 ;;
+        --database-path) DATABASE_PATH="$2"; shift 2 ;;
         -h|--help) SHOW_HELP=true; shift ;;
         *) echo -e "${RED}❌ Unknown option: $1${NC}"; exit 1 ;;
     esac
@@ -38,47 +44,84 @@ done
 
 show_help() {
     cat << EOF
-🚀 MEMG Core MCP Server - Clean CLI
+🚀 MEMG Core MCP Server - Simplified CLI
 
-USAGE: $0 <target-path> [options]
+USAGE: $0 <yaml-file> [options]
 
 OPTIONS:
-  --fresh    Fresh start (auto-backup + clean rebuild) - requires confirmation
-  --force    Skip safety confirmations (use with --fresh)
-  --stop     Stop container
-  --backup   Create manual backup
-  --help     Show help
+  --fresh          Fresh start (auto-backup + clean rebuild) - requires confirmation
+  --force          Skip safety confirmations (use with --fresh)
+  --no-mount       Copy YAML into container (no runtime mount) - ephemeral data
+  --port, -p       Override port (default: 8888, or from .env if exists)
+  --database-path  Override database storage location (default: same as YAML file)
+  --stop           Stop container
+  --backup         Create manual backup
+  --help           Show help
 
 EXAMPLES:
-  $0 software_developer/                    # Smart start
-  $0 software_developer/ --fresh            # Fresh rebuild (with confirmation)
-  $0 software_developer/ --fresh --force    # Fresh rebuild (no confirmation)
-  $0 software_developer/ --stop             # Stop server
+  $0 path/to/myschema.yaml                              # Smart start (default port 8888)
+  $0 path/to/myschema.yaml --port 8228                  # Use specific port
+  $0 myschema.yaml --database-path ~/my_memories        # Store in ~/my_memories/myschema_8888/
+  $0 path/to/myschema.yaml --fresh                      # Fresh rebuild (with confirmation)
+  $0 path/to/myschema.yaml --no-mount                   # Self-contained (ephemeral)
+  $0 path/to/myschema.yaml --stop                       # Stop server
 EOF
 }
 
 # Validation
 validate_setup() {
-    [ -z "$TARGET_PATH" ] && { echo -e "${RED}❌ Target path required${NC}"; exit 1; }
+    [ -z "$YAML_FILE" ] && { echo -e "${RED}❌ YAML file path required${NC}"; show_help; exit 1; }
+    [ ! -f "$YAML_FILE" ] && { echo -e "${RED}❌ YAML file not found: $YAML_FILE${NC}"; exit 1; }
 
-    TARGET_DIR="${TARGET_PATH%/}"
-    [ ! -d "$TARGET_DIR" ] && { echo -e "${RED}❌ Directory not found: $TARGET_DIR${NC}"; exit 1; }
+    # Determine port (priority: --port > .env > default)
+    MEMORY_SYSTEM_MCP_PORT="8888"  # Default
 
-    local env_file="$TARGET_DIR/.env"
-    [ ! -f "$env_file" ] && { echo -e "${RED}❌ .env file missing${NC}"; exit 1; }
+    # Override with .env if exists
+    if [ -f ".env" ]; then
+        ENV_PORT=$(grep -E '^MEMORY_SYSTEM_MCP_PORT=' .env 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+        [ -n "$ENV_PORT" ] && MEMORY_SYSTEM_MCP_PORT="$ENV_PORT"
+        echo -e "${BLUE}ℹ️  Found .env file, using port from .env${NC}"
+    else
+        echo -e "${BLUE}ℹ️  No .env file found, using default port${NC}"
+    fi
 
-    # Load environment
-    eval $(grep -E '^(MEMORY_SYSTEM_MCP_PORT|MEMG_YAML_SCHEMA|BASE_MEMORY_PATH)=' "$env_file" | sed 's/^/export /')
+    # Override with CLI --port if provided
+    if [ -n "$PORT" ]; then
+        MEMORY_SYSTEM_MCP_PORT="$PORT"
+        echo -e "${BLUE}ℹ️  Using port from --port argument${NC}"
+    fi
 
-    [ -z "$MEMORY_SYSTEM_MCP_PORT" ] && { echo -e "${RED}❌ MEMORY_SYSTEM_MCP_PORT missing${NC}"; exit 1; }
-    [ -z "$MEMG_YAML_SCHEMA" ] && { echo -e "${RED}❌ MEMG_YAML_SCHEMA missing${NC}"; exit 1; }
-    [ ! -f "$TARGET_DIR/$MEMG_YAML_SCHEMA" ] && { echo -e "${RED}❌ YAML file missing: $MEMG_YAML_SCHEMA${NC}"; exit 1; }
+    # Validate port is numeric
+    if ! [[ "$MEMORY_SYSTEM_MCP_PORT" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}❌ Invalid port: $MEMORY_SYSTEM_MCP_PORT${NC}"
+        exit 1
+    fi
+
+    # Extract schema name from file path (without extension)
+    SCHEMA_NAME=$(basename "$YAML_FILE" .yaml)
+    SCHEMA_NAME=$(basename "$SCHEMA_NAME" .yml)
+
+    # Database path: use --database-path if provided, otherwise same directory as YAML file
+    if [ -n "$DATABASE_PATH" ]; then
+        # Expand ~ to home directory if present
+        DATABASE_BASE_PATH="${DATABASE_PATH/#\~/$HOME}"
+        echo -e "${BLUE}ℹ️  Using custom database path: $DATABASE_BASE_PATH${NC}"
+    else
+        DATABASE_BASE_PATH=$(dirname "$YAML_FILE")
+        echo -e "${BLUE}ℹ️  Using default database path (same as YAML file)${NC}"
+    fi
+
+    # Set environment variables for docker-compose
+    export YAML_FILE
+    export SCHEMA_NAME
+    export MEMORY_SYSTEM_MCP_PORT
+    export DATABASE_BASE_PATH
 
     # Check port conflict (skip for stop/backup operations)
     if [ "$STOP_ONLY" = false ] && [ "$BACKUP_ONLY" = false ]; then
         if lsof -Pi :$MEMORY_SYSTEM_MCP_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
             echo -e "${RED}❌ Port $MEMORY_SYSTEM_MCP_PORT in use${NC}"
-            echo "Stop first: $0 $TARGET_PATH --stop"
+            echo "Stop first: $0 $YAML_FILE --stop"
             exit 1
         fi
     fi
@@ -89,7 +132,18 @@ validate_setup() {
         [ ! -f "$file" ] && { echo -e "${RED}❌ $file missing (run from experiments/mcp/)${NC}"; exit 1; }
     done
 
-    echo -e "${GREEN}✅ Setup validated - Port: $MEMORY_SYSTEM_MCP_PORT${NC}"
+    # Validate no-mount files exist
+    if [ "$NO_MOUNT" = true ]; then
+        if [ ! -f "Dockerfile.no-mount" ] || [ ! -f "docker-compose.no-mount.yml" ]; then
+            echo -e "${RED}❌ No-mount Docker files missing (Dockerfile.no-mount, docker-compose.no-mount.yml)${NC}"
+            exit 1
+        fi
+        echo -e "${BLUE}✅ Using no-mount mode (ephemeral data)${NC}"
+    else
+        echo -e "${BLUE}✅ Using mount mode (persistent data in ${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}/)${NC}"
+    fi
+
+    echo -e "${GREEN}✅ Setup validated - Port: $MEMORY_SYSTEM_MCP_PORT, Schema: $SCHEMA_NAME${NC}"
 }
 
 # Container status: 0=running, 1=stopped, 2=missing
@@ -102,27 +156,27 @@ check_container() {
     echo "$info" | grep -q "Up" && return 0 || return 1
 }
 
-# Backup functions
+# Backup functions (only for mount mode)
 has_data() {
-    local data_path="$TARGET_DIR/${BASE_MEMORY_PATH:-local_memory_data}_${MEMORY_SYSTEM_MCP_PORT}"
+    [ "$NO_MOUNT" = true ] && return 1  # No-mount mode has no persistent data
+    local data_path="${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
     [ -d "$data_path" ] && [ -n "$(find "$data_path" -name "*.sqlite" -o -name "memg" 2>/dev/null)" ]
 }
 
 create_backup() {
-    local data_path="$TARGET_DIR/${BASE_MEMORY_PATH:-local_memory_data}_${MEMORY_SYSTEM_MCP_PORT}"
-
     if ! has_data; then
         echo -e "${BLUE}ℹ️  No data to backup${NC}"
         return 0
     fi
 
-    mkdir -p "$TARGET_DIR/backups"
-    local backup_file="$TARGET_DIR/backups/backup_$(date +%Y-%m-%d_%H-%M-%S).tar.gz"
+    mkdir -p "backups"
+    local data_path="${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
+    local backup_file="backups/${SCHEMA_NAME}_backup_$(date +%Y-%m-%d_%H-%M-%S).tar.gz"
 
-    if tar -czf "$backup_file" -C "$(dirname "$data_path")" "$(basename "$data_path")" 2>/dev/null; then
+    if tar -czf "$backup_file" "$data_path" 2>/dev/null; then
         echo -e "${GREEN}✅ Backup created: $(basename "$backup_file")${NC}"
         # Keep last 5 backups
-        ls -t "$TARGET_DIR/backups"/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
+        ls -t backups/${SCHEMA_NAME}_backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
     else
         echo -e "${RED}❌ Backup failed${NC}"; exit 1
     fi
@@ -133,7 +187,7 @@ confirm_destructive_action() {
     local action="$1"
     echo -e "${RED}⚠️  WARNING: This will DELETE all existing data!${NC}"
     echo -e "${YELLOW}Action: $action${NC}"
-    echo -e "${YELLOW}Data path: $TARGET_DIR/${BASE_MEMORY_PATH:-local_memory_data}_${MEMORY_SYSTEM_MCP_PORT}${NC}"
+    echo -e "${YELLOW}Data path: ${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}${NC}"
     echo ""
     echo -e "${BLUE}A backup will be created automatically before deletion.${NC}"
     echo ""
@@ -150,29 +204,53 @@ confirm_destructive_action() {
 # Main operations
 fresh_start() {
     local project="memg-mcp-${MEMORY_SYSTEM_MCP_PORT}"
-    local data_path="$TARGET_DIR/${BASE_MEMORY_PATH:-local_memory_data}_${MEMORY_SYSTEM_MCP_PORT}"
+    local data_path="${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
+    local compose_file=""
 
-    # Safety confirmation if data exists
-    if has_data; then
-        if [ "$FORCE" = false ]; then
-            confirm_destructive_action "Fresh start (delete database + rebuild)"
-        else
-            echo -e "${YELLOW}⚠️  FORCE mode: Skipping confirmation but creating backup...${NC}"
+    # Set compose file based on mount option
+    if [ "$NO_MOUNT" = true ]; then
+        compose_file="-f docker-compose.no-mount.yml"
+        echo -e "${BLUE}🔄 Fresh start (no-mount mode)${NC}"
+    else
+        echo -e "${BLUE}🔄 Fresh start${NC}"
+        # Safety confirmation if data exists
+        if has_data; then
+            if [ "$FORCE" = false ]; then
+                confirm_destructive_action "Fresh start (delete database + rebuild)"
+            else
+                echo -e "${YELLOW}⚠️  FORCE mode: Skipping confirmation but creating backup...${NC}"
+            fi
         fi
     fi
 
-    echo -e "${BLUE}🔄 Fresh start${NC}"
     create_backup
-    docker-compose --project-name "$project" down 2>/dev/null || true
-    [ -d "$data_path" ] && rm -rf "$data_path"
-    mkdir -p "${data_path}/qdrant" "${data_path}/kuzu"
-    docker-compose --project-name "$project" build --no-cache
-    docker-compose --project-name "$project" up -d
+    docker-compose $compose_file --project-name "$project" down 2>/dev/null || true
+
+    # Only create/clean directories if not in no-mount mode
+    if [ "$NO_MOUNT" != true ]; then
+        [ -d "$data_path" ] && rm -rf "$data_path"
+        mkdir -p "${data_path}/qdrant" "${data_path}/kuzu"
+    fi
+
+    docker-compose $compose_file --project-name "$project" build --no-cache
+    docker-compose $compose_file --project-name "$project" up -d
 }
 
 smart_start() {
     local project="memg-mcp-${MEMORY_SYSTEM_MCP_PORT}"
-    local data_path="$TARGET_DIR/${BASE_MEMORY_PATH:-local_memory_data}_${MEMORY_SYSTEM_MCP_PORT}"
+    local data_path="${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
+    local compose_file=""
+
+    # Set compose file based on mount option
+    if [ "$NO_MOUNT" = true ]; then
+        compose_file="-f docker-compose.no-mount.yml"
+        echo -e "${BLUE}🧠 Smart start (no-mount mode - forcing rebuild)${NC}"
+        # No-mount mode always requires rebuild since YAML is copied into image
+        # No directory creation needed - everything is self-contained in container
+        docker-compose $compose_file --project-name "$project" build --no-cache
+        docker-compose $compose_file --project-name "$project" up -d
+        return
+    fi
 
     set +e  # Temporarily disable exit on error
     check_container
@@ -181,11 +259,14 @@ smart_start() {
 
     case $status in
         0) echo -e "${GREEN}✅ Already running${NC}" ;;
-        1) echo -e "${BLUE}▶️  Starting...${NC}"; docker-compose --project-name "$project" up -d ;;
+        1) echo -e "${BLUE}▶️  Starting...${NC}"; docker-compose $compose_file --project-name "$project" up -d ;;
         2) echo -e "${BLUE}🔨 Building...${NC}"
-           mkdir -p "${data_path}/qdrant" "${data_path}/kuzu"
-           docker-compose --project-name "$project" build --no-cache
-           docker-compose --project-name "$project" up -d ;;
+           # Only create directories for regular (non-no-mount) mode
+           if [ "$NO_MOUNT" != true ]; then
+               mkdir -p "${data_path}/qdrant" "${data_path}/kuzu"
+           fi
+           docker-compose $compose_file --project-name "$project" build --no-cache
+           docker-compose $compose_file --project-name "$project" up -d ;;
     esac
 }
 
@@ -196,6 +277,7 @@ wait_for_health() {
     for i in {1..8}; do
         if curl -sf "http://localhost:$MEMORY_SYSTEM_MCP_PORT/health" >/dev/null 2>&1; then
             echo -e "${GREEN}✅ Server ready: http://localhost:$MEMORY_SYSTEM_MCP_PORT${NC}"
+            echo -e "${GREEN}✅ Schema: $(basename "$YAML_FILE")${NC}"
             return 0
         fi
         [ $i -lt 8 ] && sleep 2
@@ -213,11 +295,14 @@ main() {
     validate_setup
     PROJECT_NAME="memg-mcp-${MEMORY_SYSTEM_MCP_PORT}"
 
-    # Set TARGET_PATH for docker-compose
-    export TARGET_PATH="$([[ "$TARGET_DIR" == /* ]] && echo "$TARGET_DIR" || echo "./$TARGET_DIR")"
+    # Set compose file for operations
+    local compose_file=""
+    if [ "$NO_MOUNT" = true ]; then
+        compose_file="-f docker-compose.no-mount.yml"
+    fi
 
     if [ "$STOP_ONLY" = true ]; then
-        docker-compose --project-name "$PROJECT_NAME" down || echo -e "${YELLOW}⚠️  Nothing to stop${NC}"
+        docker-compose $compose_file --project-name "$PROJECT_NAME" down || echo -e "${YELLOW}⚠️  Nothing to stop${NC}"
     elif [ "$BACKUP_ONLY" = true ]; then
         create_backup
     elif [ "$FRESH" = true ]; then

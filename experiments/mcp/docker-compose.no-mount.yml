@@ -2,16 +2,13 @@ services:
   memg-mcp-server:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.no-mount
       args:
         YAML_FILE: ${YAML_FILE}
     container_name: memg-mcp-server-${MEMORY_SYSTEM_MCP_PORT:-8888}
     ports:
       - "${MEMORY_SYSTEM_MCP_PORT:-8888}:${MEMORY_SYSTEM_MCP_PORT:-8888}"
-    # Mount persistent database storage
-    volumes:
-      - ${DATABASE_BASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT:-8888}/qdrant:/app/databases/qdrant
-      - ${DATABASE_BASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT:-8888}/kuzu:/app/databases/kuzu
+    # No volume mounts - truly self-contained (ephemeral data)
     environment:
       MEMORY_SYSTEM_MCP_PORT: ${MEMORY_SYSTEM_MCP_PORT:-8888}
       MEMORY_SYSTEM_MCP_HOST: "0.0.0.0"

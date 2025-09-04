@@ -15,8 +15,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy wheel file and requirements
-# COPY memg_core-0.6.3.dev5-py3-none-any.whl /app/
+# Copy requirements
 COPY requirements_mcp.txt /app/requirements_mcp.txt
 
 # Install MCP server dependencies (includes local memg-core wheel)
@@ -42,6 +41,7 @@ USER memg
 # Set default environment (can be overridden by docker-compose)
 ENV MEMORY_SYSTEM_MCP_HOST=0.0.0.0
 ENV MEMORY_SYSTEM_MCP_PORT=8888
+ENV MEMG_YAML_SCHEMA=/app/schema.yaml
 
 # Expose the port from .env (default 8888)
 EXPOSE 8888
