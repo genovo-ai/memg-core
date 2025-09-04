@@ -10,8 +10,8 @@ services:
       - "${MEMORY_SYSTEM_MCP_PORT:-8888}:${MEMORY_SYSTEM_MCP_PORT:-8888}"
     # Mount persistent database storage
     volumes:
-      - ${DATABASE_BASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT:-8888}/qdrant:/app/databases/qdrant
-      - ${DATABASE_BASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT:-8888}/kuzu:/app/databases/kuzu
+      - ${DATABASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT:-8888}/qdrant:/app/databases/qdrant
+      - ${DATABASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT:-8888}/kuzu:/app/databases/kuzu
     environment:
       MEMORY_SYSTEM_MCP_PORT: ${MEMORY_SYSTEM_MCP_PORT:-8888}
       MEMORY_SYSTEM_MCP_HOST: "0.0.0.0"

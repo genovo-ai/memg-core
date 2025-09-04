@@ -102,20 +102,28 @@ validate_setup() {
     SCHEMA_NAME=$(basename "$SCHEMA_NAME" .yml)
 
     # Database path: use --database-path if provided, otherwise same directory as YAML file
-    if [ -n "$DATABASE_PATH" ]; then
-        # Expand ~ to home directory if present
-        DATABASE_BASE_PATH="${DATABASE_PATH/#\~/$HOME}"
-        echo -e "${BLUE}ℹ️  Using custom database path: $DATABASE_BASE_PATH${NC}"
+    if [ -z "$DATABASE_PATH" ]; then
+        # Default to YAML file directory (convert to absolute path)
+        DATABASE_PATH=$(cd "$(dirname "$YAML_FILE")" && pwd)
+        echo -e "${BLUE}ℹ️  Using default database path (same as YAML file): $DATABASE_PATH${NC}"
     else
-        DATABASE_BASE_PATH=$(dirname "$YAML_FILE")
-        echo -e "${BLUE}ℹ️  Using default database path (same as YAML file)${NC}"
+        # Convert custom database path to absolute path
+        DATABASE_PATH=$(cd "$DATABASE_PATH" && pwd)
+        echo -e "${BLUE}ℹ️  Using custom database path: $DATABASE_PATH${NC}"
     fi
 
     # Set environment variables for docker-compose
     export YAML_FILE
     export SCHEMA_NAME
     export MEMORY_SYSTEM_MCP_PORT
-    export DATABASE_BASE_PATH
+    export DATABASE_PATH
+
+    # Create database directories if not in no-mount mode
+    if [ "$NO_MOUNT" != true ] && [ "$STOP_ONLY" = false ] && [ "$BACKUP_ONLY" = false ]; then
+        local data_path="${DATABASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
+        mkdir -p "${data_path}/qdrant" "${data_path}/kuzu"
+        echo -e "${BLUE}ℹ️  Created database directories: $data_path${NC}"
+    fi
 
     # Check port conflict (skip for stop/backup operations)
     if [ "$STOP_ONLY" = false ] && [ "$BACKUP_ONLY" = false ]; then
@@ -159,7 +167,7 @@ check_container() {
 # Backup functions (only for mount mode)
 has_data() {
     [ "$NO_MOUNT" = true ] && return 1  # No-mount mode has no persistent data
-    local data_path="${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
+    local data_path="${DATABASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
     [ -d "$data_path" ] && [ -n "$(find "$data_path" -name "*.sqlite" -o -name "memg" 2>/dev/null)" ]
 }
 
@@ -170,7 +178,7 @@ create_backup() {
     fi
 
     mkdir -p "backups"
-    local data_path="${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
+    local data_path="${DATABASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
     local backup_file="backups/${SCHEMA_NAME}_backup_$(date +%Y-%m-%d_%H-%M-%S).tar.gz"
 
     if tar -czf "$backup_file" "$data_path" 2>/dev/null; then
@@ -204,7 +212,7 @@ confirm_destructive_action() {
 # Main operations
 fresh_start() {
     local project="memg-mcp-${MEMORY_SYSTEM_MCP_PORT}"
-    local data_path="${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
+    local data_path="${DATABASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
     local compose_file=""
 
     # Set compose file based on mount option
@@ -238,7 +246,7 @@ fresh_start() {
 
 smart_start() {
     local project="memg-mcp-${MEMORY_SYSTEM_MCP_PORT}"
-    local data_path="${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
+    local data_path="${DATABASE_PATH}/${SCHEMA_NAME}_${MEMORY_SYSTEM_MCP_PORT}"
     local compose_file=""
 
     # Set compose file based on mount option

@@ -12,6 +12,7 @@ import logging
 import os
 import time
 from typing import Any, Dict, Optional
+from pydantic import Field
 
 from dotenv import load_dotenv
 
@@ -20,8 +21,8 @@ load_dotenv(override=True)  # Allow .env file to override environment variables
 
 from fastapi.responses import JSONResponse
 from fastmcp import FastMCP
-# Import our YAML docstring helper for dynamic tool descriptions
-from yaml_docstring_helper import YamlDocstringHelper
+# Use YamlTranslator directly - no need for separate docstring helper
+from memg_core.core.yaml_translator import YamlTranslator
 
 from memg_core import __version__
 # Import the current API from the installed library
@@ -39,17 +40,17 @@ logger = logging.getLogger(__name__)
 # Global client instance
 memg_client: Optional[MemgClient] = None
 
-# Global docstring helper instance
-docstring_helper: Optional[YamlDocstringHelper] = None
+# Global YAML translator instance
+yaml_translator: Optional[YamlTranslator] = None
 
 def initialize_client() -> None:
-    """Initialize the global MemgClient instance and docstring helper during startup."""
-    global memg_client, docstring_helper
+    """Initialize the global MemgClient instance and YAML translator during startup."""
+    global memg_client, yaml_translator
     if memg_client is not None:
         logger.warning("⚠️ MemgClient already initialized - skipping")
         return
 
-    logger.info("🔧 Initializing MemgClient and docstring helper during startup...")
+    logger.info("🔧 Initializing MemgClient and YAML translator during startup...")
 
     # Get YAML schema from environment - this is required for generic server
     yaml_path = os.getenv("MEMG_YAML_SCHEMA")
@@ -102,14 +103,14 @@ def initialize_client() -> None:
         memg_client = MemgClient(yaml_path=yaml_path, db_path=db_path)
         logger.info("✅ MemgClient initialized successfully during startup")
 
-        # Initialize docstring helper with the same YAML path
+        # Initialize YAML translator with the same YAML path
         try:
-            docstring_helper = YamlDocstringHelper(yaml_path)
-            logger.info("✅ Docstring helper initialized successfully")
+            yaml_translator = YamlTranslator(yaml_path)
+            logger.info("✅ YAML translator initialized successfully")
         except Exception as e:
-            logger.warning(f"⚠️ Failed to initialize docstring helper: {e}")
+            logger.warning(f"⚠️ Failed to initialize YAML translator: {e}")
             logger.warning("⚠️ Will use fallback docstrings")
-            docstring_helper = None
+            yaml_translator = None
 
         # Test the client with a simple operation to ensure it's working
         logger.info("🧪 Testing client initialization...")
@@ -127,46 +128,36 @@ def get_memg_client() -> MemgClient:
         raise RuntimeError("MemgClient not initialized - server startup failed")
     return memg_client
 
-def get_dynamic_docstring(tool_name: str) -> str:
-    """Get dynamic docstring from YAML helper or fallback to static."""
-    global docstring_helper
-
-    if docstring_helper is None:
-        # Fallback docstrings if helper failed to initialize
-        fallback_docstrings = {
-            "add_memory": "Add a memory with YAML-driven validation. Updated this to test the YAML docstring helper.",
-            "delete_memory": "Delete a memory by HRID. Updated this to test the YAML docstring helper.",
-            "update_memory": "Update memory with partial payload changes (patch-style update).",
-            "search_memories": "Search memories using semantic vector search with graph expansion. Updated this to test the YAML docstring helper.",
-            "get_memory": "Get a single memory by HRID with full payload and metadata.",
-            "get_memories": "Get multiple memories with filtering, pagination, and optional graph expansion.",
-            "add_relationship": "Add a relationship between two memories. Updated this to test the YAML docstring helper.",
-            "delete_relationship": "Delete a relationship between two memories."
-        }
-        return fallback_docstrings.get(tool_name, "Tool description not available.")
+def get_memory_types_for_field() -> str:
+    """Get memory types string for Field descriptions."""
+    global yaml_translator
 
     try:
-        if tool_name == "add_memory":
-            return docstring_helper.generate_add_memory_docstring()
-        elif tool_name == "delete_memory":
-            return docstring_helper.generate_delete_memory_docstring()
-        elif tool_name == "update_memory":
-            return "Update memory with partial payload changes (patch-style update). Provide HRID, user_id, and only the fields you want to change."
-        elif tool_name == "search_memories":
-            return docstring_helper.generate_search_memories_docstring()
-        elif tool_name == "add_relationship":
-            return docstring_helper.generate_add_relationship_docstring()
-        elif tool_name == "delete_relationship":
-            return "Delete a relationship between two memories. Provide HRIDs, relation_type, and user_id. Memory types are inferred from HRIDs."
-        elif tool_name == "get_memory":
-            return docstring_helper.generate_get_memory_docstring()
-        elif tool_name == "get_memories":
-            return docstring_helper.generate_get_memories_docstring()
-        else:
-            return f"Dynamic docstring for {tool_name} not implemented."
-    except Exception as e:
-        logger.warning(f"⚠️ Failed to generate dynamic docstring for {tool_name}: {e}")
-        return f"Error generating docstring for {tool_name}."
+        if yaml_translator:
+            entities = yaml_translator.get_entity_types()
+            return ", ".join(sorted(entities))
+    except Exception:
+        pass
+
+    return "bug, document, memo, note, solution, task"  # fallback
+
+def get_dynamic_docstring(tool_name: str) -> str:
+    """Generate docstrings from templates with YAML values."""
+    global yaml_translator
+
+    # Simple docstring templates
+    templates = {
+        "add_memory": "Add a memory with proper payload based on the type of memory.",
+        "delete_memory": "Delete a memory by HRID.",
+        "update_memory": "Update memory with partial payload changes (patch-style update).",
+        "search_memories": "Search memories using semantic vector search with graph expansion.",
+        "get_memory": "Get a single memory by HRID.",
+        "get_memories": "Get multiple memories with filtering and optional graph expansion.",
+        "add_relationship": "Add a relationship between two memories.",
+        "delete_relationship": "Delete a relationship between two memories."
+    }
+
+    return templates.get(tool_name, f"Tool: {tool_name}")
 
 def shutdown_client():
     """Shutdown the global MemgClient instance."""
@@ -201,7 +192,11 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
     """Register MCP tools."""
 
     @app.tool("add_memory", description=get_dynamic_docstring("add_memory"))
-    def add_memory_tool(memory_type: str, user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def add_memory_tool(
+        memory_type: str = Field(..., description=f"One of the supported memory types: {get_memory_types_for_field()}"),
+        user_id: str = Field(..., description="User identifier - separates user's memories from each other"),
+        payload: Dict[str, Any] = Field(..., description="Memory data with required fields based on the type of memory")
+    ) -> Dict[str, Any]:
         logger.info(f"=== ADD_MEMORY TOOL CALLED ===")
         logger.info(f"Adding {memory_type} for user {user_id}")
         logger.info(f"Payload: {payload}")
@@ -230,7 +225,10 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
 
 
     @app.tool("delete_memory", description=get_dynamic_docstring("delete_memory"))
-    def delete_memory_tool(memory_id: str, user_id: str) -> Dict[str, Any]:
+    def delete_memory_tool(
+        memory_id: str = Field(..., description="Memory HRID (human readable identifier)"),
+        user_id: str = Field(..., description="User identifier (for ownership verification)")
+    ) -> Dict[str, Any]:
         try:
             client = get_memg_client()
             success = client.delete_memory(
@@ -254,7 +252,12 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
 
 
     @app.tool("update_memory", description=get_dynamic_docstring("update_memory"))
-    def update_memory_tool(hrid: str, payload_updates: Dict[str, Any], user_id: str, memory_type: Optional[str] = None) -> Dict[str, Any]:
+    def update_memory_tool(
+        hrid: str = Field(..., description="Memory HRID (human readable identifier)"),
+        payload_updates: Dict[str, Any] = Field(..., description="Payload updates (only fields you want to change)"),
+        user_id: str = Field(..., description="User identifier"),
+        memory_type: Optional[str] = Field(None, description="Memory type (optional)")
+    ) -> Dict[str, Any]:
         logger.info(f"=== UPDATE_MEMORY TOOL CALLED ===")
         logger.info(f"Updating {hrid} for user {user_id}")
         logger.info(f"Updates: {payload_updates}")
@@ -294,13 +297,13 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
 
     @app.tool("search_memories", description=get_dynamic_docstring("search_memories"))
     def search_memories_tool(
-        query: str,
-        user_id: str,
-        limit: int = 5,
-        memory_type: Optional[str] = None,
-        neighbor_limit: int = 5,
-        hops: int = 1,
-        include_semantic: bool = True
+        query: str = Field(..., description="Search query text"),
+        user_id: str = Field(..., description="User identifier (required for data isolation)"),
+        limit: int = Field(5, description="Maximum results (default: 5, max: 50)"),
+        memory_type: Optional[str] = Field(None, description=f"Filter by type ({get_memory_types_for_field()}, optional)"),
+        neighbor_limit: int = Field(5, description="Max graph neighbors per result (default: 5)"),
+        hops: int = Field(1, description="Graph traversal depth (default: 1)"),
+        include_semantic: bool = Field(True, description="Include semantic search (default: true)")
     ) -> Dict[str, Any]:
         logger.info(f"=== SEARCH_MEMORIES TOOL CALLED ===")
         logger.info(f"Query: {query}")
@@ -386,13 +389,13 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
 
     @app.tool("add_relationship", description=get_dynamic_docstring("add_relationship"))
     def add_relationship_tool(
-        from_memory_hrid: str,
-        to_memory_hrid: str,
-        relation_type: str,
-        from_memory_type: str,
-        to_memory_type: str,
-        user_id: str,
-        properties: Optional[Dict[str, Any]] = None
+        from_memory_hrid: str = Field(..., description="Source memory HRID"),
+        to_memory_hrid: str = Field(..., description="Target memory HRID"),
+        relation_type: str = Field(..., description="Relationship type"),
+        from_memory_type: str = Field(..., description="Source entity type"),
+        to_memory_type: str = Field(..., description="Target entity type"),
+        user_id: str = Field(..., description="User identifier"),
+        properties: Optional[Dict[str, Any]] = Field(None, description="Additional relationship properties (optional)")
     ) -> Dict[str, Any]:
         logger.info(f"=== ADD_RELATIONSHIP TOOL CALLED ===")
         logger.info(f"From: {from_memory_hrid} ({from_memory_type}) -> To: {to_memory_hrid} ({to_memory_type})")
@@ -483,12 +486,6 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
 
     @app.tool("get_system_info")
     def get_system_info_tool(random_string: str = "") -> Dict[str, Any]:
-        """
-        Get system information and available memory types from YAML schema.
-
-        Returns:
-            Dict with system info, version, available functions, and memory types from YAML
-        """
         try:
             from memg_core.core.types import get_entity_type_enum
 
@@ -515,9 +512,12 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 "yaml_schema": os.getenv("MEMG_YAML_SCHEMA", "not configured")
             }
 
-    @app.tool("get_memory")
-    def get_memory_tool(hrid: str, user_id: str, memory_type: Optional[str] = None) -> Dict[str, Any]:
-        """Get a single memory by HRID."""
+    @app.tool("get_memory", description=get_dynamic_docstring("get_memory"))
+    def get_memory_tool(
+        hrid: str = Field(..., description="Memory HRID (human readable identifier)"),
+        user_id: str = Field(..., description="User identifier (for ownership verification)"),
+        memory_type: Optional[str] = Field(None, description="Memory type (optional)")
+    ) -> Dict[str, Any]:
         logger.info(f"=== GET_MEMORY TOOL CALLED ===")
         logger.info(f"Getting memory {hrid} for user {user_id}")
 
@@ -551,17 +551,16 @@ def register_tools(app: FastMCP) -> None:  # pylint: disable=too-many-statements
                 "memory": None
             }
 
-    @app.tool("get_memories")
+    @app.tool("get_memories", description=get_dynamic_docstring("get_memories"))
     def get_memories_tool(
-        user_id: str,
-        memory_type: Optional[str] = None,
-        limit: int = 50,
-        offset: int = 0,
-        include_neighbors: bool = False,
-        hops: int = 1,
-        filters: Optional[Dict[str, Any]] = None
+        user_id: str = Field(..., description="User identifier"),
+        memory_type: Optional[str] = Field(None, description=f"Filter by type ({get_memory_types_for_field()}, optional)"),
+        limit: int = Field(50, description="Maximum results (default: 50)"),
+        offset: int = Field(0, description="Skip first N results for pagination (default: 0)"),
+        include_neighbors: bool = Field(False, description="Include graph neighbors (default: false)"),
+        hops: int = Field(1, description="Graph traversal depth when include_neighbors=true (default: 1)"),
+        filters: Optional[Dict[str, Any]] = Field(None, description="Additional field-based filters (optional)")
     ) -> Dict[str, Any]:
-        """Get multiple memories with filtering and optional graph expansion."""
         logger.info(f"=== GET_MEMORIES TOOL CALLED ===")
         logger.info(f"Getting memories for user {user_id}, type: {memory_type}, limit: {limit}")
 
@@ -612,12 +611,6 @@ def create_app() -> FastMCP:
     # Add a simple health check tool instead of endpoint
     @app.tool("health_check")
     def health_check_tool(random_string: str = "") -> Dict[str, Any]:
-        """
-        Health check tool for monitoring.
-
-        Returns:
-            Dict with health status, service info, and version
-        """
         client_status = "initialized" if memg_client is not None else "not initialized"
         return {
             "status": "healthy",
