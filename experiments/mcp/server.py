@@ -79,38 +79,14 @@ def initialize_client() -> None:
 
 def _setup_database_paths() -> str:
     """Setup database paths based on environment configuration."""
-    # Check if we have mounted volumes configured
-    qdrant_path = os.getenv("QDRANT_STORAGE_PATH")
-    kuzu_path = os.getenv("KUZU_DB_PATH")
+    # MEMG_DB_PATH is required - no fallbacks allowed
+    memg_db_path = os.getenv("MEMG_DB_PATH")
 
-    if qdrant_path and kuzu_path:
-        # Using mounted volumes - create a temporary structure that memg-core expects
-        db_path = "/app/data"
-        os.makedirs(f"{db_path}/qdrant", exist_ok=True)
-        os.makedirs(f"{db_path}/kuzu", exist_ok=True)
+    if not memg_db_path:
+        raise RuntimeError("MEMG_DB_PATH environment variable is required but not set")
 
-        # Create symlinks to the mounted volumes
-        qdrant_link = f"{db_path}/qdrant"
-        kuzu_link = f"{db_path}/kuzu"
-
-        # Remove existing directories and create symlinks
-        if os.path.exists(qdrant_link) and not os.path.islink(qdrant_link):
-            os.rmdir(qdrant_link)
-        if not os.path.exists(qdrant_link):
-            os.symlink(qdrant_path, qdrant_link)
-
-        if os.path.exists(kuzu_link) and not os.path.islink(kuzu_link):
-            os.rmdir(kuzu_link)
-        if not os.path.exists(kuzu_link):
-            os.symlink(os.path.dirname(kuzu_path), kuzu_link)
-
-        logger.info(f"🔧 Using mounted volumes via symlinks - qdrant: {qdrant_path} -> {qdrant_link}, kuzu: {kuzu_path} -> {kuzu_link}")
-        return db_path
-    else:
-        # Fallback to tmp directory for non-mounted usage
-        db_path = "tmp"
-        logger.info(f"🔧 Using internal storage: {db_path}")
-        return db_path
+    logger.info(f"🔧 Using configured database path: {memg_db_path}")
+    return memg_db_path
 
 def get_memg_client() -> MemgClient:
     """Get the global MemgClient instance (must be initialized first)."""
@@ -129,6 +105,92 @@ def shutdown_client():
             logger.error(f"⚠️ Error closing MemgClient: {e}")
         finally:
             memg_client = None
+
+# ========================= PAYLOAD TRANSFORMATION HELPERS =========================
+
+def format_datetime_simple(dt_str: str) -> str:
+    """Convert ISO datetime to simple format: '2025-09-04 21:55:11'"""
+    if not dt_str:
+        return dt_str
+    try:
+        # Handle both with and without timezone
+        if 'T' in dt_str:
+            date_part, time_part = dt_str.split('T')
+            if '+' in time_part:
+                time_part = time_part.split('+')[0]
+            elif 'Z' in time_part:
+                time_part = time_part.replace('Z', '')
+            # Take only seconds precision (remove microseconds if present)
+            if '.' in time_part:
+                time_part = time_part.split('.')[0]
+            return f"{date_part} {time_part}"
+        return dt_str
+    except Exception:
+        return dt_str
+
+def flatten_memory_payload(memory_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Flatten memory payload structure for consistent API responses."""
+    if not memory_data:
+        return memory_data
+
+    # Start with system fields from root level
+    flattened = {
+        "hrid": memory_data.get("hrid"),
+        "memory_type": memory_data.get("memory_type"),
+        "user_id": memory_data.get("user_id")
+    }
+
+    # Add formatted timestamps from root level
+    if memory_data.get("created_at"):
+        flattened["created_at"] = format_datetime_simple(memory_data["created_at"])
+    if memory_data.get("updated_at"):
+        flattened["updated_at"] = format_datetime_simple(memory_data["updated_at"])
+
+    # Handle payload structure - flatten it into root level
+    payload = memory_data.get("payload", {})
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            # Skip system fields and metadata that shouldn't be at user level
+            if key not in ["hrid", "memory_type", "user_id", "created_at", "updated_at", "_label", "vector"]:
+                flattened[key] = value
+
+        # If payload has its own timestamps (from list operations), use those instead
+        if payload.get("created_at") and not memory_data.get("created_at"):
+            flattened["created_at"] = format_datetime_simple(payload["created_at"])
+        if payload.get("updated_at") and not memory_data.get("updated_at"):
+            flattened["updated_at"] = format_datetime_simple(payload["updated_at"])
+
+    # Add score if present (from search results)
+    if "score" in memory_data:
+        flattened["score"] = memory_data["score"]
+
+    # Add relationships if present
+    if "relationships" in memory_data:
+        flattened["relationships"] = memory_data["relationships"]
+
+    # Add any other root-level fields that aren't system fields
+    for key, value in memory_data.items():
+        if key not in ["hrid", "memory_type", "user_id", "created_at", "updated_at", "payload", "score", "relationships"]:
+            flattened[key] = value
+
+    return flattened
+
+def enhance_relationship_with_context(relationship: Dict[str, Any], target_memories: Dict[str, Dict]) -> Dict[str, Any]:
+    """Add statement context to relationship objects."""
+    enhanced = relationship.copy()
+    target_hrid = relationship.get("target_hrid")
+
+    if target_hrid and target_hrid in target_memories:
+        target_memory = target_memories[target_hrid]
+        # Add statement for context
+        if isinstance(target_memory, dict):
+            payload = target_memory.get("payload", {})
+            if isinstance(payload, dict) and "statement" in payload:
+                enhanced["target_statement"] = payload["statement"]
+            elif "statement" in target_memory:
+                enhanced["target_statement"] = target_memory["statement"]
+
+    return enhanced
 
 # ========================= ERROR HANDLING =========================
 
@@ -299,14 +361,21 @@ def handle_memory_operation(operation: str, client_method: str, **kwargs) -> Dic
         # Handle different return types
         if operation == "get_memory_by_hrid":
             if result:
-                return {"result": "Memory retrieved successfully", "memory": result}
+                flattened_memory = flatten_memory_payload(result)
+                return {"result": "Memory retrieved successfully", "memory": flattened_memory}
             else:
                 return {"result": "Memory not found", "hrid": kwargs.get("hrid"), "memory": None}
 
         elif operation == "list_memories_by_type":
+            # Flatten all memories in the list
+            flattened_memories = []
+            if isinstance(result, list):
+                for memory in result:
+                    flattened_memories.append(flatten_memory_payload(memory))
+
             return {
                 "result": f"Retrieved {len(result)} memories",
-                "memories": result,
+                "memories": flattened_memories,
                 "count": len(result),
                 "query_params": {k: v for k, v in kwargs.items() if k in ["memory_type", "limit", "offset", "include_neighbors", "filters"]}
             }
@@ -396,13 +465,37 @@ def handle_search_operation(query: str, user_id: str, **search_params) -> Dict[s
 
         logger.info(f"Search completed, found {len(results.memories)} seeds and {len(results.neighbors)} neighbors")
 
-        # Return SearchResult directly as dict with simplified status
+        # Convert SearchResult to dict and flatten payloads
         search_dict = results.model_dump()
+
+        # Create a lookup map for neighbor memories to enhance relationships
+        neighbor_lookup = {}
+        flattened_neighbors = []
+
+        for neighbor in search_dict.get("neighbors", []):
+            flattened_neighbor = flatten_memory_payload(neighbor)
+            flattened_neighbors.append(flattened_neighbor)
+            neighbor_lookup[neighbor.get("hrid")] = neighbor
+
+        # Flatten seed memories and enhance their relationships
+        flattened_memories = []
+        for memory in search_dict.get("memories", []):
+            flattened_memory = flatten_memory_payload(memory)
+
+            # Enhance relationships with target statement context
+            if "relationships" in flattened_memory:
+                enhanced_relationships = []
+                for rel in flattened_memory["relationships"]:
+                    enhanced_rel = enhance_relationship_with_context(rel, neighbor_lookup)
+                    enhanced_relationships.append(enhanced_rel)
+                flattened_memory["relationships"] = enhanced_relationships
+
+            flattened_memories.append(flattened_memory)
 
         return {
             "status": f"Found {len(results.memories)} memories and {len(results.neighbors)} neighbors",
-            "memories": search_dict["memories"],
-            "neighbors": search_dict["neighbors"],
+            "memories": flattened_memories,
+            "neighbors": flattened_neighbors,
             "query": query,
             "user_id": user_id,
             "search_params": {
@@ -654,7 +747,7 @@ if __name__ == "__main__":
 
     print(f"🚀 MEMG Core MCP Server (Dynamic) v{__version__} on {host}:{port}")
     print(f"📋 Using YAML: {os.getenv('MEMG_YAML_SCHEMA', 'NOT CONFIGURED - REQUIRED!')}")
-    print(f"💾 Using DB path: {os.getenv('QDRANT_STORAGE_PATH', 'tmp')}")
+    print(f"💾 Using DB path: {os.getenv('DATABASE_PATH', 'Note found!!')}")
     print(f"🏥 Health check available at /health")
 
     try:

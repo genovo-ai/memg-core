@@ -43,8 +43,7 @@ ENV MEMORY_SYSTEM_MCP_HOST=0.0.0.0
 ENV MEMORY_SYSTEM_MCP_PORT=8888
 ENV MEMG_YAML_SCHEMA=/app/schema.yaml
 
-# Expose the port from .env (default 8888)
-EXPOSE 8888
+# Port is exposed via docker-compose port mapping
 
 # Health check using custom health endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
