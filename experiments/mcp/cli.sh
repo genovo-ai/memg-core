@@ -135,7 +135,7 @@ validate_setup() {
     fi
 
     # Check MCP files
-    local files=("Dockerfile" "docker-compose.yml" "mcp_server.py" "requirements_mcp.txt")
+    local files=("Dockerfile" "docker-compose.yml" "server.py" "requirements_mcp.txt")
     for file in "${files[@]}"; do
         [ ! -f "$file" ] && { echo -e "${RED}❌ $file missing (run from experiments/mcp/)${NC}"; exit 1; }
     done
