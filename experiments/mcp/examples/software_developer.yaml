@@ -34,7 +34,6 @@ entities:
     description: "General note or observation to memorize"
     fields:
       project: { type: string }  # Optional project namespace for filtering
-      origin: { type: enum, choices: [system, user], default: system } # source of the note
     relations:
       note:
         - name: note_related_to_note
