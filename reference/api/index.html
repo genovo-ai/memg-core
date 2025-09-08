@@ -10571,16 +10571,7 @@ Eliminates the need for scattered interface creation.</p>
 
               <details class="quote">
                 <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">585</span>
-<span class="normal">586</span>
-<span class="normal">587</span>
-<span class="normal">588</span>
-<span class="normal">589</span>
-<span class="normal">590</span>
-<span class="normal">591</span>
-<span class="normal">592</span>
-<span class="normal">593</span>
-<span class="normal">594</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">594</span>
 <span class="normal">595</span>
 <span class="normal">596</span>
 <span class="normal">597</span>
@@ -10939,7 +10930,22 @@ Eliminates the need for scattered interface creation.</p>
 <span class="normal">950</span>
 <span class="normal">951</span>
 <span class="normal">952</span>
-<span class="normal">953</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SearchService</span><span class="p">:</span>
+<span class="normal">953</span>
+<span class="normal">954</span>
+<span class="normal">955</span>
+<span class="normal">956</span>
+<span class="normal">957</span>
+<span class="normal">958</span>
+<span class="normal">959</span>
+<span class="normal">960</span>
+<span class="normal">961</span>
+<span class="normal">962</span>
+<span class="normal">963</span>
+<span class="normal">964</span>
+<span class="normal">965</span>
+<span class="normal">966</span>
+<span class="normal">967</span>
+<span class="normal">968</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SearchService</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Search orchestration service - coordinates specialized handlers for GraphRAG operations.</span>
 
 <span class="sd">    Clean orchestration layer that delegates to specialized handlers:</span>
@@ -11194,79 +11200,85 @@ Eliminates the need for scattered interface creation.</p>
 
             <span class="c1"># Apply graph expansion if requested</span>
             <span class="k">if</span> <span class="n">include_neighbors</span> <span class="ow">and</span> <span class="n">memories</span><span class="p">:</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="c1"># Convert to MemorySeed objects for graph expansion</span>
-                    <span class="n">memory_seeds</span> <span class="o">=</span> <span class="p">[]</span>
-                    <span class="k">for</span> <span class="n">memory_data</span> <span class="ow">in</span> <span class="n">memories</span><span class="p">:</span>
-                        <span class="c1"># Create MemorySeed directly from memory_data</span>
-                        <span class="n">hrid</span> <span class="o">=</span> <span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;hrid&quot;</span><span class="p">]</span>
+                <span class="c1"># Convert to MemorySeed objects for graph expansion</span>
+                <span class="n">memory_seeds</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">memory_data</span> <span class="ow">in</span> <span class="n">memories</span><span class="p">:</span>
+                    <span class="c1"># Create MemorySeed directly from memory_data</span>
+                    <span class="n">hrid</span> <span class="o">=</span> <span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;hrid&quot;</span><span class="p">]</span>
 
-                        <span class="c1"># Create MemorySeed</span>
-                        <span class="n">seed</span> <span class="o">=</span> <span class="n">MemorySeed</span><span class="p">(</span>
-                            <span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span>
-                            <span class="n">hrid</span><span class="o">=</span><span class="n">hrid</span><span class="p">,</span>
-                            <span class="n">memory_type</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;memory_type&quot;</span><span class="p">],</span>
-                            <span class="n">created_at</span><span class="o">=</span><span class="n">memory_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">),</span>
-                            <span class="n">updated_at</span><span class="o">=</span><span class="n">memory_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;updated_at&quot;</span><span class="p">),</span>
-                            <span class="n">payload</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span>
-                            <span class="n">score</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">],</span>
-                            <span class="n">relationships</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># Will be populated by graph expansion</span>
-                        <span class="p">)</span>
-                        <span class="n">memory_seeds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+                    <span class="c1"># Create MemorySeed</span>
+                    <span class="n">created_at</span> <span class="o">=</span> <span class="n">memory_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">)</span>
+                    <span class="n">updated_at</span> <span class="o">=</span> <span class="n">memory_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;updated_at&quot;</span><span class="p">)</span>
 
-                    <span class="c1"># Apply graph expansion</span>
-                    <span class="n">expanded_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_append_neighbors</span><span class="p">(</span>
-                        <span class="n">seeds</span><span class="o">=</span><span class="n">memory_seeds</span><span class="p">,</span>
+                    <span class="c1"># Parse datetime strings if they exist, otherwise use current time</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">created_at</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                        <span class="n">created_at</span> <span class="o">=</span> <span class="n">_parse_datetime</span><span class="p">(</span><span class="n">created_at</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">created_at</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">created_at</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">updated_at</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                        <span class="n">updated_at</span> <span class="o">=</span> <span class="n">_parse_datetime</span><span class="p">(</span><span class="n">updated_at</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">updated_at</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">updated_at</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span>
+
+                    <span class="n">seed</span> <span class="o">=</span> <span class="n">MemorySeed</span><span class="p">(</span>
                         <span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span>
-                        <span class="n">relation_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># All relations</span>
-                        <span class="n">neighbor_limit</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>  <span class="c1"># Default limit</span>
-                        <span class="n">hops</span><span class="o">=</span><span class="n">hops</span><span class="p">,</span>
-                        <span class="n">projection</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                        <span class="n">hrid</span><span class="o">=</span><span class="n">hrid</span><span class="p">,</span>
+                        <span class="n">memory_type</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;memory_type&quot;</span><span class="p">],</span>
+                        <span class="n">created_at</span><span class="o">=</span><span class="n">created_at</span><span class="p">,</span>
+                        <span class="n">updated_at</span><span class="o">=</span><span class="n">updated_at</span><span class="p">,</span>
+                        <span class="n">payload</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span>
+                        <span class="n">score</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">],</span>
+                        <span class="n">relationships</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># Will be populated by graph expansion</span>
                     <span class="p">)</span>
+                    <span class="n">memory_seeds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 
-                    <span class="c1"># Convert back to dict format for API compatibility</span>
-                    <span class="n">expanded_memories</span> <span class="o">=</span> <span class="p">[]</span>
-                    <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">expanded_result</span><span class="o">.</span><span class="n">memories</span><span class="p">:</span>
-                        <span class="n">memory_data</span> <span class="o">=</span> <span class="p">{</span>
-                            <span class="s2">&quot;hrid&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">hrid</span><span class="p">,</span>
-                            <span class="s2">&quot;memory_type&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory_type</span><span class="p">,</span>
-                            <span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span>  <span class="c1"># Use the user_id parameter</span>
-                            <span class="s2">&quot;created_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
-                            <span class="s2">&quot;updated_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
-                            <span class="s2">&quot;payload&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">payload</span><span class="p">,</span>
-                            <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
-                            <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;kuzu_query_expanded&quot;</span><span class="p">,</span>
-                            <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;query_type&quot;</span><span class="p">:</span> <span class="s2">&quot;get_memories_expanded&quot;</span><span class="p">},</span>
-                            <span class="s2">&quot;relationships&quot;</span><span class="p">:</span> <span class="p">[</span>
-                                <span class="p">{</span>
-                                    <span class="s2">&quot;relation_type&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">relation_type</span><span class="p">,</span>
-                                    <span class="s2">&quot;target_hrid&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">target_hrid</span><span class="p">,</span>
-                                    <span class="s2">&quot;scores&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">scores</span><span class="p">,</span>
-                                <span class="p">}</span>
-                                <span class="k">for</span> <span class="n">rel</span> <span class="ow">in</span> <span class="n">seed</span><span class="o">.</span><span class="n">relationships</span>
-                            <span class="p">],</span>
-                        <span class="p">}</span>
-                        <span class="n">expanded_memories</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">memory_data</span><span class="p">)</span>
+                <span class="c1"># Apply graph expansion using the graph handler</span>
+                <span class="n">neighbors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_handler</span><span class="o">.</span><span class="n">expand_neighbors</span><span class="p">(</span>
+                    <span class="n">seeds</span><span class="o">=</span><span class="n">memory_seeds</span><span class="p">,</span>
+                    <span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span>
+                    <span class="n">relation_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># All relations</span>
+                    <span class="n">neighbor_limit</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>  <span class="c1"># Default limit</span>
+                    <span class="n">hops</span><span class="o">=</span><span class="n">hops</span><span class="p">,</span>
+                    <span class="n">projection</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="p">)</span>
 
-                    <span class="k">return</span> <span class="n">expanded_memories</span>
+                <span class="c1"># Create SearchResult to maintain consistency</span>
+                <span class="n">expanded_result</span> <span class="o">=</span> <span class="n">SearchResult</span><span class="p">(</span>
+                    <span class="n">memories</span><span class="o">=</span><span class="n">memory_seeds</span><span class="p">,</span>
+                    <span class="n">neighbors</span><span class="o">=</span><span class="n">neighbors</span><span class="p">,</span>
+                <span class="p">)</span>
 
-                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                    <span class="c1"># If graph expansion fails, fall back to basic memories</span>
-                    <span class="c1"># Log the actual error with full details for debugging</span>
-                    <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+                <span class="c1"># Convert back to dict format for API compatibility</span>
+                <span class="n">expanded_memories</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">expanded_result</span><span class="o">.</span><span class="n">memories</span><span class="p">:</span>
+                    <span class="n">memory_data</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;hrid&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">hrid</span><span class="p">,</span>
+                        <span class="s2">&quot;memory_type&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory_type</span><span class="p">,</span>
+                        <span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span>  <span class="c1"># Use the user_id parameter</span>
+                        <span class="s2">&quot;created_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
+                        <span class="s2">&quot;updated_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
+                        <span class="s2">&quot;payload&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">payload</span><span class="p">,</span>
+                        <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+                        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;kuzu_query_expanded&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;query_type&quot;</span><span class="p">:</span> <span class="s2">&quot;get_memories_expanded&quot;</span><span class="p">},</span>
+                        <span class="s2">&quot;relationships&quot;</span><span class="p">:</span> <span class="p">[</span>
+                            <span class="p">{</span>
+                                <span class="s2">&quot;relation_type&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">relation_type</span><span class="p">,</span>
+                                <span class="s2">&quot;target_hrid&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">target_hrid</span><span class="p">,</span>
+                                <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+                            <span class="p">}</span>
+                            <span class="k">for</span> <span class="n">rel</span> <span class="ow">in</span> <span class="n">seed</span><span class="o">.</span><span class="n">relationships</span>
+                        <span class="p">],</span>
+                    <span class="p">}</span>
+                    <span class="n">expanded_memories</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">memory_data</span><span class="p">)</span>
 
-                    <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Graph expansion failed in get_memories(): </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-                        <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                    <span class="p">)</span>
-                    <span class="c1"># Fall through to return basic memories</span>
+                <span class="k">return</span> <span class="n">expanded_memories</span>
 
             <span class="k">return</span> <span class="n">memories</span>
 
         <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="c1"># Log the error instead of silently failing</span>
-            <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-
             <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;get_memories() failed: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="k">return</span> <span class="p">[]</span>
 
@@ -11370,16 +11382,7 @@ Eliminates the need for scattered interface creation.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">601</span>
-<span class="normal">602</span>
-<span class="normal">603</span>
-<span class="normal">604</span>
-<span class="normal">605</span>
-<span class="normal">606</span>
-<span class="normal">607</span>
-<span class="normal">608</span>
-<span class="normal">609</span>
-<span class="normal">610</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">610</span>
 <span class="normal">611</span>
 <span class="normal">612</span>
 <span class="normal">613</span>
@@ -11402,7 +11405,16 @@ Eliminates the need for scattered interface creation.</p>
 <span class="normal">630</span>
 <span class="normal">631</span>
 <span class="normal">632</span>
-<span class="normal">633</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db_clients</span><span class="p">):</span>
+<span class="normal">633</span>
+<span class="normal">634</span>
+<span class="normal">635</span>
+<span class="normal">636</span>
+<span class="normal">637</span>
+<span class="normal">638</span>
+<span class="normal">639</span>
+<span class="normal">640</span>
+<span class="normal">641</span>
+<span class="normal">642</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db_clients</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Initialize SearchService with DatabaseClients.</span>
 
 <span class="sd">    Args:</span>
@@ -11607,16 +11619,7 @@ Eliminates the need for scattered interface creation.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">772</span>
-<span class="normal">773</span>
-<span class="normal">774</span>
-<span class="normal">775</span>
-<span class="normal">776</span>
-<span class="normal">777</span>
-<span class="normal">778</span>
-<span class="normal">779</span>
-<span class="normal">780</span>
-<span class="normal">781</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">781</span>
 <span class="normal">782</span>
 <span class="normal">783</span>
 <span class="normal">784</span>
@@ -11749,7 +11752,22 @@ Eliminates the need for scattered interface creation.</p>
 <span class="normal">911</span>
 <span class="normal">912</span>
 <span class="normal">913</span>
-<span class="normal">914</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memories</span><span class="p">(</span>
+<span class="normal">914</span>
+<span class="normal">915</span>
+<span class="normal">916</span>
+<span class="normal">917</span>
+<span class="normal">918</span>
+<span class="normal">919</span>
+<span class="normal">920</span>
+<span class="normal">921</span>
+<span class="normal">922</span>
+<span class="normal">923</span>
+<span class="normal">924</span>
+<span class="normal">925</span>
+<span class="normal">926</span>
+<span class="normal">927</span>
+<span class="normal">928</span>
+<span class="normal">929</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memories</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">memory_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -11817,79 +11835,85 @@ Eliminates the need for scattered interface creation.</p>
 
         <span class="c1"># Apply graph expansion if requested</span>
         <span class="k">if</span> <span class="n">include_neighbors</span> <span class="ow">and</span> <span class="n">memories</span><span class="p">:</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="c1"># Convert to MemorySeed objects for graph expansion</span>
-                <span class="n">memory_seeds</span> <span class="o">=</span> <span class="p">[]</span>
-                <span class="k">for</span> <span class="n">memory_data</span> <span class="ow">in</span> <span class="n">memories</span><span class="p">:</span>
-                    <span class="c1"># Create MemorySeed directly from memory_data</span>
-                    <span class="n">hrid</span> <span class="o">=</span> <span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;hrid&quot;</span><span class="p">]</span>
+            <span class="c1"># Convert to MemorySeed objects for graph expansion</span>
+            <span class="n">memory_seeds</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">memory_data</span> <span class="ow">in</span> <span class="n">memories</span><span class="p">:</span>
+                <span class="c1"># Create MemorySeed directly from memory_data</span>
+                <span class="n">hrid</span> <span class="o">=</span> <span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;hrid&quot;</span><span class="p">]</span>
 
-                    <span class="c1"># Create MemorySeed</span>
-                    <span class="n">seed</span> <span class="o">=</span> <span class="n">MemorySeed</span><span class="p">(</span>
-                        <span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span>
-                        <span class="n">hrid</span><span class="o">=</span><span class="n">hrid</span><span class="p">,</span>
-                        <span class="n">memory_type</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;memory_type&quot;</span><span class="p">],</span>
-                        <span class="n">created_at</span><span class="o">=</span><span class="n">memory_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">),</span>
-                        <span class="n">updated_at</span><span class="o">=</span><span class="n">memory_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;updated_at&quot;</span><span class="p">),</span>
-                        <span class="n">payload</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span>
-                        <span class="n">score</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">],</span>
-                        <span class="n">relationships</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># Will be populated by graph expansion</span>
-                    <span class="p">)</span>
-                    <span class="n">memory_seeds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+                <span class="c1"># Create MemorySeed</span>
+                <span class="n">created_at</span> <span class="o">=</span> <span class="n">memory_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">)</span>
+                <span class="n">updated_at</span> <span class="o">=</span> <span class="n">memory_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;updated_at&quot;</span><span class="p">)</span>
 
-                <span class="c1"># Apply graph expansion</span>
-                <span class="n">expanded_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_append_neighbors</span><span class="p">(</span>
-                    <span class="n">seeds</span><span class="o">=</span><span class="n">memory_seeds</span><span class="p">,</span>
+                <span class="c1"># Parse datetime strings if they exist, otherwise use current time</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">created_at</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                    <span class="n">created_at</span> <span class="o">=</span> <span class="n">_parse_datetime</span><span class="p">(</span><span class="n">created_at</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">created_at</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">created_at</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">updated_at</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                    <span class="n">updated_at</span> <span class="o">=</span> <span class="n">_parse_datetime</span><span class="p">(</span><span class="n">updated_at</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">updated_at</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">updated_at</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span>
+
+                <span class="n">seed</span> <span class="o">=</span> <span class="n">MemorySeed</span><span class="p">(</span>
                     <span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span>
-                    <span class="n">relation_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># All relations</span>
-                    <span class="n">neighbor_limit</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>  <span class="c1"># Default limit</span>
-                    <span class="n">hops</span><span class="o">=</span><span class="n">hops</span><span class="p">,</span>
-                    <span class="n">projection</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">hrid</span><span class="o">=</span><span class="n">hrid</span><span class="p">,</span>
+                    <span class="n">memory_type</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;memory_type&quot;</span><span class="p">],</span>
+                    <span class="n">created_at</span><span class="o">=</span><span class="n">created_at</span><span class="p">,</span>
+                    <span class="n">updated_at</span><span class="o">=</span><span class="n">updated_at</span><span class="p">,</span>
+                    <span class="n">payload</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;payload&quot;</span><span class="p">],</span>
+                    <span class="n">score</span><span class="o">=</span><span class="n">memory_data</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">],</span>
+                    <span class="n">relationships</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># Will be populated by graph expansion</span>
                 <span class="p">)</span>
+                <span class="n">memory_seeds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 
-                <span class="c1"># Convert back to dict format for API compatibility</span>
-                <span class="n">expanded_memories</span> <span class="o">=</span> <span class="p">[]</span>
-                <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">expanded_result</span><span class="o">.</span><span class="n">memories</span><span class="p">:</span>
-                    <span class="n">memory_data</span> <span class="o">=</span> <span class="p">{</span>
-                        <span class="s2">&quot;hrid&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">hrid</span><span class="p">,</span>
-                        <span class="s2">&quot;memory_type&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory_type</span><span class="p">,</span>
-                        <span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span>  <span class="c1"># Use the user_id parameter</span>
-                        <span class="s2">&quot;created_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
-                        <span class="s2">&quot;updated_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
-                        <span class="s2">&quot;payload&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">payload</span><span class="p">,</span>
-                        <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
-                        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;kuzu_query_expanded&quot;</span><span class="p">,</span>
-                        <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;query_type&quot;</span><span class="p">:</span> <span class="s2">&quot;get_memories_expanded&quot;</span><span class="p">},</span>
-                        <span class="s2">&quot;relationships&quot;</span><span class="p">:</span> <span class="p">[</span>
-                            <span class="p">{</span>
-                                <span class="s2">&quot;relation_type&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">relation_type</span><span class="p">,</span>
-                                <span class="s2">&quot;target_hrid&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">target_hrid</span><span class="p">,</span>
-                                <span class="s2">&quot;scores&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">scores</span><span class="p">,</span>
-                            <span class="p">}</span>
-                            <span class="k">for</span> <span class="n">rel</span> <span class="ow">in</span> <span class="n">seed</span><span class="o">.</span><span class="n">relationships</span>
-                        <span class="p">],</span>
-                    <span class="p">}</span>
-                    <span class="n">expanded_memories</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">memory_data</span><span class="p">)</span>
+            <span class="c1"># Apply graph expansion using the graph handler</span>
+            <span class="n">neighbors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_handler</span><span class="o">.</span><span class="n">expand_neighbors</span><span class="p">(</span>
+                <span class="n">seeds</span><span class="o">=</span><span class="n">memory_seeds</span><span class="p">,</span>
+                <span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span>
+                <span class="n">relation_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># All relations</span>
+                <span class="n">neighbor_limit</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>  <span class="c1"># Default limit</span>
+                <span class="n">hops</span><span class="o">=</span><span class="n">hops</span><span class="p">,</span>
+                <span class="n">projection</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="p">)</span>
 
-                <span class="k">return</span> <span class="n">expanded_memories</span>
+            <span class="c1"># Create SearchResult to maintain consistency</span>
+            <span class="n">expanded_result</span> <span class="o">=</span> <span class="n">SearchResult</span><span class="p">(</span>
+                <span class="n">memories</span><span class="o">=</span><span class="n">memory_seeds</span><span class="p">,</span>
+                <span class="n">neighbors</span><span class="o">=</span><span class="n">neighbors</span><span class="p">,</span>
+            <span class="p">)</span>
 
-            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                <span class="c1"># If graph expansion fails, fall back to basic memories</span>
-                <span class="c1"># Log the actual error with full details for debugging</span>
-                <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+            <span class="c1"># Convert back to dict format for API compatibility</span>
+            <span class="n">expanded_memories</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">expanded_result</span><span class="o">.</span><span class="n">memories</span><span class="p">:</span>
+                <span class="n">memory_data</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;hrid&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">hrid</span><span class="p">,</span>
+                    <span class="s2">&quot;memory_type&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">memory_type</span><span class="p">,</span>
+                    <span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span>  <span class="c1"># Use the user_id parameter</span>
+                    <span class="s2">&quot;created_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
+                    <span class="s2">&quot;updated_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Not available in MemorySeed</span>
+                    <span class="s2">&quot;payload&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">payload</span><span class="p">,</span>
+                    <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">seed</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+                    <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;kuzu_query_expanded&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;query_type&quot;</span><span class="p">:</span> <span class="s2">&quot;get_memories_expanded&quot;</span><span class="p">},</span>
+                    <span class="s2">&quot;relationships&quot;</span><span class="p">:</span> <span class="p">[</span>
+                        <span class="p">{</span>
+                            <span class="s2">&quot;relation_type&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">relation_type</span><span class="p">,</span>
+                            <span class="s2">&quot;target_hrid&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">target_hrid</span><span class="p">,</span>
+                            <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+                        <span class="p">}</span>
+                        <span class="k">for</span> <span class="n">rel</span> <span class="ow">in</span> <span class="n">seed</span><span class="o">.</span><span class="n">relationships</span>
+                    <span class="p">],</span>
+                <span class="p">}</span>
+                <span class="n">expanded_memories</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">memory_data</span><span class="p">)</span>
 
-                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Graph expansion failed in get_memories(): </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-                    <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                <span class="p">)</span>
-                <span class="c1"># Fall through to return basic memories</span>
+            <span class="k">return</span> <span class="n">expanded_memories</span>
 
         <span class="k">return</span> <span class="n">memories</span>
 
     <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="c1"># Log the error instead of silently failing</span>
-        <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-
         <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;get_memories() failed: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">[]</span>
 </code></pre></div></td></tr></table></div>
@@ -12016,16 +12040,7 @@ Eliminates the need for scattered interface creation.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">707</span>
-<span class="normal">708</span>
-<span class="normal">709</span>
-<span class="normal">710</span>
-<span class="normal">711</span>
-<span class="normal">712</span>
-<span class="normal">713</span>
-<span class="normal">714</span>
-<span class="normal">715</span>
-<span class="normal">716</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">716</span>
 <span class="normal">717</span>
 <span class="normal">718</span>
 <span class="normal">719</span>
@@ -12079,7 +12094,16 @@ Eliminates the need for scattered interface creation.</p>
 <span class="normal">767</span>
 <span class="normal">768</span>
 <span class="normal">769</span>
-<span class="normal">770</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memory</span><span class="p">(</span>
+<span class="normal">770</span>
+<span class="normal">771</span>
+<span class="normal">772</span>
+<span class="normal">773</span>
+<span class="normal">774</span>
+<span class="normal">775</span>
+<span class="normal">776</span>
+<span class="normal">777</span>
+<span class="normal">778</span>
+<span class="normal">779</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memory</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">hrid</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -12299,22 +12323,7 @@ Eliminates the need for scattered interface creation.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">916</span>
-<span class="normal">917</span>
-<span class="normal">918</span>
-<span class="normal">919</span>
-<span class="normal">920</span>
-<span class="normal">921</span>
-<span class="normal">922</span>
-<span class="normal">923</span>
-<span class="normal">924</span>
-<span class="normal">925</span>
-<span class="normal">926</span>
-<span class="normal">927</span>
-<span class="normal">928</span>
-<span class="normal">929</span>
-<span class="normal">930</span>
-<span class="normal">931</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">931</span>
 <span class="normal">932</span>
 <span class="normal">933</span>
 <span class="normal">934</span>
@@ -12336,7 +12345,22 @@ Eliminates the need for scattered interface creation.</p>
 <span class="normal">950</span>
 <span class="normal">951</span>
 <span class="normal">952</span>
-<span class="normal">953</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memory_neighbors</span><span class="p">(</span>
+<span class="normal">953</span>
+<span class="normal">954</span>
+<span class="normal">955</span>
+<span class="normal">956</span>
+<span class="normal">957</span>
+<span class="normal">958</span>
+<span class="normal">959</span>
+<span class="normal">960</span>
+<span class="normal">961</span>
+<span class="normal">962</span>
+<span class="normal">963</span>
+<span class="normal">964</span>
+<span class="normal">965</span>
+<span class="normal">966</span>
+<span class="normal">967</span>
+<span class="normal">968</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_memory_neighbors</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">memory_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">memory_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -12627,16 +12651,7 @@ Eliminates the need for scattered interface creation.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">635</span>
-<span class="normal">636</span>
-<span class="normal">637</span>
-<span class="normal">638</span>
-<span class="normal">639</span>
-<span class="normal">640</span>
-<span class="normal">641</span>
-<span class="normal">642</span>
-<span class="normal">643</span>
-<span class="normal">644</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">644</span>
 <span class="normal">645</span>
 <span class="normal">646</span>
 <span class="normal">647</span>
@@ -12697,7 +12712,16 @@ Eliminates the need for scattered interface creation.</p>
 <span class="normal">702</span>
 <span class="normal">703</span>
 <span class="normal">704</span>
-<span class="normal">705</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span>
+<span class="normal">705</span>
+<span class="normal">706</span>
+<span class="normal">707</span>
+<span class="normal">708</span>
+<span class="normal">709</span>
+<span class="normal">710</span>
+<span class="normal">711</span>
+<span class="normal">712</span>
+<span class="normal">713</span>
+<span class="normal">714</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -15949,16 +15973,16 @@ Canonicalization for undirected pairs can be added here later if decided.</p>
 
             <details class="quote">
               <summary>Source code in <code>src/memg_core/core/pipelines/retrieval.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">956</span>
-<span class="normal">957</span>
-<span class="normal">958</span>
-<span class="normal">959</span>
-<span class="normal">960</span>
-<span class="normal">961</span>
-<span class="normal">962</span>
-<span class="normal">963</span>
-<span class="normal">964</span>
-<span class="normal">965</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_search_service</span><span class="p">(</span><span class="n">db_clients</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SearchService</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">971</span>
+<span class="normal">972</span>
+<span class="normal">973</span>
+<span class="normal">974</span>
+<span class="normal">975</span>
+<span class="normal">976</span>
+<span class="normal">977</span>
+<span class="normal">978</span>
+<span class="normal">979</span>
+<span class="normal">980</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_search_service</span><span class="p">(</span><span class="n">db_clients</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SearchService</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory function to create a SearchService instance.</span>
 
 <span class="sd">    Args:</span>
