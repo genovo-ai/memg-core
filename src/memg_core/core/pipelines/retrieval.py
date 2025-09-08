@@ -12,6 +12,7 @@ NO modes, NO fallbacks, NO backward compatibility.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import logging
 from typing import Any
 
 from ...core.exceptions import DatabaseError
@@ -111,8 +112,12 @@ class MemorySerializer:
         return {
             "user_id": memory.user_id,  # Required for user filtering
             "memory_type": memory.memory_type,  # Required for type filtering
-            "created_at": memory.created_at.isoformat(),  # Required for time filtering
-            "updated_at": memory.updated_at.isoformat(),  # Required for time filtering
+            "created_at": memory.created_at.isoformat()
+            if memory.created_at
+            else datetime.now(UTC).isoformat(),  # Required for time filtering
+            "updated_at": memory.updated_at.isoformat()
+            if memory.updated_at
+            else datetime.now(UTC).isoformat(),  # Required for time filtering
             "hrid": hrid,  # Include HRID for user-facing operations
             **memory.payload,  # Include all YAML-validated entity fields
         }
@@ -130,8 +135,12 @@ class MemorySerializer:
             "id": memory.id,
             "user_id": memory.user_id,
             "memory_type": memory.memory_type,
-            "created_at": memory.created_at.isoformat(),
-            "updated_at": memory.updated_at.isoformat(),
+            "created_at": memory.created_at.isoformat()
+            if memory.created_at
+            else datetime.now(UTC).isoformat(),
+            "updated_at": memory.updated_at.isoformat()
+            if memory.updated_at
+            else datetime.now(UTC).isoformat(),
             **memory.payload,  # Include all YAML-validated fields
         }
 
@@ -837,79 +846,85 @@ class SearchService:
 
             # Apply graph expansion if requested
             if include_neighbors and memories:
-                try:
-                    # Convert to MemorySeed objects for graph expansion
-                    memory_seeds = []
-                    for memory_data in memories:
-                        # Create MemorySeed directly from memory_data
-                        hrid = memory_data["hrid"]
+                # Convert to MemorySeed objects for graph expansion
+                memory_seeds = []
+                for memory_data in memories:
+                    # Create MemorySeed directly from memory_data
+                    hrid = memory_data["hrid"]
 
-                        # Create MemorySeed
-                        seed = MemorySeed(
-                            user_id=user_id,
-                            hrid=hrid,
-                            memory_type=memory_data["memory_type"],
-                            created_at=memory_data.get("created_at"),
-                            updated_at=memory_data.get("updated_at"),
-                            payload=memory_data["payload"],
-                            score=memory_data["score"],
-                            relationships=[],  # Will be populated by graph expansion
-                        )
-                        memory_seeds.append(seed)
+                    # Create MemorySeed
+                    created_at = memory_data.get("created_at")
+                    updated_at = memory_data.get("updated_at")
 
-                    # Apply graph expansion
-                    expanded_result = self._append_neighbors(
-                        seeds=memory_seeds,
+                    # Parse datetime strings if they exist, otherwise use current time
+                    if isinstance(created_at, str):
+                        created_at = _parse_datetime(created_at)
+                    elif created_at is None:
+                        created_at = datetime.now(UTC)
+
+                    if isinstance(updated_at, str):
+                        updated_at = _parse_datetime(updated_at)
+                    elif updated_at is None:
+                        updated_at = datetime.now(UTC)
+
+                    seed = MemorySeed(
                         user_id=user_id,
-                        relation_names=None,  # All relations
-                        neighbor_limit=5,  # Default limit
-                        hops=hops,
-                        projection=None,
+                        hrid=hrid,
+                        memory_type=memory_data["memory_type"],
+                        created_at=created_at,
+                        updated_at=updated_at,
+                        payload=memory_data["payload"],
+                        score=memory_data["score"],
+                        relationships=[],  # Will be populated by graph expansion
                     )
+                    memory_seeds.append(seed)
 
-                    # Convert back to dict format for API compatibility
-                    expanded_memories = []
-                    for seed in expanded_result.memories:
-                        memory_data = {
-                            "hrid": seed.hrid,
-                            "memory_type": seed.memory_type,
-                            "user_id": user_id,  # Use the user_id parameter
-                            "created_at": None,  # Not available in MemorySeed
-                            "updated_at": None,  # Not available in MemorySeed
-                            "payload": seed.payload,
-                            "score": seed.score,
-                            "source": "kuzu_query_expanded",
-                            "metadata": {"query_type": "get_memories_expanded"},
-                            "relationships": [
-                                {
-                                    "relation_type": rel.relation_type,
-                                    "target_hrid": rel.target_hrid,
-                                    "scores": rel.scores,
-                                }
-                                for rel in seed.relationships
-                            ],
-                        }
-                        expanded_memories.append(memory_data)
+                # Apply graph expansion using the graph handler
+                neighbors = self.graph_handler.expand_neighbors(
+                    seeds=memory_seeds,
+                    user_id=user_id,
+                    relation_names=None,  # All relations
+                    neighbor_limit=5,  # Default limit
+                    hops=hops,
+                    projection=None,
+                )
 
-                    return expanded_memories
+                # Create SearchResult to maintain consistency
+                expanded_result = SearchResult(
+                    memories=memory_seeds,
+                    neighbors=neighbors,
+                )
 
-                except Exception as e:
-                    # If graph expansion fails, fall back to basic memories
-                    # Log the actual error with full details for debugging
-                    import logging
+                # Convert back to dict format for API compatibility
+                expanded_memories = []
+                for seed in expanded_result.memories:
+                    memory_data = {
+                        "hrid": seed.hrid,
+                        "memory_type": seed.memory_type,
+                        "user_id": user_id,  # Use the user_id parameter
+                        "created_at": None,  # Not available in MemorySeed
+                        "updated_at": None,  # Not available in MemorySeed
+                        "payload": seed.payload,
+                        "score": seed.score,
+                        "source": "kuzu_query_expanded",
+                        "metadata": {"query_type": "get_memories_expanded"},
+                        "relationships": [
+                            {
+                                "relation_type": rel.relation_type,
+                                "target_hrid": rel.target_hrid,
+                                "score": rel.score,
+                            }
+                            for rel in seed.relationships
+                        ],
+                    }
+                    expanded_memories.append(memory_data)
 
-                    logging.error(
-                        f"Graph expansion failed in get_memories(): {type(e).__name__}: {e}",
-                        exc_info=True,
-                    )
-                    # Fall through to return basic memories
+                return expanded_memories
 
             return memories
 
         except (DatabaseError, ValueError, KeyError) as e:
             # Log the error instead of silently failing
-            import logging
-
             logging.error(f"get_memories() failed: {type(e).__name__}: {e}", exc_info=True)
             return []
 
