@@ -125,3 +125,5 @@ tests/*tmp*
 
 experiments/fastapi/*
 experiments/job*
+
+.cursor*

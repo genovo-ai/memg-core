@@ -2,11 +2,8 @@
 
 from . import config, exceptions, models, yaml_translator
 from .interfaces import Embedder, KuzuInterface, QdrantInterface
-from .retrievers import (
-    _project_payload,
-    build_memory_from_flat_payload,
-    build_memory_from_kuzu_row,
-)
+
+# Parser functions moved to retrieval.py - no longer exported from core
 
 __all__ = [
     "config",
@@ -16,7 +13,4 @@ __all__ = [
     "Embedder",
     "KuzuInterface",
     "QdrantInterface",
-    "_project_payload",
-    "build_memory_from_flat_payload",
-    "build_memory_from_kuzu_row",
 ]

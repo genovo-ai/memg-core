@@ -46,6 +46,11 @@ class MemoryService:
         self.yaml_translator = db_clients.get_yaml_translator()
         self.hrid_tracker = HridTracker(self.kuzu)
 
+        # Initialize memory serializer for packing/unpacking
+        from .retrieval import MemorySerializer
+
+        self.memory_serializer = MemorySerializer(self.hrid_tracker)
+
     def add_memory(
         self,
         memory_type: str,
@@ -92,20 +97,14 @@ class MemoryService:
             # Generate embedding from anchor text
             vector = self.embedder.get_embedding(anchor_text)
 
-            # Create complete flat payload for Qdrant (includes system fields for filtering)
-            flat_payload = {
-                "user_id": memory.user_id,  # Required for user filtering
-                "memory_type": memory.memory_type,  # Required for type filtering
-                "created_at": memory.created_at.isoformat(),  # Required for time filtering
-                "updated_at": memory.updated_at.isoformat(),  # Required for time filtering
-                "hrid": hrid,  # Include HRID for user-facing operations
-                **memory.payload,  # Include all YAML-validated entity fields
-            }
+            # Use centralized serializer for packing
+            flat_payload = self.memory_serializer.to_qdrant_payload(memory, hrid)
+            kuzu_data = self.memory_serializer.to_kuzu_data(memory)
 
             # Add to Qdrant (vector storage) with complete payload
             success, _point_id = self.qdrant.add_point(
                 vector=vector,
-                payload=flat_payload,  # Complete flat payload with system + entity fields
+                payload=flat_payload,
                 point_id=memory.id,
                 collection=collection,
             )
@@ -117,14 +116,6 @@ class MemoryService:
                 )
 
             # Add to Kuzu (graph storage) - use entity-specific table
-            kuzu_data = {
-                "id": memory.id,
-                "user_id": memory.user_id,
-                "memory_type": memory.memory_type,
-                "created_at": memory.created_at.isoformat(),
-                "updated_at": memory.updated_at.isoformat(),
-                **memory.payload,  # Include all YAML-validated fields
-            }
             self.kuzu.add_node(memory_type, kuzu_data)
 
             # Create HRID mapping after successful storage
@@ -224,15 +215,9 @@ class MemoryService:
             # Generate new embedding from updated anchor text
             vector = self.embedder.get_embedding(anchor_text)
 
-            # Create updated flat payload for Qdrant
-            flat_payload = {
-                "user_id": memory.user_id,
-                "memory_type": memory.memory_type,
-                "created_at": memory.created_at.isoformat(),
-                "updated_at": memory.updated_at.isoformat(),
-                "hrid": hrid,  # Preserve HRID
-                **memory.payload,  # Updated and validated payload
-            }
+            # Use centralized serializer for packing
+            flat_payload = self.memory_serializer.to_qdrant_payload(memory, hrid)
+            kuzu_data = self.memory_serializer.to_kuzu_data(memory)
 
             # Update Qdrant point (upsert with same UUID)
             success, _point_id = self.qdrant.add_point(
@@ -247,16 +232,6 @@ class MemoryService:
                     operation="update_memory",
                     context={"memory_id": memory.id, "hrid": hrid},
                 )
-
-            # Update Kuzu node (need to implement update_node method)
-            kuzu_data = {
-                "id": memory.id,
-                "user_id": memory.user_id,
-                "memory_type": memory.memory_type,
-                "created_at": memory.created_at.isoformat(),
-                "updated_at": memory.updated_at.isoformat(),
-                **memory.payload,
-            }
 
             # Update Kuzu node using efficient update_node method
             # This preserves relationships and is more efficient than delete+add

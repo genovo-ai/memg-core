@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from ..interfaces import Embedder
+from ..core.interfaces import Embedder
 
 
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
@@ -44,43 +44,35 @@ def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
     return max(0.0, min(1.0, similarity))
 
 
-def calculate_neighbor_scores(
+def calculate_neighbor_relevance(
     neighbor_anchor: str,
-    query: str,
+    seed_anchor: str,
     seed_score: float,
-    hop: int,
     embedder: Embedder,
-    decay_rate: float = 0.9,
-) -> dict[str, float]:
-    """Calculate dual scores for a neighbor memory.
+) -> float:
+    """Calculate recursive neighbor relevance: seed_score × neighbor_to_seed_similarity.
 
     Args:
         neighbor_anchor: Anchor text of the neighbor memory.
-        query: Original search query.
+        seed_anchor: Anchor text of the seed memory.
         seed_score: Score of the seed that led to this neighbor.
-        hop: Number of hops from original seed (1-based).
         embedder: Embedder instance for generating embeddings.
-        decay_rate: Decay rate for hop-based scoring (default: 0.9).
 
     Returns:
-        dict[str, float]: Dictionary with 'to_query' and 'to_neighbor' scores.
+        float: Recursive relevance score (always ≤ seed_score).
     """
-    # Calculate to_query score (neighbor relevance to original query)
     try:
+        # Calculate similarity between neighbor and seed
         neighbor_embedding = embedder.get_embedding(neighbor_anchor)
-        query_embedding = embedder.get_embedding(query)
-        to_query_score = cosine_similarity(neighbor_embedding, query_embedding)
+        seed_embedding = embedder.get_embedding(seed_anchor)
+        neighbor_to_seed_similarity = cosine_similarity(neighbor_embedding, seed_embedding)
+
+        # Recursive multiplication: seed_score × neighbor_to_seed_similarity
+        # This naturally decays through the relationship chain
+        return seed_score * neighbor_to_seed_similarity
     except Exception:
-        # Fallback to decay-based score if embedding fails
-        to_query_score = seed_score * (decay_rate**hop)
-
-    # Calculate to_neighbor score (relationship strength with decay)
-    to_neighbor_score = seed_score * (decay_rate**hop)
-
-    return {
-        "to_query": to_query_score,
-        "to_neighbor": to_neighbor_score,
-    }
+        # Fallback: use 50% of seed score if embedding fails
+        return seed_score * 0.5
 
 
 def filter_by_decay_threshold(
