@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
-import warnings
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -62,74 +61,6 @@ class Memory(BaseModel):
         return v.strip()
 
     # (properties removed – dynamic __getattr__ handles field access)
-
-    def to_qdrant_payload(self) -> dict[str, Any]:
-        """DEPRECATED: Serializes to a strict {'core': ..., 'entity': ...} structure.
-
-        This method is deprecated and will be removed in a future version.
-        The current implementation uses flat payload structure directly in MemoryStore.
-
-        Returns:
-            dict[str, Any]: Deprecated payload structure.
-        """
-        warnings.warn(
-            "Memory.to_qdrant_payload() is deprecated. Use flat payload structure directly.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        core = {
-            "id": self.id,
-            "user_id": self.user_id,
-            "memory_type": self.memory_type,
-            "created_at": (
-                self.created_at.isoformat()
-                if hasattr(self.created_at, "isoformat")
-                else str(self.created_at)
-            ),
-        }
-        if self.updated_at:
-            core["updated_at"] = (
-                self.updated_at.isoformat()
-                if hasattr(self.updated_at, "isoformat")
-                else str(self.updated_at)
-            )
-        if self.hrid:
-            core["hrid"] = self.hrid
-
-        # Entity payload contains only YAML-defined fields
-        entity = dict(self.payload)
-
-        return {"core": core, "entity": entity}
-
-    def to_kuzu_node(self) -> dict[str, Any]:
-        """Export a minimal node for Kuzu, containing only core fields.
-
-        NO hardcoded fields - only system fields stored in graph.
-
-        Returns:
-            dict[str, Any]: Node data for Kuzu storage.
-        """
-        node = {
-            "id": self.id,
-            "user_id": self.user_id,
-            "memory_type": self.memory_type,
-            "created_at": (
-                self.created_at.isoformat()
-                if hasattr(self.created_at, "isoformat")
-                else str(self.created_at)
-            ),
-        }
-        if self.updated_at:
-            node["updated_at"] = (
-                self.updated_at.isoformat()
-                if hasattr(self.updated_at, "isoformat")
-                else str(self.updated_at)
-            )
-        if self.hrid:
-            node["hrid"] = self.hrid
-
-        return node
 
     def __getattr__(self, item: str):
         """Dynamic attribute access for YAML-defined payload fields ONLY.
@@ -219,27 +150,37 @@ class RelationshipInfo(BaseModel):
     Attributes:
         relation_type: Type of relationship (e.g., FIXES, ADDRESSES).
         target_hrid: HRID of the target memory.
-        scores: Scoring information for the relationship.
+        score: Relationship relevance score with natural decay.
+        relationships: Nested relationships for multi-hop expansion.
     """
 
     relation_type: str = Field(..., description="Relationship type from YAML schema")
     target_hrid: str = Field(..., description="HRID of target memory")
-    scores: dict[str, float] = Field(default_factory=dict, description="Relationship scores")
+    score: float = Field(..., ge=0.0, le=1.0, description="Relationship relevance score")
+    relationships: list[RelationshipInfo] = Field(
+        default_factory=list, description="Nested relationships"
+    )
 
 
 class MemorySeed(BaseModel):
     """Memory seed with full payload and explicit relationships.
 
     Attributes:
+        user_id: Owner of the memory.
         hrid: Human-readable identifier.
         memory_type: Entity type from YAML schema.
+        created_at: Creation timestamp.
+        updated_at: Last update timestamp.
         payload: Full entity payload.
         score: Vector similarity score to query.
         relationships: List of relationships to other memories.
     """
 
+    user_id: str = Field(..., description="Owner of the memory")
     hrid: str = Field(..., description="Human-readable identifier")
     memory_type: str = Field(..., description="Entity type from YAML schema")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime | None = Field(None, description="Last update timestamp")
     payload: dict[str, Any] = Field(..., description="Full entity payload")
     score: float = Field(
         ..., ge=0.0, le=1.0 + _MAX_SCORE_TOLERANCE, description="Vector similarity score"
@@ -263,14 +204,22 @@ class MemoryNeighbor(BaseModel):
     """Memory neighbor with anchor-only payload.
 
     Attributes:
+        user_id: Owner of the memory.
         hrid: Human-readable identifier.
         memory_type: Entity type from YAML schema.
+        created_at: Creation timestamp.
+        updated_at: Last update timestamp.
         payload: Anchor-only payload (statement field only).
+        score: Recursive relevance score (seed_score × neighbor_similarity).
     """
 
+    user_id: str = Field(..., description="Owner of the memory")
     hrid: str = Field(..., description="Human-readable identifier")
     memory_type: str = Field(..., description="Entity type from YAML schema")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime | None = Field(None, description="Last update timestamp")
     payload: dict[str, Any] = Field(..., description="Anchor-only payload")
+    score: float = Field(..., ge=0.0, le=1.0, description="Recursive relevance score")
 
 
 class SearchResult(BaseModel):

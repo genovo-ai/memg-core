@@ -17,93 +17,322 @@ from typing import Any
 from ...core.exceptions import DatabaseError
 from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
+from ...utils.scoring import calculate_neighbor_relevance
 from ..config import get_config
 from ..exceptions import ProcessingError
-from ..models import MemoryNeighbor, MemorySeed, SearchResult
-from ..retrievers.expanders import _append_neighbors, _find_semantic_expansion
-from ..retrievers.parsers import (
-    _project_payload,
-    build_memory_from_flat_payload,
-)
+from ..models import Memory, MemoryNeighbor, MemorySeed, RelationshipInfo, SearchResult
+from ..yaml_translator import YamlTranslator
+
+# System fields that are stored flat in Qdrant but should be separated from entity payload
+SYSTEM_FIELD_NAMES = {
+    "user_id",
+    "memory_type",
+    "created_at",
+    "updated_at",
+    "id",
+    "hrid",
+}
 
 
-class SearchService:
-    """Unified search service - handles all search and retrieval operations.
+class PayloadProjector:
+    """Handles payload projection and filtering based on include_details and projection settings."""
 
-    Provides GraphRAG search functionality using DatabaseClients for interface access.
-    Eliminates the need to pass interfaces as function parameters.
-
-    Attributes:
-        qdrant: Qdrant interface instance.
-        kuzu: Kuzu interface instance.
-        embedder: Embedder instance.
-        yaml_translator: YAML translator instance.
-        hrid_tracker: HRID tracker instance.
-    """
-
-    def __init__(self, db_clients):
-        """Initialize SearchService with DatabaseClients.
+    def __init__(self, yaml_translator: YamlTranslator):
+        """Initialize with YAML translator for anchor field lookup.
 
         Args:
-            db_clients: DatabaseClients instance (after init_dbs() called).
+            yaml_translator: YAML translator instance for schema operations.
         """
-        if not isinstance(db_clients, DatabaseClients):
-            raise TypeError("db_clients must be a DatabaseClients instance")
+        self.yaml_translator = yaml_translator
 
-        # Get interfaces from DatabaseClients (reuses DDL-created clients)
-        self.qdrant = db_clients.get_qdrant_interface()
-        self.kuzu = db_clients.get_kuzu_interface()
-        self.embedder = db_clients.get_embedder()
-        self.yaml_translator = db_clients.get_yaml_translator()
-        self.hrid_tracker = HridTracker(self.kuzu)
-        self.config = get_config()
+    def project(
+        self,
+        memory_type: str,
+        payload: dict[str, Any],
+        *,
+        include_details: str,
+        projection: dict[str, list[str]] | None = None,
+    ) -> dict[str, Any]:
+        """Project payload based on include_details setting and optional projection.
 
-    def search(
+        Args:
+            memory_type: Entity type for YAML anchor field lookup.
+            payload: Original payload dict.
+            include_details: "none" (anchor only) or "self" (full payload).
+            projection: Optional per-type field allowlist.
+
+        Returns:
+            dict[str, Any]: Projected payload dict with anchor field always included.
+        """
+        if not payload:
+            return {}
+
+        # Get anchor field from YAML schema - crash if missing
+        anchor_field = self.yaml_translator.get_anchor_field(memory_type)
+
+        if include_details == "none":
+            # Return only anchor field - crash if missing
+            return {anchor_field: payload[anchor_field]}
+
+        # include_details == "self" - apply projection if provided
+        result_payload = dict(payload)
+
+        # Apply projection filtering if provided
+        if projection and memory_type in projection:
+            allowed_fields = set(projection[memory_type])
+            # Always include anchor field
+            allowed_fields.add(anchor_field)
+            result_payload = {k: v for k, v in result_payload.items() if k in allowed_fields}
+
+        return result_payload
+
+
+class MemorySerializer:
+    """Centralized memory serialization - handles packing/unpacking for all storage formats."""
+
+    def __init__(self, hrid_tracker: HridTracker):
+        """Initialize with HRID tracker for UUID↔HRID translation.
+
+        Args:
+            hrid_tracker: HRID tracker instance for ID management.
+        """
+        self.hrid_tracker = hrid_tracker
+
+    def to_qdrant_payload(self, memory: Memory, hrid: str) -> dict[str, Any]:
+        """Pack Memory object into flat Qdrant payload format.
+
+        Args:
+            memory: Memory object to serialize.
+            hrid: Human-readable ID for the memory.
+
+        Returns:
+            dict[str, Any]: Flat payload for Qdrant storage with system + entity fields.
+        """
+        return {
+            "user_id": memory.user_id,  # Required for user filtering
+            "memory_type": memory.memory_type,  # Required for type filtering
+            "created_at": memory.created_at.isoformat(),  # Required for time filtering
+            "updated_at": memory.updated_at.isoformat(),  # Required for time filtering
+            "hrid": hrid,  # Include HRID for user-facing operations
+            **memory.payload,  # Include all YAML-validated entity fields
+        }
+
+    def to_kuzu_data(self, memory: Memory) -> dict[str, Any]:
+        """Pack Memory object into Kuzu node data format.
+
+        Args:
+            memory: Memory object to serialize.
+
+        Returns:
+            dict[str, Any]: Node data for Kuzu storage with system + entity fields.
+        """
+        return {
+            "id": memory.id,
+            "user_id": memory.user_id,
+            "memory_type": memory.memory_type,
+            "created_at": memory.created_at.isoformat(),
+            "updated_at": memory.updated_at.isoformat(),
+            **memory.payload,  # Include all YAML-validated fields
+        }
+
+    def from_qdrant_point(self, point_id: str, payload: dict[str, Any]) -> Memory:
+        """Build Memory object from flat Qdrant payload.
+
+        Args:
+            point_id: Point ID from Qdrant (UUID).
+            payload: Flat payload from Qdrant.
+
+        Returns:
+            Memory: Memory object with proper field separation.
+        """
+        # Get HRID from tracker if available (extract user_id from payload)
+        user_id = payload.get("user_id", "")
+        memory_hrid = self.hrid_tracker.get_hrid(point_id, user_id)
+
+        # Extract entity fields (everything except system fields)
+        entity_fields = {k: v for k, v in payload.items() if k not in SYSTEM_FIELD_NAMES}
+
+        # Build Memory object with proper ID separation
+        return Memory(
+            id=point_id,  # Always UUID for internal operations
+            user_id=payload.get("user_id") or "",  # Ensure string type
+            memory_type=payload.get("memory_type") or "",  # Ensure string type
+            payload=entity_fields,
+            created_at=(
+                _parse_datetime(payload["created_at"])
+                if payload.get("created_at")
+                else datetime.now()
+            ),
+            updated_at=(
+                _parse_datetime(payload["updated_at"])
+                if payload.get("updated_at")
+                else datetime.now()
+            ),
+            hrid=memory_hrid,  # HRID for external API
+        )
+
+    def from_kuzu_row(self, row: dict[str, Any]) -> Memory:
+        """Build Memory object from Kuzu row data.
+
+        Args:
+            row: Row data from Kuzu query result.
+
+        Returns:
+            Memory: Memory object with proper field separation.
+
+        Note:
+            This handles the complex Kuzu row format that can have nested node objects.
+        """
+        # Extract neighbor memory from row - handle both formats
+        neighbor_id = row["id"]
+
+        # Handle both node object and flat row formats
+        if "node" in row:
+            node_data = row["node"]
+            if hasattr(node_data, "__dict__"):
+                node_data = node_data.__dict__
+            elif not isinstance(node_data, dict):
+                node_data = {}
+        else:
+            node_data = row
+
+        # Get HRID from tracker if available (extract user_id from node_data)
+        user_id_for_hrid = node_data.get("user_id", "")
+        memory_hrid = self.hrid_tracker.get_hrid(neighbor_id, user_id_for_hrid)
+
+        # Extract system fields with fallback logic
+        user_id = node_data.get("user_id") or row.get("user_id")
+        memory_type = node_data.get("memory_type") or row.get("memory_type")
+        created_at_str = node_data.get("created_at") or row.get("created_at")
+        updated_at_str = node_data.get("updated_at") or row.get("updated_at")
+
+        # Create entity payload by excluding system fields
+        entity_payload = {k: v for k, v in node_data.items() if k not in SYSTEM_FIELD_NAMES}
+
+        # Build Memory object with proper ID separation
+        return Memory(
+            id=neighbor_id,  # Always UUID for internal operations
+            user_id=user_id or "",  # Ensure string type
+            memory_type=memory_type or "",  # Ensure string type
+            payload=entity_payload,
+            created_at=(_parse_datetime(created_at_str) if created_at_str else datetime.now()),
+            updated_at=(_parse_datetime(updated_at_str) if updated_at_str else datetime.now()),
+            hrid=memory_hrid,  # HRID for external API
+        )
+
+    def to_memory_seed(self, memory: Memory, score: float) -> MemorySeed:
+        """Convert Memory object to MemorySeed.
+
+        Args:
+            memory: Memory object to convert.
+            score: Relevance score for this seed.
+
+        Returns:
+            MemorySeed: Seed object for search results.
+        """
+        return MemorySeed(
+            user_id=memory.user_id,
+            hrid=memory.hrid or memory.id,
+            memory_type=memory.memory_type,
+            created_at=memory.created_at,
+            updated_at=memory.updated_at,
+            payload=memory.payload,
+            score=score,
+            relationships=[],  # Will be populated by graph expansion
+        )
+
+    def to_memory_neighbor(self, memory: Memory, score: float) -> MemoryNeighbor:
+        """Convert Memory object to MemoryNeighbor.
+
+        Args:
+            memory: Memory object to convert.
+            score: Relevance score for this neighbor.
+
+        Returns:
+            MemoryNeighbor: Neighbor object for search results.
+        """
+        return MemoryNeighbor(
+            user_id=memory.user_id,
+            hrid=memory.hrid or memory.id,
+            memory_type=memory.memory_type,
+            created_at=memory.created_at,
+            updated_at=memory.updated_at,
+            payload=memory.payload,  # Should already be projected to anchor-only
+            score=score,
+        )
+
+
+def _parse_datetime(date_str: str) -> datetime:
+    """Parse datetime string - crash if invalid.
+
+    Args:
+        date_str: ISO format datetime string.
+
+    Returns:
+        datetime: Parsed datetime object.
+
+    Raises:
+        ValueError: If datetime string is invalid.
+    """
+    return datetime.fromisoformat(date_str)
+
+
+class VectorSearchHandler:
+    """Handles Qdrant vector search operations and seed generation."""
+
+    def __init__(
+        self,
+        qdrant,
+        embedder,
+        memory_serializer: MemorySerializer,
+        payload_projector: PayloadProjector,
+    ):
+        """Initialize with required interfaces and utilities.
+
+        Args:
+            qdrant: Qdrant interface for vector operations.
+            embedder: Embedder for query vectorization.
+            memory_serializer: MemorySerializer utility for object construction.
+            payload_projector: PayloadProjector utility for payload filtering.
+        """
+        self.qdrant = qdrant
+        self.embedder = embedder
+        self.memory_serializer = memory_serializer
+        self.payload_projector = payload_projector
+
+    def search_seeds(
         self,
         query: str,
         user_id: str,
         limit: int = 5,
         *,
         memory_type: str | None = None,
-        relation_names: list[str] | None = None,
-        neighbor_limit: int = 5,
-        hops: int = 1,
-        include_semantic: bool = True,
-        include_details: str = "self",
         modified_within_days: int | None = None,
         filters: dict[str, Any] | None = None,
         projection: dict[str, list[str]] | None = None,
         score_threshold: float | None = None,
-        decay_threshold: float | None = None,
-    ) -> SearchResult:
-        """GraphRAG search: vector seeds → graph expansion → semantic enhancement.
-
-        This method encapsulates the graph_rag_search logic as a class method,
-        eliminating the need to pass interfaces as parameters.
+        include_details: str = "self",
+    ) -> list[MemorySeed]:
+        """Search for vector seeds using Qdrant.
 
         Args:
-            query: Search query text (required).
-            user_id: User ID for filtering (required).
-            limit: Maximum results to return (default: 5).
+            query: Search query text.
+            user_id: User ID for filtering.
+            limit: Maximum results to return.
             memory_type: Optional memory type filter.
-            relation_names: Specific relations to expand (None = all relations).
-            neighbor_limit: Max neighbors per seed (default: 5).
-            hops: Number of graph hops to expand (default: 1).
-            include_semantic: Enable semantic expansion via see_also (default: True).
-            include_details: "self" (full payload) or "none" (anchor only) for seeds.
-            modified_within_days: Filter by recency (e.g., last 7 days).
-            filters: Custom field-based filtering (e.g., {"project": "memg-core"}).
+            modified_within_days: Filter by recency.
+            filters: Custom field-based filtering.
             projection: Control which fields to return per memory type.
-            score_threshold: Minimum similarity score threshold (0.0-1.0).
-            decay_threshold: Minimum neighbor relevance threshold (0.0-1.0).
+            score_threshold: Minimum similarity score threshold.
+            include_details: "self" (full payload) or "none" (anchor only).
 
         Returns:
-            SearchResult: Search result with explicit seed/neighbor separation.
+            list[MemorySeed]: Vector search seeds with projected payloads.
         """
         if not query or not query.strip():
-            return SearchResult()
+            return []
 
-        # 1. Get seeds from Qdrant vector search
+        # Generate query vector
         query_vector = self.embedder.get_embedding(query)
 
         # Build filters for Qdrant
@@ -118,77 +347,32 @@ class SearchService:
         vector_points = self.qdrant.search_points(
             vector=query_vector,
             limit=limit,
-            filters=qdrant_filters,  # user_id already included by _build_qdrant_filters
+            filters=qdrant_filters,
             score_threshold=score_threshold,
         )
 
-        # Convert Qdrant points to SearchResult seeds
+        # Convert Qdrant points to MemorySeeds
         seeds: list[MemorySeed] = []
         for point in vector_points:
             payload = point["payload"]
             point_id = point["id"]
 
-            # Use centralized utility for Memory construction
-            memory = build_memory_from_flat_payload(point_id, payload, self.hrid_tracker)
+            # Build Memory object
+            memory = self.memory_serializer.from_qdrant_point(point_id, payload)
 
-            # Project seed payload based on include_details and projection
-            memory.payload = _project_payload(
+            # Project payload based on include_details and projection
+            memory.payload = self.payload_projector.project(
                 memory.memory_type,
                 memory.payload,
                 include_details=include_details,
                 projection=projection,
-                yaml_translator=self.yaml_translator,
             )
 
-            seed_result = MemorySeed(
-                hrid=memory.hrid or memory.id,
-                memory_type=memory.memory_type,
-                payload=memory.payload,
-                score=float(point["score"]),
-                relationships=[],  # Will be populated by graph expansion
-            )
-
+            # Convert to MemorySeed
+            seed_result = self.memory_serializer.to_memory_seed(memory, float(point["score"]))
             seeds.append(seed_result)
 
-        if not seeds:
-            return SearchResult()
-
-        # 2. Graph expansion (neighbors with anchor-only payloads)
-        neighbors: list[MemoryNeighbor] = []
-        if hops > 0:
-            graph_result = _append_neighbors(
-                seeds=seeds,
-                kuzu=self.kuzu,
-                user_id=user_id,
-                relation_names=relation_names,
-                neighbor_limit=neighbor_limit,
-                hops=hops,
-                projection=projection,
-                hrid_tracker=self.hrid_tracker,
-                yaml_translator=self.yaml_translator,
-                decay_rate=self.config.memg.decay_rate,
-            )
-            # Seeds are now modified with relationships, neighbors are in graph_result.neighbors
-            neighbors.extend(graph_result.neighbors)
-
-        # 3. Semantic expansion (optional, type-specific "see also")
-        if include_semantic:
-            semantic_neighbors = _find_semantic_expansion(
-                seeds=seeds,  # Only expand from original seeds, not neighbors
-                qdrant=self.qdrant,
-                embedder=self.embedder,
-                user_id=user_id,
-                projection=projection,
-                hrid_tracker=self.hrid_tracker,
-                yaml_translator=self.yaml_translator,
-            )
-            neighbors.extend(semantic_neighbors)
-
-        # Compose final SearchResult with seeds and neighbors
-        return SearchResult(
-            memories=seeds,
-            neighbors=neighbors,
-        )
+        return seeds
 
     def _build_qdrant_filters(
         self,
@@ -228,6 +412,297 @@ class SearchService:
             filters["updated_at_from"] = cutoff_date.isoformat()
 
         return filters
+
+
+class GraphExpansionHandler:
+    """Handles Kuzu graph traversal and neighbor expansion."""
+
+    def __init__(
+        self,
+        kuzu,
+        embedder,
+        yaml_translator,
+        memory_serializer: MemorySerializer,
+        payload_projector: PayloadProjector,
+        hrid_tracker,
+    ):
+        """Initialize with required interfaces and utilities.
+
+        Args:
+            kuzu: Kuzu interface for graph operations.
+            embedder: Embedder for neighbor relevance scoring.
+            yaml_translator: YAML translator for anchor field lookup.
+            memory_serializer: MemorySerializer utility for object construction.
+            payload_projector: PayloadProjector utility for payload filtering.
+            hrid_tracker: HRID tracker for UUID↔HRID translation.
+        """
+        self.kuzu = kuzu
+        self.embedder = embedder
+        self.yaml_translator = yaml_translator
+        self.memory_serializer = memory_serializer
+        self.payload_projector = payload_projector
+        self.hrid_tracker = hrid_tracker
+
+    def expand_neighbors(
+        self,
+        seeds: list[MemorySeed],
+        user_id: str,
+        relation_names: list[str] | None,
+        neighbor_limit: int,
+        hops: int = 1,
+        projection: dict[str, list[str]] | None = None,
+    ) -> list[MemoryNeighbor]:
+        """Expand neighbors from Kuzu graph with progressive score decay.
+
+        Args:
+            seeds: Initial seed results from vector search.
+            user_id: User ID for isolation.
+            relation_names: Specific relation types to expand (None = all relations).
+            neighbor_limit: Max neighbors per seed.
+            hops: Number of hops to expand (progressive score decay).
+            projection: Optional field projection.
+
+        Returns:
+            list[MemoryNeighbor]: Neighbors with anchor-only payloads and populated seed relationships.
+        """
+        all_neighbors: list[MemoryNeighbor] = []  # Collect all neighbors
+        current_hop_seeds = seeds
+
+        for _ in range(hops):
+            next_hop_results: list[MemoryNeighbor] = []
+            # Track processed nodes per hop to avoid cycles within the same hop
+            hop_processed_ids: set[str] = set()
+
+            for seed in current_hop_seeds:
+                # Get UUID from HRID for Kuzu queries
+                seed_uuid = self.hrid_tracker.get_uuid(seed.hrid, user_id)
+                if not seed_uuid or seed_uuid in hop_processed_ids:
+                    continue
+
+                hop_processed_ids.add(seed_uuid)
+
+                # Get neighbors from Kuzu - using entity-specific tables
+                neighbor_rows = self.kuzu.neighbors(
+                    node_label=seed.memory_type,  # Use entity-specific table (bug, task, etc.)
+                    node_uuid=seed_uuid,  # Use UUID for Kuzu queries
+                    user_id=user_id,  # CRITICAL: User isolation
+                    rel_types=relation_names,  # None means all relations
+                    direction="any",
+                    limit=neighbor_limit,
+                    neighbor_label=None,  # Accept neighbors from any entity table
+                )
+
+                for row in neighbor_rows:
+                    # Extract neighbor memory from row
+                    neighbor_id = row["id"]
+                    if not neighbor_id or neighbor_id in hop_processed_ids:
+                        continue
+
+                    # Build neighbor Memory object using centralized utility
+                    neighbor_memory = self.memory_serializer.from_kuzu_row(row)
+
+                    # Project to anchor-only payload for neighbors
+                    neighbor_memory.payload = self.payload_projector.project(
+                        neighbor_memory.memory_type,
+                        neighbor_memory.payload,
+                        include_details="none",
+                        projection=projection,
+                    )
+
+                    # Calculate recursive relevance score
+                    neighbor_score = self._calculate_neighbor_score(neighbor_memory, seed)
+
+                    # Extract relationship info and add to seed's relationships
+                    rel_type = row.get("rel_type")
+                    target_hrid = neighbor_memory.hrid or neighbor_memory.id
+
+                    if rel_type and target_hrid:
+                        # Create RelationshipInfo and add to seed with actual score
+                        relationship_info = RelationshipInfo(
+                            relation_type=rel_type,
+                            target_hrid=target_hrid,
+                            score=neighbor_score,
+                        )
+                        seed.relationships.append(relationship_info)
+
+                    # Create MemoryNeighbor object using utility method
+                    neighbor_result = self.memory_serializer.to_memory_neighbor(
+                        neighbor_memory, neighbor_score
+                    )
+                    next_hop_results.append(neighbor_result)
+
+            # Add this hop's results to all neighbors
+            all_neighbors.extend(next_hop_results)
+
+            # Prepare for next hop (if any) - convert neighbors back to seeds for next iteration
+            next_hop_seeds = []
+            for neighbor in next_hop_results:
+                # Convert MemoryNeighbor back to MemorySeed for next hop expansion
+                seed_for_next_hop = MemorySeed(
+                    user_id=neighbor.user_id,
+                    hrid=neighbor.hrid,
+                    memory_type=neighbor.memory_type,
+                    created_at=neighbor.created_at,
+                    updated_at=neighbor.updated_at,
+                    payload=neighbor.payload,
+                    score=neighbor.score,  # Use the neighbor's score
+                    relationships=[],  # No relationships needed for expansion
+                )
+                next_hop_seeds.append(seed_for_next_hop)
+
+            current_hop_seeds = next_hop_seeds
+
+            # Stop if no more neighbors found
+            if not next_hop_results:
+                break
+
+        return all_neighbors
+
+    def _calculate_neighbor_score(self, neighbor_memory: Memory, seed: MemorySeed) -> float:
+        """Calculate recursive neighbor relevance score.
+
+        Args:
+            neighbor_memory: The neighbor memory object.
+            seed: The seed that led to this neighbor.
+
+        Returns:
+            float: Recursive relevance score.
+        """
+        # Get anchor fields from YAML schema instead of hardcoding "statement"
+        neighbor_anchor_field = self.yaml_translator.get_anchor_field(neighbor_memory.memory_type)
+        seed_anchor_field = self.yaml_translator.get_anchor_field(seed.memory_type)
+        neighbor_anchor = neighbor_memory.payload.get(neighbor_anchor_field, "")
+        seed_anchor = seed.payload.get(seed_anchor_field, "")
+
+        return calculate_neighbor_relevance(
+            neighbor_anchor=neighbor_anchor,
+            seed_anchor=seed_anchor,
+            seed_score=seed.score,
+            embedder=self.embedder,
+        )
+
+
+class SearchService:
+    """Search orchestration service - coordinates specialized handlers for GraphRAG operations.
+
+    Clean orchestration layer that delegates to specialized handlers:
+    - VectorSearchHandler: Qdrant vector search and seed generation
+    - GraphExpansionHandler: Kuzu graph traversal and neighbor expansion
+    - MemorySerializer: Memory object packing/unpacking and conversion
+    - PayloadProjector: Payload filtering and projection
+
+    Attributes:
+        vector_handler: Handles vector search operations.
+        graph_handler: Handles graph expansion operations.
+        memory_serializer: Handles memory serialization and construction.
+        payload_projector: Handles payload projection.
+    """
+
+    def __init__(self, db_clients):
+        """Initialize SearchService with DatabaseClients.
+
+        Args:
+            db_clients: DatabaseClients instance (after init_dbs() called).
+        """
+        if not isinstance(db_clients, DatabaseClients):
+            raise TypeError("db_clients must be a DatabaseClients instance")
+
+        # Get interfaces from DatabaseClients (reuses DDL-created clients)
+        self.qdrant = db_clients.get_qdrant_interface()
+        self.kuzu = db_clients.get_kuzu_interface()
+        self.embedder = db_clients.get_embedder()
+        self.yaml_translator = db_clients.get_yaml_translator()
+        self.hrid_tracker = HridTracker(self.kuzu)
+        self.config = get_config()
+
+        # Initialize utility classes
+        self.memory_serializer = MemorySerializer(self.hrid_tracker)
+        self.payload_projector = PayloadProjector(self.yaml_translator)
+
+        # Initialize handler classes
+        self.vector_handler = VectorSearchHandler(
+            self.qdrant, self.embedder, self.memory_serializer, self.payload_projector
+        )
+        self.graph_handler = GraphExpansionHandler(
+            self.kuzu,
+            self.embedder,
+            self.yaml_translator,
+            self.memory_serializer,
+            self.payload_projector,
+            self.hrid_tracker,
+        )
+
+    def search(
+        self,
+        query: str,
+        user_id: str,
+        limit: int = 5,
+        *,
+        memory_type: str | None = None,
+        relation_names: list[str] | None = None,
+        neighbor_limit: int = 5,
+        hops: int = 1,
+        include_details: str = "self",
+        modified_within_days: int | None = None,
+        filters: dict[str, Any] | None = None,
+        projection: dict[str, list[str]] | None = None,
+        score_threshold: float | None = None,
+        decay_threshold: float | None = None,  # keep for now, we need to implement it later
+    ) -> SearchResult:
+        """GraphRAG search orchestration: vector seeds → graph expansion → result composition.
+
+        Pure orchestration method that delegates to specialized handlers for clean separation of concerns.
+
+        Args:
+            query: Search query text (required).
+            user_id: User ID for filtering (required).
+            limit: Maximum results to return (default: 5).
+            memory_type: Optional memory type filter.
+            relation_names: Specific relations to expand (None = all relations).
+            neighbor_limit: Max neighbors per seed (default: 5).
+            hops: Number of graph hops to expand (default: 1).
+            include_details: "self" (full payload) or "none" (anchor only) for seeds.
+            modified_within_days: Filter by recency (e.g., last 7 days).
+            filters: Custom field-based filtering (e.g., {"project": "memg-core"}).
+            projection: Control which fields to return per memory type.
+            score_threshold: Minimum similarity score threshold (0.0-1.0).
+
+        Returns:
+            SearchResult: Search result with explicit seed/neighbor separation.
+        """
+        # 1. Get seeds from vector search using handler
+        seeds = self.vector_handler.search_seeds(
+            query=query,
+            user_id=user_id,
+            limit=limit,
+            memory_type=memory_type,
+            modified_within_days=modified_within_days,
+            filters=filters,
+            projection=projection,
+            score_threshold=score_threshold,
+            include_details=include_details,
+        )
+
+        if not seeds:
+            return SearchResult()
+
+        # 2. Graph expansion (neighbors with anchor-only payloads)
+        neighbors: list[MemoryNeighbor] = []
+        if hops > 0:
+            neighbors = self.graph_handler.expand_neighbors(
+                seeds=seeds,
+                user_id=user_id,
+                relation_names=relation_names,
+                neighbor_limit=neighbor_limit,
+                hops=hops,
+                projection=projection,
+            )
+
+        # Compose final SearchResult with seeds and neighbors
+        return SearchResult(
+            memories=seeds,
+            neighbors=neighbors,
+        )
 
     def get_memory(
         self,
@@ -371,8 +846,11 @@ class SearchService:
 
                         # Create MemorySeed
                         seed = MemorySeed(
+                            user_id=user_id,
                             hrid=hrid,
                             memory_type=memory_data["memory_type"],
+                            created_at=memory_data.get("created_at"),
+                            updated_at=memory_data.get("updated_at"),
                             payload=memory_data["payload"],
                             score=memory_data["score"],
                             relationships=[],  # Will be populated by graph expansion
@@ -380,17 +858,13 @@ class SearchService:
                         memory_seeds.append(seed)
 
                     # Apply graph expansion
-                    expanded_result = _append_neighbors(
+                    expanded_result = self._append_neighbors(
                         seeds=memory_seeds,
-                        kuzu=self.kuzu,
                         user_id=user_id,
                         relation_names=None,  # All relations
                         neighbor_limit=5,  # Default limit
                         hops=hops,
                         projection=None,
-                        hrid_tracker=self.hrid_tracker,
-                        yaml_translator=self.yaml_translator,
-                        decay_rate=self.config.memg.decay_rate,
                     )
 
                     # Convert back to dict format for API compatibility
