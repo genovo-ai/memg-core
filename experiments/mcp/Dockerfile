@@ -16,11 +16,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy wheel file and requirements
-# COPY memg_core-0.6.3.dev5-py3-none-any.whl /app/
+COPY memg_core-0.7.1.dev14-py3-none-any_new.whl /app/memg_core-0.7.1.dev14-py3-none-any.whl
 COPY requirements_mcp.txt /app/requirements_mcp.txt
 
 # Install MCP server dependencies (includes local memg-core wheel)
-RUN pip install --no-cache-dir -r requirements_mcp.txt
+RUN pip install --no-cache-dir -r requirements_mcp.txt /app/memg_core-0.7.1.dev14-py3-none-any.whl
 
 # Return to app directory and create directories for persistent storage
 WORKDIR /app

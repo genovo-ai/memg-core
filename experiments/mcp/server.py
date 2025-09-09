@@ -460,7 +460,9 @@ def handle_search_operation(query: str, user_id: str, **search_params) -> Dict[s
             limit=limit,
             neighbor_limit=search_params.get("neighbor_limit", 5),
             hops=search_params.get("hops", 1),
-            include_semantic=search_params.get("include_semantic", True)
+            score_threshold=search_params.get("score_threshold"),
+            decay_rate=search_params.get("decay_rate"),
+            decay_threshold=search_params.get("decay_threshold")
         )
 
         logger.info(f"Search completed, found {len(results.memories)} seeds and {len(results.neighbors)} neighbors")
@@ -560,8 +562,10 @@ def register_remaining_tools(app: FastMCP) -> None:
         limit: int = Field(5, description="Maximum results (default: 5, max: 50)"),
         memory_type: Optional[str] = Field(None, description="Filter by memory type (optional)"),
         neighbor_limit: int = Field(5, description="Max graph neighbors per result (default: 5)"),
-        hops: int = Field(1, description="Graph traversal depth (default: 1)"),
-        include_semantic: bool = Field(True, description="Include semantic search (default: true)")
+        hops: int = Field(2, description="Graph traversal depth (default: 1)"),
+        score_threshold: float = Field(0.75, description="Minimum similarity score threshold (0.0-1.0, 0.0 = no threshold)"),
+        decay_rate: float = Field(0.80, description="Score decay factor per hop (1.0 = no decay)"),
+        decay_threshold: float = Field(0.60, description="Explicit neighbor score threshold (0.0 = use decay_rate instead)")
     ) -> Dict[str, Any]:
         logger.info(f"=== SEARCH_MEMORIES TOOL CALLED ===")
         logger.info(f"Query: {query}")
@@ -574,7 +578,9 @@ def register_remaining_tools(app: FastMCP) -> None:
             memory_type=memory_type,
             neighbor_limit=neighbor_limit,
             hops=hops,
-            include_semantic=include_semantic
+            score_threshold=score_threshold,
+            decay_rate=decay_rate,
+            decay_threshold=decay_threshold,
         )
 
     @app.tool("add_relationship", description="Add a relationship between two memories.")

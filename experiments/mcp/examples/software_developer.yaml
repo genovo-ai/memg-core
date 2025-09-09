@@ -161,3 +161,21 @@ entities:
           description: "Solution implementing a task"
           predicate: IMPLEMENTS
           directed: true
+
+  - name: learning
+    parent: memo
+    description: "Learning or knowledge acquisition for longer term memory"
+    fields:
+      area:      { type: string }  # Optional project namespace for filtering
+      details:      { type: string }
+    relations:
+      learning:
+        - name: learning_relates_to_learning
+          description: "Learning or knowledge which relates to another learning"
+          predicate: RELATES_TO
+          directed: false
+      document:
+        - name: learning_relates_to_document
+          description: "Learning or knowledge which relates to a document"
+          predicate: RELATES_TO
+          directed: false

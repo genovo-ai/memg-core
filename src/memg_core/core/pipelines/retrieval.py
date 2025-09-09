@@ -460,6 +460,7 @@ class GraphExpansionHandler:
         neighbor_limit: int,
         hops: int = 1,
         projection: dict[str, list[str]] | None = None,
+        neighbor_threshold: float | None = None,
     ) -> list[MemoryNeighbor]:
         """Expand neighbors from Kuzu graph with progressive score decay.
 
@@ -470,12 +471,17 @@ class GraphExpansionHandler:
             neighbor_limit: Max neighbors per seed.
             hops: Number of hops to expand (progressive score decay).
             projection: Optional field projection.
+            neighbor_threshold: Minimum score threshold for neighbors (None = no filtering).
 
         Returns:
             list[MemoryNeighbor]: Neighbors with anchor-only payloads and populated seed relationships.
         """
         all_neighbors: list[MemoryNeighbor] = []  # Collect all neighbors
         current_hop_seeds = seeds
+        original_seeds = seeds  # Keep reference to original seeds for relationship tree building
+
+        # Track all seed HRIDs to prevent them from appearing in neighbors
+        seed_hrids = {seed.hrid for seed in seeds}
 
         for _ in range(hops):
             next_hop_results: list[MemoryNeighbor] = []
@@ -521,18 +527,28 @@ class GraphExpansionHandler:
                     # Calculate recursive relevance score
                     neighbor_score = self._calculate_neighbor_score(neighbor_memory, seed)
 
-                    # Extract relationship info and add to seed's relationships
+                    # Apply neighbor threshold filtering
+                    if neighbor_threshold is not None and neighbor_score < neighbor_threshold:
+                        continue  # Skip neighbors below threshold
+
+                    # Skip if this neighbor is actually one of the original seeds
+                    if neighbor_memory.hrid in seed_hrids:
+                        continue  # Don't include seeds in neighbors list
+
+                    # Extract relationship info and add to relationship tree
                     rel_type = row.get("rel_type")
                     target_hrid = neighbor_memory.hrid or neighbor_memory.id
 
                     if rel_type and target_hrid:
-                        # Create RelationshipInfo and add to seed with actual score
+                        # Create RelationshipInfo with nested structure support
                         relationship_info = RelationshipInfo(
                             relation_type=rel_type,
                             target_hrid=target_hrid,
                             score=neighbor_score,
                         )
-                        seed.relationships.append(relationship_info)
+
+                        # Add to relationship tree - find the right place to nest this relationship
+                        self._add_to_relationship_tree(original_seeds, seed.hrid, relationship_info)
 
                     # Create MemoryNeighbor object using utility method
                     neighbor_result = self.memory_serializer.to_memory_neighbor(
@@ -565,7 +581,93 @@ class GraphExpansionHandler:
             if not next_hop_results:
                 break
 
-        return all_neighbors
+        # Deduplicate neighbors by HRID, keeping the highest score
+        return self._deduplicate_neighbors(all_neighbors)
+
+    def _add_to_relationship_tree(
+        self, seeds: list[MemorySeed], source_hrid: str, relationship_info: RelationshipInfo
+    ) -> None:
+        """Add relationship to the correct place in the relationship tree.
+
+        This method recursively searches through the relationship tree to find
+        where the new relationship should be nested based on the source HRID.
+
+        Args:
+            seeds: Original seeds that contain the relationship tree roots
+            source_hrid: HRID of the memory that has this relationship
+            relationship_info: Relationship to add to the tree
+        """
+        # First, try to add to direct seeds
+        for seed in seeds:
+            if seed.hrid == source_hrid:
+                seed.relationships.append(relationship_info)
+                return
+
+        # If not found in seeds, search recursively in relationship trees
+        for seed in seeds:
+            if self._add_to_nested_relationships(
+                seed.relationships, source_hrid, relationship_info
+            ):
+                return
+
+    def _add_to_nested_relationships(
+        self,
+        relationships: list[RelationshipInfo],
+        source_hrid: str,
+        relationship_info: RelationshipInfo,
+    ) -> bool:
+        """Recursively search and add to nested relationships.
+
+        Args:
+            relationships: List of relationships to search
+            source_hrid: HRID of the memory that has this relationship
+            relationship_info: Relationship to add
+
+        Returns:
+            bool: True if relationship was added, False if not found
+        """
+        for rel in relationships:
+            # Check if this relationship target matches our source
+            if rel.target_hrid == source_hrid:
+                rel.relationships.append(relationship_info)
+                return True
+
+            # Recursively search nested relationships
+            if self._add_to_nested_relationships(rel.relationships, source_hrid, relationship_info):
+                return True
+
+        return False
+
+    def _deduplicate_neighbors(self, neighbors: list[MemoryNeighbor]) -> list[MemoryNeighbor]:
+        """Deduplicate neighbors by HRID, keeping the one with the highest score.
+
+        Args:
+            neighbors: List of neighbors that may contain duplicates
+
+        Returns:
+            list[MemoryNeighbor]: Deduplicated neighbors with highest scores
+        """
+        if not neighbors:
+            return neighbors
+
+        # Group neighbors by HRID and keep the one with highest score
+        best_neighbors: dict[str, MemoryNeighbor] = {}
+
+        for neighbor in neighbors:
+            hrid = neighbor.hrid
+            if hrid not in best_neighbors or neighbor.score > best_neighbors[hrid].score:
+                best_neighbors[hrid] = neighbor
+
+        # Return deduplicated list, preserving original order where possible
+        seen_hrids = set()
+        deduplicated = []
+
+        for neighbor in neighbors:
+            if neighbor.hrid not in seen_hrids:
+                deduplicated.append(best_neighbors[neighbor.hrid])
+                seen_hrids.add(neighbor.hrid)
+
+        return deduplicated
 
     def _calculate_neighbor_score(self, neighbor_memory: Memory, seed: MemorySeed) -> float:
         """Calculate recursive neighbor relevance score.
@@ -656,7 +758,8 @@ class SearchService:
         filters: dict[str, Any] | None = None,
         projection: dict[str, list[str]] | None = None,
         score_threshold: float | None = None,
-        decay_threshold: float | None = None,  # keep for now, we need to implement it later
+        decay_rate: float | None = None,
+        decay_threshold: float | None = None,
     ) -> SearchResult:
         """GraphRAG search orchestration: vector seeds → graph expansion → result composition.
 
@@ -675,6 +778,8 @@ class SearchService:
             filters: Custom field-based filtering (e.g., {"project": "memg-core"}).
             projection: Control which fields to return per memory type.
             score_threshold: Minimum similarity score threshold (0.0-1.0).
+            decay_rate: Score decay factor per hop (default: 1.0 = no decay).
+            decay_threshold: Explicit neighbor score threshold (overrides decay_rate).
 
         Returns:
             SearchResult: Search result with explicit seed/neighbor separation.
@@ -698,6 +803,11 @@ class SearchService:
         # 2. Graph expansion (neighbors with anchor-only payloads)
         neighbors: list[MemoryNeighbor] = []
         if hops > 0:
+            # Calculate neighbor filtering threshold
+            neighbor_threshold = self._calculate_neighbor_threshold(
+                score_threshold, decay_rate, decay_threshold, hops
+            )
+
             neighbors = self.graph_handler.expand_neighbors(
                 seeds=seeds,
                 user_id=user_id,
@@ -705,6 +815,7 @@ class SearchService:
                 neighbor_limit=neighbor_limit,
                 hops=hops,
                 projection=projection,
+                neighbor_threshold=neighbor_threshold,
             )
 
         # Compose final SearchResult with seeds and neighbors
@@ -712,6 +823,39 @@ class SearchService:
             memories=seeds,
             neighbors=neighbors,
         )
+
+    def _calculate_neighbor_threshold(
+        self,
+        score_threshold: float | None,
+        decay_rate: float | None,
+        decay_threshold: float | None,
+        hops: int,
+    ) -> float | None:
+        """Calculate neighbor filtering threshold using elegant hierarchy.
+
+        Args:
+            score_threshold: Minimum similarity score for seeds.
+            decay_rate: Score decay factor per hop (1.0 = no decay).
+            decay_threshold: Explicit neighbor threshold (overrides decay_rate).
+            hops: Number of graph hops.
+
+        Returns:
+            float | None: Neighbor threshold or None (no filtering).
+        """
+        # 1. Most explicit: User specified exact neighbor threshold
+        if decay_threshold is not None:
+            return decay_threshold
+
+        # 2. Dynamic decay: Calculate threshold based on hops
+        if score_threshold is not None and decay_rate is not None:
+            return score_threshold * (decay_rate**hops)
+
+        # 3. Conservative default: Same threshold for neighbors as seeds
+        if score_threshold is not None:
+            return score_threshold
+
+        # 4. No filtering
+        return None
 
     def get_memory(
         self,
