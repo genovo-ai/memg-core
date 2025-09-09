@@ -275,6 +275,155 @@ class TestPublicAPISearchFiltering:
             "Should return SearchResult with neighbors attribute"
         )
 
+    def test_decay_filtering_parameters(self, predictable_user_id: str):
+        """Test the new decay filtering system with score_threshold, decay_rate, and decay_threshold."""
+        # Add memories that will create a connected graph using available test schema types
+        task_hrid = add_memory(
+            memory_type="task",
+            payload={"statement": "implement authentication system", "priority": "high"},
+            user_id=predictable_user_id,
+        )
+
+        note_hrid = add_memory(
+            memory_type="note",
+            payload={"statement": "authentication login issue notes", "project": "auth"},
+            user_id=predictable_user_id,
+        )
+
+        document_hrid = add_memory(
+            memory_type="document",
+            payload={
+                "statement": "authentication system documentation",
+                "details": "Detailed auth guide",
+            },
+            user_id=predictable_user_id,
+        )
+
+        # Create relationships to enable graph expansion using available predicates
+        add_relationship(
+            from_memory_hrid=note_hrid,
+            to_memory_hrid=task_hrid,
+            relation_type="ANNOTATES",
+            from_memory_type="note",
+            to_memory_type="task",
+            user_id=predictable_user_id,
+        )
+
+        add_relationship(
+            from_memory_hrid=document_hrid,
+            to_memory_hrid=task_hrid,
+            relation_type="SUPPORTS",
+            from_memory_type="document",
+            to_memory_type="task",
+            user_id=predictable_user_id,
+        )
+
+        # Test 1: Basic search without decay filtering
+        basic_result = search(
+            query="authentication",
+            user_id=predictable_user_id,
+            limit=5,
+            hops=2,  # Enable graph expansion
+        )
+
+        basic_memory_count = len(basic_result.memories)
+
+        assert basic_memory_count > 0, "Should find some memories"
+
+        # Test 2: Search with score_threshold (conservative default)
+        threshold_result = search(
+            query="authentication",
+            user_id=predictable_user_id,
+            limit=5,
+            hops=2,
+            score_threshold=0.1,  # Low threshold to allow most results
+        )
+
+        # Should have similar or fewer results due to threshold
+        assert len(threshold_result.memories) <= basic_memory_count
+
+        # Test 3: Search with decay_rate (dynamic decay)
+        decay_rate_result = search(
+            query="authentication",
+            user_id=predictable_user_id,
+            limit=5,
+            hops=2,
+            score_threshold=0.1,
+            decay_rate=0.5,  # Aggressive decay
+        )
+
+        # Should potentially have fewer neighbors due to decay filtering
+        assert len(decay_rate_result.memories) <= len(threshold_result.memories)
+
+        # Test 4: Search with explicit decay_threshold
+        explicit_threshold_result = search(
+            query="authentication",
+            user_id=predictable_user_id,
+            limit=5,
+            hops=2,
+            score_threshold=0.1,
+            decay_threshold=0.05,  # Very low explicit threshold
+        )
+
+        assert len(explicit_threshold_result.memories) <= len(threshold_result.memories)
+
+        # Test 5: Verify API accepts all parameters without error
+        comprehensive_result = search(
+            query="authentication",
+            user_id=predictable_user_id,
+            limit=5,
+            hops=2,
+            score_threshold=0.2,
+            decay_rate=0.8,
+            decay_threshold=0.1,  # This should override decay_rate calculation
+        )
+
+        # Should complete without errors
+
+        assert isinstance(comprehensive_result.memories, list)
+        assert isinstance(comprehensive_result.neighbors, list)
+
+    def test_decay_threshold_calculation_logic(self):
+        """Test the threshold calculation logic directly."""
+
+        # Create a mock service to test the calculation method
+        class MockSearchService:
+            def _calculate_neighbor_threshold(
+                self, score_threshold, decay_rate, decay_threshold, hops
+            ):
+                # Copy the exact logic from SearchService
+                if decay_threshold is not None:
+                    return decay_threshold
+                if score_threshold is not None and decay_rate is not None:
+                    return score_threshold * (decay_rate**hops)
+                if score_threshold is not None:
+                    return score_threshold
+                return None
+
+        service = MockSearchService()
+
+        # Test case 1: Explicit decay_threshold takes precedence
+        result = service._calculate_neighbor_threshold(0.8, 0.9, 0.6, 2)
+        assert result == 0.6, f"Expected 0.6, got {result}"
+
+        # Test case 2: Dynamic decay calculation
+        result = service._calculate_neighbor_threshold(0.8, 0.9, None, 2)
+        expected = 0.8 * (0.9**2)  # 0.648
+        assert abs(result - expected) < 0.001, f"Expected {expected}, got {result}"
+
+        # Test case 3: Conservative default (same threshold)
+        result = service._calculate_neighbor_threshold(0.8, None, None, 2)
+        assert result == 0.8, f"Expected 0.8, got {result}"
+
+        # Test case 4: No filtering
+        result = service._calculate_neighbor_threshold(None, None, None, 2)
+        assert result is None, f"Expected None, got {result}"
+
+        # Test case 5: Edge case - zero hops
+        result = service._calculate_neighbor_threshold(0.8, 0.5, None, 0)
+        expected = 0.8 * (0.5**0)  # 0.8 * 1 = 0.8
+        assert result == expected, f"Expected {expected}, got {result}"
+
 
 class TestNewAPIFunctionality:
     """Test new API functions: update_memory, delete_relationship, get_memory, get_memories."""

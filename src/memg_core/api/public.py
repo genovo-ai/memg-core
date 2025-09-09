@@ -58,6 +58,7 @@ class MemgClient:
         memory_type: str | None = None,
         limit: int = 10,
         score_threshold: float | None = None,
+        decay_rate: float | None = None,
         decay_threshold: float | None = None,
         **kwargs,
     ) -> SearchResult:
@@ -69,7 +70,8 @@ class MemgClient:
             memory_type: Optional memory type filter.
             limit: Maximum number of results to return.
             score_threshold: Minimum similarity score threshold (0.0-1.0).
-            decay_threshold: Minimum neighbor relevance threshold (0.0-1.0).
+            decay_rate: Score decay factor per hop (default: 1.0 = no decay).
+            decay_threshold: Explicit neighbor score threshold (overrides decay_rate).
             **kwargs: Additional search parameters.
 
         Returns:
@@ -83,6 +85,7 @@ class MemgClient:
             memory_type=memory_type,
             limit=limit,
             score_threshold=score_threshold,
+            decay_rate=decay_rate,
             decay_threshold=decay_threshold,
             **kwargs,
         )
@@ -285,6 +288,7 @@ def search(
     memory_type: str | None = None,
     limit: int = 10,
     score_threshold: float | None = None,
+    decay_rate: float | None = None,
     decay_threshold: float | None = None,
     **kwargs,
 ) -> SearchResult:
@@ -296,7 +300,8 @@ def search(
         memory_type: Optional memory type filter.
         limit: Maximum number of results to return.
         score_threshold: Minimum similarity score threshold (0.0-1.0).
-        decay_threshold: Minimum neighbor relevance threshold (0.0-1.0).
+        decay_rate: Score decay factor per hop (default: 1.0 = no decay).
+        decay_threshold: Explicit neighbor score threshold (overrides decay_rate).
         **kwargs: Additional search parameters.
 
     Returns:
@@ -309,6 +314,7 @@ def search(
         memory_type,
         limit,
         score_threshold=score_threshold,
+        decay_rate=decay_rate,
         decay_threshold=decay_threshold,
         **kwargs,
     )

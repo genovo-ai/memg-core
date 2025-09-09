@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import math
+import numpy as np
 
 from ..core.interfaces import Embedder
 
 
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
-    """Calculate cosine similarity between two vectors.
+    """Calculate cosine similarity between two vectors using numpy.
 
     Args:
         vec1: First vector.
@@ -26,22 +26,23 @@ def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
     if len(vec1) != len(vec2):
         raise ValueError(f"Vector dimensions must match: {len(vec1)} != {len(vec2)}")
 
-    # Calculate dot product
-    dot_product = sum(a * b for a, b in zip(vec1, vec2, strict=False))
+    # Convert to numpy arrays for efficient computation
+    a = np.array(vec1, dtype=np.float32)
+    b = np.array(vec2, dtype=np.float32)
 
-    # Calculate magnitudes
-    magnitude1 = math.sqrt(sum(a * a for a in vec1))
-    magnitude2 = math.sqrt(sum(b * b for b in vec2))
+    # Calculate norms
+    norm_a = np.linalg.norm(a)
+    norm_b = np.linalg.norm(b)
 
     # Avoid division by zero
-    if magnitude1 == 0 or magnitude2 == 0:
+    if norm_a == 0 or norm_b == 0:
         return 0.0
 
-    # Calculate cosine similarity
-    similarity = dot_product / (magnitude1 * magnitude2)
+    # Calculate cosine similarity: (a · b) / (||a|| * ||b||)
+    similarity = np.dot(a, b) / (norm_a * norm_b)
 
     # Clamp to [0, 1] range (cosine similarity can be [-1, 1])
-    return max(0.0, min(1.0, similarity))
+    return float(max(0.0, min(1.0, similarity)))
 
 
 def calculate_neighbor_relevance(
@@ -60,6 +61,11 @@ def calculate_neighbor_relevance(
 
     Returns:
         float: Recursive relevance score (always ≤ seed_score).
+
+    Raises:
+        RuntimeError: If embedding generation fails. This is critical - memg-core
+            cannot function without embeddings. Silent fallbacks would break the
+            entire graph-RAG system by providing meaningless similarity scores.
     """
     try:
         # Calculate similarity between neighbor and seed
@@ -70,9 +76,14 @@ def calculate_neighbor_relevance(
         # Recursive multiplication: seed_score × neighbor_to_seed_similarity
         # This naturally decays through the relationship chain
         return seed_score * neighbor_to_seed_similarity
-    except Exception:
-        # Fallback: use 50% of seed score if embedding fails
-        return seed_score * 0.5
+    except Exception as e:
+        # FAIL FAST: If embeddings fail, the entire graph-RAG system is broken
+        # Silent fallbacks would turn sophisticated graph-RAG into meaningless vanilla RAG
+        raise RuntimeError(
+            "Critical embedding failure in neighbor relevance calculation. "
+            "memg-core cannot function without embeddings. "
+            "Check embedder configuration and model availability."
+        ) from e
 
 
 def filter_by_decay_threshold(
