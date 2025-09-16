@@ -176,19 +176,34 @@ def flatten_memory_payload(memory_data: Dict[str, Any]) -> Dict[str, Any]:
     return flattened
 
 def enhance_relationship_with_context(relationship: Dict[str, Any], target_memories: Dict[str, Dict]) -> Dict[str, Any]:
-    """Add statement context to relationship objects."""
+    """Add anchor field context to relationship objects using YAML-defined anchor field."""
     enhanced = relationship.copy()
     target_hrid = relationship.get("target_hrid")
 
     if target_hrid and target_hrid in target_memories:
         target_memory = target_memories[target_hrid]
-        # Add statement for context
         if isinstance(target_memory, dict):
-            payload = target_memory.get("payload", {})
-            if isinstance(payload, dict) and "statement" in payload:
-                enhanced["target_statement"] = payload["statement"]
-            elif "statement" in target_memory:
-                enhanced["target_statement"] = target_memory["statement"]
+            memory_type = target_memory.get("memory_type")
+            if memory_type and yaml_translator:
+                try:
+                    # Get the anchor field dynamically from YAML schema
+                    anchor_field = yaml_translator.get_anchor_field(memory_type)
+
+                    # Look for anchor field in payload first, then in root
+                    payload = target_memory.get("payload", {})
+                    anchor_text = None
+
+                    if isinstance(payload, dict) and anchor_field in payload:
+                        anchor_text = payload[anchor_field]
+                    elif anchor_field in target_memory:
+                        anchor_text = target_memory[anchor_field]
+
+                    if anchor_text:
+                        # Use the actual field name as the key instead of generic names
+                        enhanced[anchor_field] = anchor_text
+
+                except Exception as e:
+                    logger.warning(f"Failed to get anchor field for memory type {memory_type}: {e}")
 
     return enhanced
 

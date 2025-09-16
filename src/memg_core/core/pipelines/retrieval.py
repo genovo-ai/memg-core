@@ -20,7 +20,6 @@ from ...utils.db_clients import DatabaseClients
 from ...utils.hrid_tracker import HridTracker
 from ...utils.scoring import calculate_neighbor_relevance
 from ..config import get_config
-from ..exceptions import ProcessingError
 from ..models import Memory, MemoryNeighbor, MemorySeed, RelationshipInfo, SearchResult
 from ..yaml_translator import YamlTranslator
 
@@ -862,23 +861,29 @@ class SearchService:
         hrid: str,
         user_id: str,
         memory_type: str | None = None,
-        collection: str | None = None,
+        include_neighbors: bool = False,
+        hops: int = 1,
+        relation_types: list[str] | None = None,
+        neighbor_limit: int = 5,
     ) -> dict[str, Any] | None:
-        """Get a single memory by HRID.
+        """Get a single memory by HRID with optional neighbor expansion.
 
         Args:
             hrid: Human-readable identifier of the memory.
             user_id: User ID for ownership verification.
             memory_type: Optional memory type hint (inferred from HRID if not provided).
-            collection: Optional Qdrant collection override.
+            include_neighbors: Whether to include neighbor nodes via graph traversal.
+            hops: Number of hops for neighbor expansion (default 1).
+            relation_types: Filter by specific relationship types (None = all relations).
+            neighbor_limit: Maximum neighbors to return per hop (default 5).
 
         Returns:
-            dict[str, Any] | None: Memory data with full payload, or None if not found.
+            dict[str, Any] | None: Memory data with full payload and optional neighbors, or None if not found.
         """
         try:
             # Infer memory type from HRID if not provided
             if memory_type is None:
-                memory_type = hrid.split("_")[0].lower()
+                memory_type = "_".join(hrid.split("_")[:-1])
 
             # Get UUID from HRID
             uuid = self.hrid_tracker.get_uuid(hrid, user_id)
@@ -886,7 +891,7 @@ class SearchService:
                 return None
 
             # Get memory data from Qdrant
-            point_data = self.qdrant.get_point(uuid, collection)
+            point_data = self.qdrant.get_point(uuid)
             if not point_data:
                 return None
 
@@ -916,6 +921,81 @@ class SearchService:
                     )
                 },
             }
+
+            # Add neighbor expansion if requested
+            if include_neighbors and hops > 0:
+                # Convert memory to MemorySeed for graph expansion
+                created_at = memory_data.get("created_at")
+                updated_at = memory_data.get("updated_at")
+
+                # Parse datetime strings if they exist, otherwise use current time
+                if isinstance(created_at, str):
+                    created_at = _parse_datetime(created_at)
+                elif created_at is None:
+                    created_at = datetime.now(UTC)
+
+                if isinstance(updated_at, str):
+                    updated_at = _parse_datetime(updated_at)
+                elif updated_at is None:
+                    updated_at = datetime.now(UTC)
+
+                # Create MemorySeed for graph expansion
+                memory_seed = MemorySeed(
+                    user_id=user_id,
+                    hrid=hrid,
+                    memory_type=memory_data["memory_type"],
+                    created_at=created_at,
+                    updated_at=updated_at,
+                    payload=memory_data["payload"],
+                    score=1.0,  # Not from vector search, so use 1.0
+                    relationships=[],  # Will be populated by graph expansion
+                )
+
+                # Use graph handler to expand neighbors
+                neighbors = self.graph_handler.expand_neighbors(
+                    seeds=[memory_seed],
+                    user_id=user_id,
+                    relation_names=relation_types,
+                    neighbor_limit=neighbor_limit,
+                    hops=hops,
+                    projection=None,  # No projection needed for get_memory
+                    neighbor_threshold=None,  # No threshold filtering
+                )
+
+                # Add neighbors and relationships to response
+                memory_data["neighbors"] = [
+                    {
+                        "hrid": neighbor.hrid,
+                        "memory_type": neighbor.memory_type,
+                        "created_at": neighbor.created_at.isoformat()
+                        if neighbor.created_at
+                        else None,
+                        "updated_at": neighbor.updated_at.isoformat()
+                        if neighbor.updated_at
+                        else None,
+                        "payload": neighbor.payload,  # Already projected to anchor-only
+                        "score": neighbor.score,
+                    }
+                    for neighbor in neighbors
+                ]
+
+                # Add relationships from the seed (populated by expand_neighbors)
+                memory_data["relationships"] = [
+                    {
+                        "relation_type": rel.relation_type,
+                        "target_hrid": rel.target_hrid,
+                        "score": rel.score,
+                        "relationships": [
+                            {
+                                "relation_type": nested_rel.relation_type,
+                                "target_hrid": nested_rel.target_hrid,
+                                "score": nested_rel.score,
+                            }
+                            for nested_rel in rel.relationships
+                        ],
+                    }
+                    for rel in memory_seed.relationships
+                ]
 
             return memory_data
 
@@ -1071,45 +1151,6 @@ class SearchService:
             # Log the error instead of silently failing
             logging.error(f"get_memories() failed: {type(e).__name__}: {e}", exc_info=True)
             return []
-
-    def get_memory_neighbors(
-        self,
-        memory_id: str,
-        memory_type: str,
-        user_id: str,
-        relation_types: list[str] | None = None,
-        direction: str = "any",
-        limit: int = 10,
-    ) -> list[dict[str, Any]]:
-        """Get related memories through graph relationships.
-
-        Args:
-            memory_id: Memory ID to find neighbors for
-            memory_type: Memory entity type
-            user_id: User ID for isolation
-            relation_types: Filter by specific relationship types
-            direction: "in", "out", or "any"
-            limit: Maximum number of neighbors
-
-        Returns:
-            List of neighbor memories with relationship info
-        """
-        try:
-            return self.kuzu.neighbors(
-                node_label=memory_type,
-                node_uuid=memory_id,
-                user_id=user_id,
-                rel_types=relation_types,
-                direction=direction,
-                limit=limit,
-            )
-        except Exception as e:
-            raise ProcessingError(
-                "Failed to get memory neighbors",
-                operation="get_memory_neighbors",
-                context={"memory_id": memory_id, "memory_type": memory_type},
-                original_error=e,
-            ) from e
 
 
 def create_search_service(db_clients) -> SearchService:

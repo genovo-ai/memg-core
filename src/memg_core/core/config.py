@@ -45,7 +45,7 @@ class MemGConfig:
     template_name: str = "default"  # Active template name
 
     # Database settings
-    qdrant_collection_name: str = "memories"
+    qdrant_collection_name: str = "memg"
     kuzu_database_path: str = "kuzu_db"
 
     def __post_init__(self):
@@ -122,7 +122,7 @@ class MemGConfig:
             batch_processing_size=int(os.getenv("MEMG_BATCH_SIZE", "50")),
             embedder_model=os.getenv("EMBEDDER_MODEL", "Snowflake/snowflake-arctic-embed-xs"),
             template_name=os.getenv("MEMG_TEMPLATE", "default"),
-            qdrant_collection_name=os.getenv("MEMG_QDRANT_COLLECTION", "memories"),
+            qdrant_collection_name=os.getenv("MEMG_QDRANT_COLLECTION", "memg"),
             kuzu_database_path=os.getenv("MEMG_KUZU_DB_PATH", "kuzu_db"),
         )
 
