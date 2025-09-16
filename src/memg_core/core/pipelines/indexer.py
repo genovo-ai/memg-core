@@ -56,7 +56,6 @@ class MemoryService:
         memory_type: str,
         payload: dict[str, Any],
         user_id: str,
-        collection: str | None = None,
     ) -> str:
         """Add a memory to both graph and vector storage.
 
@@ -64,7 +63,6 @@ class MemoryService:
             memory_type: Entity type from YAML schema (e.g., 'task', 'note').
             payload: Memory data conforming to YAML schema.
             user_id: Owner of the memory.
-            collection: Optional Qdrant collection override.
 
         Returns:
             str: Memory HRID (Human-readable ID string).
@@ -106,7 +104,6 @@ class MemoryService:
                 vector=vector,
                 payload=flat_payload,
                 point_id=memory.id,
-                collection=collection,
             )
             if not success:
                 raise ProcessingError(
@@ -139,7 +136,6 @@ class MemoryService:
         payload_updates: dict[str, Any],
         user_id: str,
         memory_type: str | None = None,
-        collection: str | None = None,
     ) -> bool:
         """Update memory with partial payload changes (patch-style update).
 
@@ -148,7 +144,6 @@ class MemoryService:
             payload_updates: Dictionary of fields to update (only changed fields).
             user_id: User ID for ownership verification.
             memory_type: Optional memory type hint (inferred from HRID if not provided).
-            collection: Optional Qdrant collection override.
 
         Returns:
             bool: True if update succeeded.
@@ -165,7 +160,7 @@ class MemoryService:
             uuid = self.hrid_tracker.get_uuid(hrid, user_id)
 
             # Get current memory data from Qdrant to merge with updates
-            current_point = self.qdrant.get_point(uuid, collection)
+            current_point = self.qdrant.get_point(uuid)
             if not current_point:
                 raise ProcessingError(
                     f"Memory not found for HRID {hrid}",
@@ -224,7 +219,6 @@ class MemoryService:
                 vector=vector,
                 payload=flat_payload,
                 point_id=memory.id,  # Same UUID preserves relationships
-                collection=collection,
             )
             if not success:
                 raise ProcessingError(

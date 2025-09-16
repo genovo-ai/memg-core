@@ -45,7 +45,7 @@ class DatabaseClients:
         """
         self.qdrant_client: QdrantClient | None = None
         self.kuzu_connection: kuzu.Connection | None = None
-        self.db_name = "memg"
+        self.db_name: str | None = None  # Set during init_dbs
         self.qdrant_path = "qdrant"
         self.kuzu_path = "kuzu"
 
@@ -81,15 +81,14 @@ class DatabaseClients:
         self.kuzu_connection = kuzu_conn
 
         # DDL operations - create collection and tables
-        self._setup_qdrant_collection(qdrant_client, self.db_name)
+        self._setup_qdrant_collection(qdrant_client)
         self._setup_kuzu_tables_with_graph_register(kuzu_conn)
 
-    def _setup_qdrant_collection(self, client: QdrantClient, collection_name: str) -> None:
+    def _setup_qdrant_collection(self, client: QdrantClient) -> None:
         """Create Qdrant collection if it doesn't exist.
 
         Args:
             client: Qdrant client instance.
-            collection_name: Name of the collection to create.
 
         Raises:
             DatabaseError: If collection creation fails.
@@ -97,6 +96,7 @@ class DatabaseClients:
         try:
             config = get_config()
             vector_dimension = config.memg.vector_dimension
+            collection_name = config.memg.qdrant_collection_name
 
             collections = client.get_collections()
             if not any(col.name == collection_name for col in collections.collections):
@@ -161,7 +161,8 @@ class DatabaseClients:
                 "Qdrant client not initialized. Call init_dbs() first.",
                 operation="get_qdrant_interface",
             )
-        return QdrantInterface(self.qdrant_client, self.db_name)
+        config = get_config()
+        return QdrantInterface(self.qdrant_client, config.memg.qdrant_collection_name)
 
     def get_kuzu_interface(self) -> KuzuInterface:
         """Get Kuzu interface using the initialized connection.

@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from ..core.config import get_config
 from ..core.models import SearchResult
 from ..core.pipelines.indexer import MemoryService, create_memory_service
 from ..core.pipelines.retrieval import SearchService, create_search_service
@@ -30,7 +31,8 @@ class MemgClient:
             db_path: Base directory path for database storage.
         """
         self._db_clients = DatabaseClients(yaml_path=yaml_path)
-        self._db_clients.init_dbs(db_path=db_path, db_name=self._db_clients.db_name)
+        config = get_config()
+        self._db_clients.init_dbs(db_path=db_path, db_name=config.memg.qdrant_collection_name)
 
         self._memory_service = create_memory_service(self._db_clients)
         self._search_service = create_search_service(self._db_clients)
@@ -192,18 +194,34 @@ class MemgClient:
         hrid: str,
         user_id: str,
         memory_type: str | None = None,
+        include_neighbors: bool = False,
+        hops: int = 1,
+        relation_types: list[str] | None = None,
+        neighbor_limit: int = 5,
     ) -> dict[str, Any] | None:
-        """Get a single memory by HRID.
+        """Get a single memory by HRID with optional neighbor expansion.
 
         Args:
             hrid: Human-readable identifier of the memory.
             user_id: User ID for ownership verification.
             memory_type: Optional memory type hint (inferred from HRID if not provided).
+            include_neighbors: Whether to include neighbor nodes via graph traversal.
+            hops: Number of hops for neighbor expansion (default 1).
+            relation_types: Filter by specific relationship types (None = all relations).
+            neighbor_limit: Maximum neighbors to return per hop (default 5).
 
         Returns:
-            dict[str, Any] | None: Memory data with full payload, or None if not found.
+            dict[str, Any] | None: Memory data with full payload and optional neighbors, or None if not found.
         """
-        return self._search_service.get_memory(hrid, user_id, memory_type)
+        return self._search_service.get_memory(
+            hrid,
+            user_id,
+            memory_type,
+            include_neighbors,
+            hops,
+            relation_types,
+            neighbor_limit,
+        )
 
     def get_memories(
         self,
@@ -420,18 +438,28 @@ def get_memory(
     hrid: str,
     user_id: str,
     memory_type: str | None = None,
+    include_neighbors: bool = False,
+    hops: int = 1,
+    relation_types: list[str] | None = None,
+    neighbor_limit: int = 5,
 ) -> dict[str, Any] | None:
-    """Get memory using environment-based client.
+    """Get memory using environment-based client with optional neighbor expansion.
 
     Args:
         hrid: Human-readable identifier of the memory.
         user_id: User ID for ownership verification.
         memory_type: Optional memory type hint (inferred from HRID if not provided).
+        include_neighbors: Whether to include neighbor nodes via graph traversal.
+        hops: Number of hops for neighbor expansion (default 1).
+        relation_types: Filter by specific relationship types (None = all relations).
+        neighbor_limit: Maximum neighbors to return per hop (default 5).
 
     Returns:
-        dict[str, Any] | None: Memory data with full payload, or None if not found.
+        dict[str, Any] | None: Memory data with full payload and optional neighbors, or None if not found.
     """
-    return _get_client().get_memory(hrid, user_id, memory_type)
+    return _get_client().get_memory(
+        hrid, user_id, memory_type, include_neighbors, hops, relation_types, neighbor_limit
+    )
 
 
 def get_memories(
