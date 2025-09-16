@@ -154,7 +154,7 @@ class MemoryService:
         try:
             # Infer memory type from HRID if not provided
             if memory_type is None:
-                memory_type = hrid.split("_")[0].lower()
+                memory_type = "_".join(hrid.split("_")[:-1])
 
             # Get existing UUID to preserve relationships
             uuid = self.hrid_tracker.get_uuid(hrid, user_id)
@@ -335,9 +335,9 @@ class MemoryService:
 
             # Infer memory types from HRIDs if not provided
             if from_memory_type is None:
-                from_memory_type = from_memory_hrid.split("_")[0].lower()
+                from_memory_type = "_".join(from_memory_hrid.split("_")[:-1])
             if to_memory_type is None:
-                to_memory_type = to_memory_hrid.split("_")[0].lower()
+                to_memory_type = "_".join(to_memory_hrid.split("_")[:-1])
 
             # Translate HRIDs to UUIDs
             from_uuid = self.hrid_tracker.get_uuid(from_memory_hrid, user_id)

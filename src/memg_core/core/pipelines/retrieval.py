@@ -883,7 +883,7 @@ class SearchService:
         try:
             # Infer memory type from HRID if not provided
             if memory_type is None:
-                memory_type = hrid.split("_")[0].lower()
+                memory_type = "_".join(hrid.split("_")[:-1])
 
             # Get UUID from HRID
             uuid = self.hrid_tracker.get_uuid(hrid, user_id)

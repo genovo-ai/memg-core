@@ -104,7 +104,7 @@ class MemgClient:
             bool: True if deletion succeeded, False otherwise.
         """
         if memory_type is None:
-            memory_type = hrid.split("_")[0].lower()
+            memory_type = "_".join(hrid.split("_")[:-1])
         return self._memory_service.delete_memory(hrid, memory_type, user_id)
 
     def update_memory(
