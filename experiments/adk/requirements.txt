@@ -1,0 +1,4 @@
+memg-core>=0.7.2
+google-adk
+google-genai
+python-dotenv

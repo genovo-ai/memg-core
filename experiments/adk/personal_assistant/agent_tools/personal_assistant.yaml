@@ -1,0 +1,60 @@
+version: v1
+
+id_policy:
+  kind: uuid
+  field: id
+
+defaults:
+  vector:
+    metric: cosine
+    normalize: true
+  timestamps:
+    auto_create: true
+    auto_update: true
+
+entities:
+  - name: memo
+    description: "Base memory unit"
+    fields:
+      id:          { type: string, required: true, system: true } # uuid
+      user_id:     { type: string, required: true, system: true } # system: true = handled by API, not in user payload
+      created_at:  { type: datetime, required: true, system: true }
+      updated_at:  { type: datetime, system: true }
+
+  - name: note
+    parent: memo
+    description: "User preferences, observations, and everyday information"
+    fields:
+      content: { type: string, required: true, max_length: 1000 }
+      category: { type: string }
+      vector: { type: vector, anchored_to: content, system: true }
+    relations:
+      note:
+        - name: note_related_to_note
+          description: "Related notes and preferences"
+          predicate: RELATED_TO
+          directed: false
+      instruction:
+        - name: note_related_to_instruction
+          description: "Note provides context for instruction"
+          predicate: RELATED_TO
+          directed: false
+
+  - name: instruction
+    parent: memo
+    description: "Long-term behavioral guidelines and rules for AI assistant"
+    fields:
+      summary: { type: string, required: true }
+      details: { type: string, required: true }
+      vector: { type: vector, anchored_to: summary, system: true }
+    relations:
+      instruction:
+        - name: instruction_related_to_instruction
+          description: "Related behavioral instructions"
+          predicate: RELATED_TO
+          directed: false
+      note:
+        - name: instruction_related_to_note
+          description: "Instruction based on user preference"
+          predicate: RELATED_TO
+          directed: false
