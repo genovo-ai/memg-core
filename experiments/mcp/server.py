@@ -357,7 +357,11 @@ def register_dynamic_add_tools(app: FastMCP) -> None:
 # ========================= UNIFIED TOOL HANDLERS =========================
 
 def handle_memory_operation(operation: str, client_method: str, **kwargs) -> Dict[str, Any]:
-    """Unified handler for memory operations (delete, update, get)."""
+    """Unified handler for memory operations (delete, update, get).
+
+    Note: As of the API unification, get_memory() and get_memories() now return
+    SearchResult instead of dict/list, providing consistent structure across all operations.
+    """
     user_id = kwargs.get("user_id")
 
     # Validate user_id
@@ -376,22 +380,32 @@ def handle_memory_operation(operation: str, client_method: str, **kwargs) -> Dic
         # Handle different return types
         if operation == "get_memory_by_hrid":
             if result:
-                flattened_memory = flatten_memory_payload(result)
-                return {"result": "Memory retrieved successfully", "memory": flattened_memory}
+                # result is now SearchResult | None
+                search_dict = result.model_dump()
+                if search_dict.get("memories"):
+                    # Get the first (and only) memory from the SearchResult
+                    memory_data = search_dict["memories"][0]
+                    flattened_memory = flatten_memory_payload(memory_data)
+                    return {"result": "Memory retrieved successfully", "memory": flattened_memory}
+                else:
+                    return {"result": "Memory not found", "hrid": kwargs.get("hrid"), "memory": None}
             else:
                 return {"result": "Memory not found", "hrid": kwargs.get("hrid"), "memory": None}
 
         elif operation == "list_memories_by_type":
-            # Flatten all memories in the list
+            # result is now SearchResult
+            search_dict = result.model_dump()
+            memories_list = search_dict.get("memories", [])
+
+            # Flatten all memories in the SearchResult
             flattened_memories = []
-            if isinstance(result, list):
-                for memory in result:
-                    flattened_memories.append(flatten_memory_payload(memory))
+            for memory in memories_list:
+                flattened_memories.append(flatten_memory_payload(memory))
 
             return {
-                "result": f"Retrieved {len(result)} memories",
+                "result": f"Retrieved {len(memories_list)} memories",
                 "memories": flattened_memories,
-                "count": len(result),
+                "count": len(memories_list),
                 "query_params": {k: v for k, v in kwargs.items() if k in ["memory_type", "limit", "offset", "include_neighbors", "filters"]}
             }
 

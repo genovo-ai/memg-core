@@ -505,16 +505,20 @@ class TestNewAPIFunctionality:
         hrid = add_memory(memory_type="note", payload=sample_note_data, user_id=predictable_user_id)
 
         # Retrieve the memory
-        memory_data = get_memory(hrid=hrid, user_id=predictable_user_id)
+        search_result = get_memory(hrid=hrid, user_id=predictable_user_id)
 
-        assert memory_data is not None, "Should retrieve existing memory"
-        assert memory_data["hrid"] == hrid
-        assert memory_data["memory_type"] == "note"
-        assert memory_data["user_id"] == predictable_user_id
-        assert memory_data["payload"]["statement"] == sample_note_data["statement"]
+        assert search_result is not None, "Should retrieve existing memory"
+        assert len(search_result.memories) == 1, "Should have exactly one memory"
 
-        # Should not expose UUIDs
-        test_helpers.assert_no_uuid_exposure(memory_data)
+        memory_data = search_result.memories[0]
+        assert memory_data.hrid == hrid
+        assert memory_data.memory_type == "note"
+        assert memory_data.user_id == predictable_user_id
+        assert memory_data.payload["statement"] == sample_note_data["statement"]
+
+        # Should not expose UUIDs - convert to dict for helper
+        memory_dict = memory_data.model_dump()
+        test_helpers.assert_no_uuid_exposure(memory_dict)
 
     def test_get_memory_nonexistent(self, predictable_user_id: str):
         """Test getting non-existent memory."""
@@ -551,23 +555,25 @@ class TestNewAPIFunctionality:
         )
 
         # Get all memories
-        memories = get_memories(user_id=predictable_user_id)
+        search_result = get_memories(user_id=predictable_user_id)
 
-        assert len(memories) >= 2, "Should retrieve all user memories"
+        assert len(search_result.memories) >= 2, "Should retrieve all user memories"
 
         # Check that both memories are present
-        hrids = [m["hrid"] for m in memories]
+        hrids = [m.hrid for m in search_result.memories]
         assert note_hrid in hrids, "Should include note"
         assert doc_hrid in hrids, "Should include document"
 
         # Verify structure
-        for memory in memories:
-            assert "hrid" in memory
-            assert "memory_type" in memory
-            assert "user_id" in memory
-            assert "payload" in memory
-            assert memory["user_id"] == predictable_user_id
-            test_helpers.assert_no_uuid_exposure(memory)
+        for memory in search_result.memories:
+            assert memory.hrid is not None
+            assert memory.memory_type is not None
+            assert memory.user_id is not None
+            assert memory.payload is not None
+            assert memory.user_id == predictable_user_id
+            # Convert to dict for helper
+            memory_dict = memory.model_dump()
+            test_helpers.assert_no_uuid_exposure(memory_dict)
 
     def test_get_memories_filtered_by_type(self, predictable_user_id: str):
         """Test get_memories with memory type filtering."""
@@ -584,11 +590,11 @@ class TestNewAPIFunctionality:
         )
 
         # Get only notes
-        notes = get_memories(user_id=predictable_user_id, memory_type="note")
+        search_result = get_memories(user_id=predictable_user_id, memory_type="note")
 
-        assert len(notes) >= 1, "Should find at least one note"
-        for memory in notes:
-            assert memory["memory_type"] == "note", "Should only return notes"
+        assert len(search_result.memories) >= 1, "Should find at least one note"
+        for memory in search_result.memories:
+            assert memory.memory_type == "note", "Should only return notes"
 
     def test_get_memories_with_pagination(self, predictable_user_id: str):
         """Test get_memories with limit and offset."""
@@ -601,12 +607,12 @@ class TestNewAPIFunctionality:
             )
 
         # Test limit
-        limited = get_memories(user_id=predictable_user_id, limit=3)
-        assert len(limited) <= 3, "Should respect limit"
+        search_result = get_memories(user_id=predictable_user_id, limit=3)
+        assert len(search_result.memories) <= 3, "Should respect limit"
 
         # Test offset
-        offset_results = get_memories(user_id=predictable_user_id, limit=2, offset=2)
-        assert len(offset_results) <= 2, "Should respect limit with offset"
+        offset_result = get_memories(user_id=predictable_user_id, limit=2, offset=2)
+        assert len(offset_result.memories) <= 2, "Should respect limit with offset"
 
     def test_get_memories_user_isolation(self):
         """Test get_memories respects user isolation."""
@@ -629,8 +635,8 @@ class TestNewAPIFunctionality:
         user1_memories = get_memories(user_id=user1)
         user2_memories = get_memories(user_id=user2)
 
-        user1_statements = [m["payload"]["statement"] for m in user1_memories]
-        user2_statements = [m["payload"]["statement"] for m in user2_memories]
+        user1_statements = [m.payload["statement"] for m in user1_memories.memories]
+        user2_statements = [m.payload["statement"] for m in user2_memories.memories]
 
         assert "User1 note" in user1_statements, "User1 should see their note"
         assert "User1 note" not in user2_statements, "User2 should not see User1's note"

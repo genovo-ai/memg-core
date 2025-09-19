@@ -198,7 +198,7 @@ class MemgClient:
         hops: int = 1,
         relation_types: list[str] | None = None,
         neighbor_limit: int = 5,
-    ) -> dict[str, Any] | None:
+    ) -> SearchResult | None:
         """Get a single memory by HRID with optional neighbor expansion.
 
         Args:
@@ -211,7 +211,7 @@ class MemgClient:
             neighbor_limit: Maximum neighbors to return per hop (default 5).
 
         Returns:
-            dict[str, Any] | None: Memory data with full payload and optional neighbors, or None if not found.
+            SearchResult | None: SearchResult with single memory as seed and optional neighbors, or None if not found.
         """
         return self._search_service.get_memory(
             hrid,
@@ -232,7 +232,7 @@ class MemgClient:
         offset: int = 0,
         include_neighbors: bool = False,
         hops: int = 1,
-    ) -> list[dict[str, Any]]:
+    ) -> SearchResult:
         """Get multiple memories with filtering and optional graph expansion.
 
         Args:
@@ -245,7 +245,7 @@ class MemgClient:
             hops: Number of hops for neighbor expansion (default 1).
 
         Returns:
-            list[dict[str, Any]]: List of memory data with full payloads.
+            SearchResult: SearchResult with memories as seeds and optional neighbors.
         """
         return self._search_service.get_memories(
             user_id, memory_type, filters, limit, offset, include_neighbors, hops
@@ -442,7 +442,7 @@ def get_memory(
     hops: int = 1,
     relation_types: list[str] | None = None,
     neighbor_limit: int = 5,
-) -> dict[str, Any] | None:
+) -> SearchResult | None:
     """Get memory using environment-based client with optional neighbor expansion.
 
     Args:
@@ -455,7 +455,7 @@ def get_memory(
         neighbor_limit: Maximum neighbors to return per hop (default 5).
 
     Returns:
-        dict[str, Any] | None: Memory data with full payload and optional neighbors, or None if not found.
+        SearchResult | None: SearchResult with single memory as seed and optional neighbors, or None if not found.
     """
     return _get_client().get_memory(
         hrid, user_id, memory_type, include_neighbors, hops, relation_types, neighbor_limit
@@ -470,7 +470,7 @@ def get_memories(
     offset: int = 0,
     include_neighbors: bool = False,
     hops: int = 1,
-) -> list[dict[str, Any]]:
+) -> SearchResult:
     """Get memories using environment-based client.
 
     Args:
@@ -483,7 +483,7 @@ def get_memories(
         hops: Number of hops for neighbor expansion (default 1).
 
     Returns:
-        list[dict[str, Any]]: List of memory data with full payloads.
+        SearchResult: SearchResult with memories as seeds and optional neighbors.
     """
     return _get_client().get_memories(
         user_id, memory_type, filters, limit, offset, include_neighbors, hops
