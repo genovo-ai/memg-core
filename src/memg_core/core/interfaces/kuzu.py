@@ -14,18 +14,15 @@ class KuzuInterface:
 
     Attributes:
         conn: Pre-initialized Kuzu connection.
-        yaml_translator: Optional YAML translator for relationship operations.
     """
 
-    def __init__(self, connection: kuzu.Connection, yaml_translator=None):
+    def __init__(self, connection: kuzu.Connection):
         """Initialize with pre-created connection.
 
         Args:
             connection: Pre-initialized Kuzu connection from DatabaseClients.
-            yaml_translator: Optional YamlTranslator for relationship operations.
         """
         self.conn = connection
-        self.yaml_translator = yaml_translator
 
     def add_node(self, table: str, properties: dict[str, Any]) -> None:
         """Add a node to the graph - pure CRUD operation.
@@ -122,40 +119,41 @@ class KuzuInterface:
         user_id: str,
         props: dict[str, Any] | None = None,
     ) -> None:
-        """Add relationship between nodes.
+        """Add relationship between nodes using single relationship table.
 
         Args:
             from_table: Source node table name.
             to_table: Target node table name.
-            rel_type: Relationship type.
+            rel_type: Relationship predicate (validated against YAML schema).
             from_id: Source node ID.
             to_id: Target node ID.
             user_id: User ID for ownership verification.
-            props: Optional relationship properties.
+            props: Optional relationship properties (DEPRECATED - not used).
 
         Raises:
             DatabaseError: If relationship creation fails.
         """
         try:
-            props = props or {}
-
             # VALIDATE RELATIONSHIP AGAINST YAML SCHEMA - crash if invalid
             if not validate_relation_predicate(rel_type):
                 raise ValueError(
                     f"Invalid relationship predicate: {rel_type}. Must be defined in YAML schema."
                 )
 
-            # Use relationship type as-is (predicates from YAML) - no sanitization
-            # rel_type should already be a valid predicate (e.g., "REFERENCED_BY", "ANNOTATES")
-
             # CRITICAL: Verify both nodes belong to the user before creating relationship
-            # First check if both nodes exist and belong to the user
+            # Use Memory table for relationship operations
             check_query = (
-                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}}), "
-                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
-                f"RETURN a.id, b.id"
+                "MATCH (a:Memory {id: $from_id, user_id: $user_id, memory_type: $from_type}), "
+                "(b:Memory {id: $to_id, user_id: $user_id, memory_type: $to_type}) "
+                "RETURN a.id, b.id"
             )
-            check_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id}
+            check_params = {
+                "from_id": from_id,
+                "to_id": to_id,
+                "user_id": user_id,
+                "from_type": from_table,
+                "to_type": to_table,
+            }
             check_result = self.query(check_query, check_params)
 
             if not check_result:
@@ -164,40 +162,21 @@ class KuzuInterface:
                     f"or don't belong to user {user_id}"
                 )
 
-            # Generate relationship table name using YamlTranslator
-            if not self.yaml_translator:
-                raise DatabaseError(
-                    "YamlTranslator required for relationship operations",
-                    operation="add_relationship",
-                    context={
-                        "from_table": from_table,
-                        "to_table": to_table,
-                        "rel_type": rel_type,
-                    },
-                )
-
-            relationship_table_name = self.yaml_translator.relationship_table_name(
-                source=from_table,
-                predicate=rel_type,
-                target=to_table,
-                directed=True,  # Direction affects semantics but not table naming for now
-            )
-
-            # Now create the relationship using the unique table name
-            prop_str = ", ".join([f"{k}: ${k}" for k in props.keys()]) if props else ""
-            rel_props = f" {{{prop_str}}}" if prop_str else ""
+            # Create relationship using predicate-specific table via Memory nodes
             create_query = (
-                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}}), "
-                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
-                f"CREATE (a)-[:{relationship_table_name}{rel_props}]->(b)"
+                "MATCH (a:Memory {id: $from_id, user_id: $user_id, memory_type: $from_type}), "
+                "(b:Memory {id: $to_id, user_id: $user_id, memory_type: $to_type}) "
+                f"CREATE (a)-[:{rel_type} {{user_id: $user_id}}]->(b)"
             )
             create_params = {
                 "from_id": from_id,
                 "to_id": to_id,
                 "user_id": user_id,
-                **props,
+                "from_type": from_table,
+                "to_type": to_table,
             }
             self.conn.execute(create_query, parameters=create_params)
+
         except Exception as e:
             raise DatabaseError(
                 f"Failed to add relationship {rel_type}",
@@ -221,12 +200,12 @@ class KuzuInterface:
         to_id: str,
         user_id: str,
     ) -> bool:
-        """Delete relationship between nodes.
+        """Delete relationship between nodes using single relationship table.
 
         Args:
             from_table: Source node table name.
             to_table: Target node table name.
-            rel_type: Relationship type.
+            rel_type: Relationship predicate (validated against YAML schema).
             from_id: Source node ID.
             to_id: Target node ID.
             user_id: User ID for ownership verification.
@@ -245,46 +224,39 @@ class KuzuInterface:
                 )
 
             # CRITICAL: Verify both nodes belong to the user before deleting relationship
-            # First check if both nodes exist and belong to the user
+            # Use Memory table for relationship operations
             check_query = (
-                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}}), "
-                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
-                f"RETURN a.id, b.id"
+                "MATCH (a:Memory {id: $from_id, user_id: $user_id, memory_type: $from_type}), "
+                "(b:Memory {id: $to_id, user_id: $user_id, memory_type: $to_type}) "
+                "RETURN a.id, b.id"
             )
-            check_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id}
+            check_params = {
+                "from_id": from_id,
+                "to_id": to_id,
+                "user_id": user_id,
+                "from_type": from_table,
+                "to_type": to_table,
+            }
             check_result = self.query(check_query, check_params)
 
             if not check_result:
                 # Nodes don't exist or don't belong to user - return False (not found)
                 return False
 
-            # Generate relationship table name using YamlTranslator
-            if not self.yaml_translator:
-                raise DatabaseError(
-                    "YamlTranslator required for relationship operations",
-                    operation="delete_relationship",
-                    context={
-                        "from_table": from_table,
-                        "to_table": to_table,
-                        "rel_type": rel_type,
-                    },
-                )
-
-            relationship_table_name = self.yaml_translator.relationship_table_name(
-                source=from_table,
-                predicate=rel_type,
-                target=to_table,
-                directed=True,  # Direction affects semantics but not table naming for now
-            )
-
-            # First check if the relationship exists
+            # Check if the specific relationship exists using Memory table and predicate-specific rel table
             check_rel_query = (
-                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}})"
-                f"-[r:{relationship_table_name}]->"
-                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
-                f"RETURN r"
+                "MATCH (a:Memory {id: $from_id, user_id: $user_id, memory_type: $from_type})"
+                f"-[r:{rel_type} {{user_id: $user_id}}]->"
+                "(b:Memory {id: $to_id, user_id: $user_id, memory_type: $to_type}) "
+                "RETURN r"
             )
-            check_rel_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id}
+            check_rel_params = {
+                "from_id": from_id,
+                "to_id": to_id,
+                "user_id": user_id,
+                "from_type": from_table,
+                "to_type": to_table,
+            }
 
             # Check if relationship exists
             relationship_exists = self.query(check_rel_query, check_rel_params)
@@ -292,14 +264,20 @@ class KuzuInterface:
                 # Relationship doesn't exist - return False
                 return False
 
-            # Delete the specific relationship (we know it exists)
+            # Delete the specific relationship using Memory table and predicate-specific rel table
             delete_query = (
-                f"MATCH (a:{from_table} {{id: $from_id, user_id: $user_id}})"
-                f"-[r:{relationship_table_name}]->"
-                f"(b:{to_table} {{id: $to_id, user_id: $user_id}}) "
-                f"DELETE r"
+                "MATCH (a:Memory {id: $from_id, user_id: $user_id, memory_type: $from_type})"
+                f"-[r:{rel_type} {{user_id: $user_id}}]->"
+                "(b:Memory {id: $to_id, user_id: $user_id, memory_type: $to_type}) "
+                "DELETE r"
             )
-            delete_params = {"from_id": from_id, "to_id": to_id, "user_id": user_id}
+            delete_params = {
+                "from_id": from_id,
+                "to_id": to_id,
+                "user_id": user_id,
+                "from_type": from_table,
+                "to_type": to_table,
+            }
 
             # Execute deletion
             self.conn.execute(delete_query, parameters=delete_params)
@@ -375,18 +353,18 @@ class KuzuInterface:
         node_label: str,
         node_uuid: str,
         user_id: str,
-        rel_types: list[str] | None = None,
+        rel_types: list[str],
         direction: str = "any",
         limit: int = 10,
         neighbor_label: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Fetch neighbors of a node by UUID only.
+        """Fetch neighbors of a node using single relationship table.
 
         Args:
             node_label: Node type/table name (e.g., "Memory", "bug") - NOT a UUID.
             node_uuid: UUID of the specific node to find neighbors for.
             user_id: User ID for isolation - only return neighbors belonging to this user.
-            rel_types: List of relationship types to filter by.
+            rel_types: List of relationship predicates to filter by (required, validated against YAML).
             direction: "in", "out", or "any" for relationship direction.
             limit: Maximum number of neighbors to return.
             neighbor_label: Type of neighbor nodes to return.
@@ -409,58 +387,57 @@ class KuzuInterface:
             raise ValueError(f"node_uuid must be a valid UUID format, got: {node_uuid}")
 
         try:
-            # Use YamlTranslator to expand predicates to concrete relationship labels
-            if not self.yaml_translator:
-                raise DatabaseError(
-                    "YamlTranslator required for neighbor operations",
-                    operation="neighbors",
-                    context={"node_label": node_label, "rel_types": rel_types},
-                )
+            # CRITICAL: User isolation - use Memory table for relationship queries
+            node_condition = "a:Memory {id: $node_uuid, user_id: $user_id, memory_type: $node_type}"
 
-            # Get concrete relationship labels for this source and predicates
-            if rel_types:
-                relationship_labels = self.yaml_translator.get_labels_for_predicates(
-                    source_type=node_label,
-                    predicates=rel_types,
-                    neighbor_label=neighbor_label,
-                )
-                if not relationship_labels:
-                    # No matching relationships found - return empty
-                    return []
-
-                # Create relationship pattern with specific labels
-                rel_filter = "|".join(relationship_labels)
-                rel_part = f":{rel_filter}"
+            # Build neighbor condition - filter by neighbor_label if specified
+            if neighbor_label:
+                neighbor_condition = "n:Memory {user_id: $user_id, memory_type: $neighbor_type}"
             else:
-                # No filtering - match all relationships
-                rel_part = ""
+                neighbor_condition = "n:Memory {user_id: $user_id}"
 
-            # CRITICAL: User isolation - both source node and neighbors must belong to user
-            node_condition = f"a:{node_label} {{id: $node_uuid, user_id: $user_id}}"
-            neighbor = f":{neighbor_label}" if neighbor_label else ""
-            neighbor_condition = f"n{neighbor} {{user_id: $user_id}}"
+            # Build relationship pattern for predicate-specific tables
+            # The caller (GraphExpansionHandler) should have already filtered predicates based on YAML schema
+            # Trust that caller (GraphExpansionHandler) has already validated predicates against YAML schema
+            predicates_to_query = rel_types
 
-            # Build direction-aware pattern
-            if direction == "out":
-                pattern = f"({node_condition})-[r{rel_part}]->({neighbor_condition})"
-            elif direction == "in":
-                pattern = f"({node_condition})<-[r{rel_part}]-({neighbor_condition})"
-            else:
-                pattern = f"({node_condition})-[r{rel_part}]-({neighbor_condition})"
+            # Use UNION to query multiple predicate tables
+            patterns = []
+            for predicate in predicates_to_query:
+                if direction == "out":
+                    pattern = f"({node_condition})-[r:{predicate} {{user_id: $user_id}}]->({neighbor_condition})"
+                elif direction == "in":
+                    pattern = f"({node_condition})<-[r:{predicate} {{user_id: $user_id}}]-({neighbor_condition})"
+                else:
+                    pattern = f"({node_condition})-[r:{predicate} {{user_id: $user_id}}]-({neighbor_condition})"
 
-            # Return neighbors only if they belong to the same user
-            cypher = f"""
-            MATCH {pattern}
-            RETURN DISTINCT n.id as id,
-                            n.user_id as user_id,
-                            n.memory_type as memory_type,
-                            n.created_at as created_at,
-                            label(r) as rel_type,
-                            n as node
-            LIMIT $limit
-            """
-            params = {"node_uuid": node_uuid, "user_id": user_id, "limit": limit}
+                # Join Memory table with specific entity table to get full payload
+                # Note: We can't dynamically determine table name in Kuzu query, so we'll return Memory node
+                patterns.append(f"""
+                MATCH {pattern}
+                RETURN DISTINCT n.id as id,
+                                n.user_id as user_id,
+                                n.memory_type as memory_type,
+                                n.created_at as created_at,
+                                '{predicate}' as rel_type,
+                                n as node
+                """)
+
+            cypher = " UNION ".join(patterns) + " LIMIT $limit"
+
+            params = {
+                "node_uuid": node_uuid,
+                "user_id": user_id,
+                "node_type": node_label,
+                "limit": limit,
+            }
+
+            # Add neighbor_type parameter if filtering by neighbor label
+            if neighbor_label:
+                params["neighbor_type"] = neighbor_label
+
             return self.query(cypher, params)
+
         except Exception as e:
             raise DatabaseError(
                 "Failed to fetch neighbors",

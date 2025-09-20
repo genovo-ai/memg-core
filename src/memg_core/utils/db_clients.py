@@ -168,7 +168,7 @@ class DatabaseClients:
         """Get Kuzu interface using the initialized connection.
 
         Returns:
-            KuzuInterface: Configured with the DDL-created connection.
+            KuzuInterface: Configured with the DDL-created connection (no yaml_translator needed).
 
         Raises:
             DatabaseError: If connection not initialized (call init_dbs first).
@@ -178,7 +178,7 @@ class DatabaseClients:
                 "Kuzu connection not initialized. Call init_dbs() first.",
                 operation="get_kuzu_interface",
             )
-        return KuzuInterface(self.kuzu_connection, self.yaml_translator)
+        return KuzuInterface(self.kuzu_connection)
 
     def get_embedder(self) -> Embedder:
         """Get embedder instance.

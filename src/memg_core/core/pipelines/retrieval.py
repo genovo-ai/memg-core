@@ -495,12 +495,24 @@ class GraphExpansionHandler:
 
                 hop_processed_ids.add(seed_uuid)
 
-                # Get neighbors from Kuzu - using entity-specific tables
+                # Schema-driven predicate filtering: only query predicates valid for this entity type
+                if relation_names is None:
+                    # Get predicates that this entity type can actually participate in from YAML schema
+                    relations = self.yaml_translator.get_relations_for_source(seed.memory_type)
+                    schema_filtered_predicates = [rel["predicate"] for rel in relations]
+
+                    if not schema_filtered_predicates:
+                        # No relationships defined for this entity type in YAML - skip
+                        continue
+                else:
+                    schema_filtered_predicates = relation_names
+
+                # Get neighbors from Kuzu - using Memory table with schema-driven predicates
                 neighbor_rows = self.kuzu.neighbors(
-                    node_label=seed.memory_type,  # Use entity-specific table (bug, task, etc.)
+                    node_label=seed.memory_type,  # Memory type for filtering
                     node_uuid=seed_uuid,  # Use UUID for Kuzu queries
                     user_id=user_id,  # CRITICAL: User isolation
-                    rel_types=relation_names,  # None means all relations
+                    rel_types=schema_filtered_predicates,  # Schema-filtered predicates only
                     direction="any",
                     limit=neighbor_limit,
                     neighbor_label=None,  # Accept neighbors from any entity table
@@ -512,8 +524,21 @@ class GraphExpansionHandler:
                     if not neighbor_id or neighbor_id in hop_processed_ids:
                         continue
 
-                    # Build neighbor Memory object using centralized utility
-                    neighbor_memory = self.memory_serializer.from_kuzu_row(row)
+                    # Get full entity data from specific entity table
+                    neighbor_memory_type = row["memory_type"]
+                    entity_rows = self.kuzu.get_nodes(
+                        user_id=user_id,
+                        node_type=neighbor_memory_type,
+                        filters={"id": neighbor_id},
+                        limit=1,
+                    )
+
+                    if not entity_rows:
+                        # Entity not found in specific table - skip
+                        continue
+
+                    # Build neighbor Memory object using full entity data
+                    neighbor_memory = self.memory_serializer.from_kuzu_row(entity_rows[0])
 
                     # Project to anchor-only payload for neighbors
                     neighbor_memory.payload = self.payload_projector.project(
