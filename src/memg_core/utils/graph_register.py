@@ -121,68 +121,46 @@ class GraphRegister:
 
         return ddl_statements
 
-    def generate_relationship_tables_ddl(self) -> list[str]:
-        """Generate DDL for relationship tables from YAML schema using YamlTranslator.
+    def generate_memory_base_table_ddl(self) -> str:
+        """Generate DDL for base Memory table used for relationships.
 
-        Uses YamlTranslator to discover relations and centralized table naming.
-        Handles directed/undirected semantics for table creation.
+        All entities are also stored in this table to enable unified relationship model.
+        Contains only system fields needed for relationships and filtering.
 
         Returns:
-            List of DDL strings for relationship tables
-
-        Raises:
-            DatabaseError: If YamlTranslator not provided or schema access fails
+            DDL string for Memory table
         """
-        if not self.yaml_translator:
-            # Return empty list if no YamlTranslator - maintains compatibility
-            return []
+        ddl = """CREATE NODE TABLE IF NOT EXISTS Memory(
+                id STRING,
+                user_id STRING,
+                memory_type STRING,
+                created_at STRING,
+                updated_at STRING,
+                PRIMARY KEY (id)
+        )"""
+
+        return ddl
+
+    def generate_relationship_tables_ddl(self) -> list[str]:
+        """Generate DDL for predicate-based relationship tables.
+
+        Creates one relationship table per predicate type (RELATES_TO, ANNOTATES, etc.).
+        Each table connects Memory nodes, eliminating entity combination explosion.
+
+        Returns:
+            List of DDL strings, one per predicate type
+        """
+        # Get all predicates from TypeRegistry
+        predicates = self.type_registry.get_valid_predicates()
 
         ddl_statements = []
-        created_tables = set()  # Track unique table names to avoid duplicates
-
-        try:
-            # Use YamlTranslator to discover all relations across all entities
-            for entity_name in self.yaml_translator.get_entity_types():
-                relation_specs = self.yaml_translator.get_relations_for_source(entity_name)
-
-                for spec in relation_specs:
-                    # Validate predicate against TypeRegistry
-                    predicate = spec["predicate"]
-                    if not self.type_registry.validate_relation_predicate(predicate):
-                        raise DatabaseError(
-                            f"Invalid predicate '{predicate}' not found in TypeRegistry",
-                            operation="generate_relationship_tables_ddl",
-                            context={"predicate": predicate, "spec": spec},
-                        )
-
-                    # Generate table name using centralized helper
-                    table_name = self.yaml_translator.relationship_table_name(
-                        source=spec["source"],
-                        predicate=spec["predicate"],
-                        target=spec["target"],
-                        directed=spec["directed"],
-                    )
-
-                    # Skip if we've already created this table
-                    if table_name in created_tables:
-                        continue
-
-                    created_tables.add(table_name)
-
-                    # Create DDL - direction affects semantics but not table structure
-                    ddl = f"""CREATE REL TABLE IF NOT EXISTS {table_name}(
-                        FROM {spec["source"]} TO {spec["target"]}
-                    )"""
-                    ddl_statements.append(ddl)
-
-        except Exception as e:
-            if isinstance(e, DatabaseError):
-                raise
-            raise DatabaseError(
-                "Failed to generate relationship tables DDL",
-                operation="generate_relationship_tables_ddl",
-                original_error=e,
-            ) from e
+        for predicate in predicates:
+            # Create relationship table for this predicate
+            ddl = f"""CREATE REL TABLE IF NOT EXISTS {predicate}(
+                FROM Memory TO Memory,
+                user_id STRING
+            )"""
+            ddl_statements.append(ddl)
 
         return ddl_statements
 
@@ -213,10 +191,13 @@ class GraphRegister:
         """
         ddl_statements = []
 
-        # Entity tables
+        # Base Memory table (for relationships)
+        ddl_statements.append(self.generate_memory_base_table_ddl())
+
+        # Entity tables (separate table per node type)
         ddl_statements.extend(self.generate_all_entity_tables_ddl())
 
-        # Relationship tables
+        # Relationship tables (one table per predicate type)
         ddl_statements.extend(self.generate_relationship_tables_ddl())
 
         # System tables

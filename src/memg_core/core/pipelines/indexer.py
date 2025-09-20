@@ -112,8 +112,19 @@ class MemoryService:
                     context={"memory_id": memory.id},
                 )
 
-            # Add to Kuzu (graph storage) - use entity-specific table
+            # Add to Kuzu (graph storage) - dual insertion for hybrid architecture
+            # 1. Add to entity-specific table (full data for detailed queries)
             self.kuzu.add_node(memory_type, kuzu_data)
+
+            # 2. Add to base Memory table (system fields only for relationships)
+            memory_data = {
+                "id": kuzu_data["id"],
+                "user_id": kuzu_data["user_id"],
+                "memory_type": kuzu_data["memory_type"],
+                "created_at": kuzu_data["created_at"],
+                "updated_at": kuzu_data["updated_at"],
+            }
+            self.kuzu.add_node("Memory", memory_data)
 
             # Create HRID mapping after successful storage
             self.hrid_tracker.create_mapping(hrid, memory.id, memory_type, user_id)

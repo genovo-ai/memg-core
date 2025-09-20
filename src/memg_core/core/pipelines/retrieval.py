@@ -495,12 +495,24 @@ class GraphExpansionHandler:
 
                 hop_processed_ids.add(seed_uuid)
 
-                # Get neighbors from Kuzu - using entity-specific tables
+                # Schema-driven predicate filtering: only query predicates valid for this entity type
+                if relation_names is None:
+                    # Get predicates that this entity type can actually participate in from YAML schema
+                    relations = self.yaml_translator.get_relations_for_source(seed.memory_type)
+                    schema_filtered_predicates = [rel["predicate"] for rel in relations]
+
+                    if not schema_filtered_predicates:
+                        # No relationships defined for this entity type in YAML - skip
+                        continue
+                else:
+                    schema_filtered_predicates = relation_names
+
+                # Get neighbors from Kuzu - using Memory table with schema-driven predicates
                 neighbor_rows = self.kuzu.neighbors(
-                    node_label=seed.memory_type,  # Use entity-specific table (bug, task, etc.)
+                    node_label=seed.memory_type,  # Memory type for filtering
                     node_uuid=seed_uuid,  # Use UUID for Kuzu queries
                     user_id=user_id,  # CRITICAL: User isolation
-                    rel_types=relation_names,  # None means all relations
+                    rel_types=schema_filtered_predicates,  # Schema-filtered predicates only
                     direction="any",
                     limit=neighbor_limit,
                     neighbor_label=None,  # Accept neighbors from any entity table
@@ -512,8 +524,21 @@ class GraphExpansionHandler:
                     if not neighbor_id or neighbor_id in hop_processed_ids:
                         continue
 
-                    # Build neighbor Memory object using centralized utility
-                    neighbor_memory = self.memory_serializer.from_kuzu_row(row)
+                    # Get full entity data from specific entity table
+                    neighbor_memory_type = row["memory_type"]
+                    entity_rows = self.kuzu.get_nodes(
+                        user_id=user_id,
+                        node_type=neighbor_memory_type,
+                        filters={"id": neighbor_id},
+                        limit=1,
+                    )
+
+                    if not entity_rows:
+                        # Entity not found in specific table - skip
+                        continue
+
+                    # Build neighbor Memory object using full entity data
+                    neighbor_memory = self.memory_serializer.from_kuzu_row(entity_rows[0])
 
                     # Project to anchor-only payload for neighbors
                     neighbor_memory.payload = self.payload_projector.project(
@@ -865,7 +890,7 @@ class SearchService:
         hops: int = 1,
         relation_types: list[str] | None = None,
         neighbor_limit: int = 5,
-    ) -> dict[str, Any] | None:
+    ) -> SearchResult | None:
         """Get a single memory by HRID with optional neighbor expansion.
 
         Args:
@@ -878,7 +903,7 @@ class SearchService:
             neighbor_limit: Maximum neighbors to return per hop (default 5).
 
         Returns:
-            dict[str, Any] | None: Memory data with full payload and optional neighbors, or None if not found.
+            SearchResult | None: SearchResult with single memory as seed and optional neighbors, or None if not found.
         """
         try:
             # Infer memory type from HRID if not provided
@@ -900,58 +925,17 @@ class SearchService:
             if payload.get("user_id") != user_id:
                 return None
 
-            # Build response with full memory information (HRID-only policy - no UUID exposure)
-            memory_data = {
-                "hrid": hrid,
-                "memory_type": payload.get("memory_type", memory_type),
-                "user_id": user_id,
-                "created_at": payload.get("created_at"),
-                "updated_at": payload.get("updated_at"),
-                "payload": {
-                    k: v
-                    for k, v in payload.items()
-                    if k
-                    not in (
-                        "id",
-                        "user_id",
-                        "memory_type",
-                        "created_at",
-                        "updated_at",
-                        "hrid",
-                    )
-                },
-            }
+            # Build Memory object using existing serializer
+            memory = self.memory_serializer.from_qdrant_point(uuid, payload)
 
-            # Add neighbor expansion if requested
+            # Convert to MemorySeed using existing infrastructure
+            memory_seed = self.memory_serializer.to_memory_seed(
+                memory, 1.0
+            )  # Score 1.0 for direct retrieval
+
+            # Handle neighbor expansion if requested
+            neighbors: list[MemoryNeighbor] = []
             if include_neighbors and hops > 0:
-                # Convert memory to MemorySeed for graph expansion
-                created_at = memory_data.get("created_at")
-                updated_at = memory_data.get("updated_at")
-
-                # Parse datetime strings if they exist, otherwise use current time
-                if isinstance(created_at, str):
-                    created_at = _parse_datetime(created_at)
-                elif created_at is None:
-                    created_at = datetime.now(UTC)
-
-                if isinstance(updated_at, str):
-                    updated_at = _parse_datetime(updated_at)
-                elif updated_at is None:
-                    updated_at = datetime.now(UTC)
-
-                # Create MemorySeed for graph expansion
-                memory_seed = MemorySeed(
-                    user_id=user_id,
-                    hrid=hrid,
-                    memory_type=memory_data["memory_type"],
-                    created_at=created_at,
-                    updated_at=updated_at,
-                    payload=memory_data["payload"],
-                    score=1.0,  # Not from vector search, so use 1.0
-                    relationships=[],  # Will be populated by graph expansion
-                )
-
-                # Use graph handler to expand neighbors
                 neighbors = self.graph_handler.expand_neighbors(
                     seeds=[memory_seed],
                     user_id=user_id,
@@ -962,42 +946,11 @@ class SearchService:
                     neighbor_threshold=None,  # No threshold filtering
                 )
 
-                # Add neighbors and relationships to response
-                memory_data["neighbors"] = [
-                    {
-                        "hrid": neighbor.hrid,
-                        "memory_type": neighbor.memory_type,
-                        "created_at": neighbor.created_at.isoformat()
-                        if neighbor.created_at
-                        else None,
-                        "updated_at": neighbor.updated_at.isoformat()
-                        if neighbor.updated_at
-                        else None,
-                        "payload": neighbor.payload,  # Already projected to anchor-only
-                        "score": neighbor.score,
-                    }
-                    for neighbor in neighbors
-                ]
-
-                # Add relationships from the seed (populated by expand_neighbors)
-                memory_data["relationships"] = [
-                    {
-                        "relation_type": rel.relation_type,
-                        "target_hrid": rel.target_hrid,
-                        "score": rel.score,
-                        "relationships": [
-                            {
-                                "relation_type": nested_rel.relation_type,
-                                "target_hrid": nested_rel.target_hrid,
-                                "score": nested_rel.score,
-                            }
-                            for nested_rel in rel.relationships
-                        ],
-                    }
-                    for rel in memory_seed.relationships
-                ]
-
-            return memory_data
+            # Return unified SearchResult
+            return SearchResult(
+                memories=[memory_seed],
+                neighbors=neighbors,
+            )
 
         except (DatabaseError, ValueError, KeyError):
             return None
@@ -1011,7 +964,7 @@ class SearchService:
         offset: int = 0,
         include_neighbors: bool = False,
         hops: int = 1,
-    ) -> list[dict[str, Any]]:
+    ) -> SearchResult:
         """Get multiple memories with filtering and optional graph expansion.
 
         Args:
@@ -1024,7 +977,7 @@ class SearchService:
             hops: Number of hops for neighbor expansion (default 1).
 
         Returns:
-            list[dict[str, Any]]: List of memory data with full payloads.
+            SearchResult: SearchResult with memories as seeds and optional neighbors.
         """
         try:
             # Use KuzuInterface to get nodes with filtering
@@ -1036,74 +989,27 @@ class SearchService:
                 offset=offset,
             )
 
-            # Convert Kuzu results directly to memory data
-            memories = []
+            # Convert Kuzu results to MemorySeeds using existing infrastructure
+            memory_seeds: list[MemorySeed] = []
             for result in results:
-                node_data = result.get("node", {})
-
-                # Get HRID from UUID
+                # Get UUID and HRID
                 uuid = result.get("id")
                 hrid = self.hrid_tracker.get_hrid(uuid, user_id) if uuid else None
-
                 if not hrid:
                     continue
 
-                # Filter out UUID fields from payload (consumers should only see HRIDs)
-                filtered_payload = {
-                    k: v for k, v in node_data.items() if k not in ["id", "_id", "uuid"]
-                }
+                # Build Memory object using existing serializer
+                memory = self.memory_serializer.from_kuzu_row(result)
 
-                # Build memory data directly
-                memory_data = {
-                    "hrid": hrid,
-                    "memory_type": result.get("memory_type"),
-                    "user_id": user_id,
-                    "created_at": result.get("created_at"),
-                    "updated_at": result.get("updated_at"),
-                    "payload": filtered_payload,
-                    "score": 1.0,  # Not from vector search
-                    "source": "kuzu_query",
-                    "metadata": {"query_type": "get_memories"},
-                }
+                # Convert to MemorySeed using existing infrastructure
+                memory_seed = self.memory_serializer.to_memory_seed(
+                    memory, 1.0
+                )  # Score 1.0 for direct retrieval
+                memory_seeds.append(memory_seed)
 
-                memories.append(memory_data)
-
-            # Apply graph expansion if requested
-            if include_neighbors and memories:
-                # Convert to MemorySeed objects for graph expansion
-                memory_seeds = []
-                for memory_data in memories:
-                    # Create MemorySeed directly from memory_data
-                    hrid = memory_data["hrid"]
-
-                    # Create MemorySeed
-                    created_at = memory_data.get("created_at")
-                    updated_at = memory_data.get("updated_at")
-
-                    # Parse datetime strings if they exist, otherwise use current time
-                    if isinstance(created_at, str):
-                        created_at = _parse_datetime(created_at)
-                    elif created_at is None:
-                        created_at = datetime.now(UTC)
-
-                    if isinstance(updated_at, str):
-                        updated_at = _parse_datetime(updated_at)
-                    elif updated_at is None:
-                        updated_at = datetime.now(UTC)
-
-                    seed = MemorySeed(
-                        user_id=user_id,
-                        hrid=hrid,
-                        memory_type=memory_data["memory_type"],
-                        created_at=created_at,
-                        updated_at=updated_at,
-                        payload=memory_data["payload"],
-                        score=memory_data["score"],
-                        relationships=[],  # Will be populated by graph expansion
-                    )
-                    memory_seeds.append(seed)
-
-                # Apply graph expansion using the graph handler
+            # Handle neighbor expansion if requested
+            neighbors: list[MemoryNeighbor] = []
+            if include_neighbors and memory_seeds and hops > 0:
                 neighbors = self.graph_handler.expand_neighbors(
                     seeds=memory_seeds,
                     user_id=user_id,
@@ -1111,46 +1017,19 @@ class SearchService:
                     neighbor_limit=5,  # Default limit
                     hops=hops,
                     projection=None,
+                    neighbor_threshold=None,  # No threshold filtering
                 )
 
-                # Create SearchResult to maintain consistency
-                expanded_result = SearchResult(
-                    memories=memory_seeds,
-                    neighbors=neighbors,
-                )
-
-                # Convert back to dict format for API compatibility
-                expanded_memories = []
-                for seed in expanded_result.memories:
-                    memory_data = {
-                        "hrid": seed.hrid,
-                        "memory_type": seed.memory_type,
-                        "user_id": user_id,  # Use the user_id parameter
-                        "created_at": None,  # Not available in MemorySeed
-                        "updated_at": None,  # Not available in MemorySeed
-                        "payload": seed.payload,
-                        "score": seed.score,
-                        "source": "kuzu_query_expanded",
-                        "metadata": {"query_type": "get_memories_expanded"},
-                        "relationships": [
-                            {
-                                "relation_type": rel.relation_type,
-                                "target_hrid": rel.target_hrid,
-                                "score": rel.score,
-                            }
-                            for rel in seed.relationships
-                        ],
-                    }
-                    expanded_memories.append(memory_data)
-
-                return expanded_memories
-
-            return memories
+            # Return unified SearchResult
+            return SearchResult(
+                memories=memory_seeds,
+                neighbors=neighbors,
+            )
 
         except (DatabaseError, ValueError, KeyError) as e:
             # Log the error instead of silently failing
             logging.error(f"get_memories() failed: {type(e).__name__}: {e}", exc_info=True)
-            return []
+            return SearchResult()  # Return empty SearchResult instead of empty list
 
 
 def create_search_service(db_clients) -> SearchService:

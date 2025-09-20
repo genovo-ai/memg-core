@@ -194,58 +194,10 @@ class YamlTranslator:
                 )
         return out
 
-    @staticmethod
-    def relationship_table_name(
-        source: str,
-        predicate: str,
-        target: str,
-        *,
-        directed: bool = True,  # noqa: unused-argument
-    ) -> str:
-        """Generate relationship table name.
-
-        For now, table name does not encode direction; direction affects creation/query semantics.
-        Canonicalization for undirected pairs can be added here later if decided.
-        """
-        return f"{str(source).upper()}_{str(predicate).upper()}_{str(target).upper()}"
-
-    def get_labels_for_predicates(
-        self,
-        source_type: str,
-        predicates: list[str] | None,
-        neighbor_label: str | None = None,
-    ) -> list[str]:
-        """Expand predicate names to concrete relationship labels for a given source.
-
-        Args:
-            source_type: Source entity type name
-            predicates: List of predicate names to include (case-insensitive). If None, include all.
-            neighbor_label: Optional target entity type filter (case-insensitive)
-
-        Returns:
-            List of concrete relationship labels (table names) matching the filter.
-        """
-        if not source_type:
-            raise YamlTranslatorError("Empty source_type")
-
-        preds_u = set(p.upper() for p in predicates) if predicates else None
-        neighbor_l = neighbor_label.lower() if neighbor_label else None
-
-        labels: list[str] = []
-        for spec in self.get_relations_for_source(source_type):
-            if preds_u is not None and spec["predicate"].upper() not in preds_u:
-                continue
-            if neighbor_l is not None and spec["target"].lower() != neighbor_l:
-                continue
-            labels.append(
-                self.relationship_table_name(
-                    source=spec["source"],
-                    predicate=spec["predicate"],
-                    target=spec["target"],
-                    directed=spec["directed"],
-                )
-            )
-        return labels
+    # REMOVED: Table explosion methods no longer needed with single relationship table
+    # - relationship_table_name(): Generated complex table names like NOTE_ANNOTATES_DOCUMENT
+    # - get_labels_for_predicates(): Expanded predicates to multiple table labels
+    # These methods caused the table explosion anti-pattern and are no longer used.
 
     def debug_relation_map(self) -> dict[str, dict[str, list[dict[str, Any]]]]:
         """Return a nested relation map for debugging/printing.
