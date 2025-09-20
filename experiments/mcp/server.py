@@ -612,26 +612,3 @@ def create_app() -> FastMCP:
 
 # Create the app instance for FastMCP to run
 mcp_app = create_app()
-
-# Optional: Traditional Python execution (for development)
-if __name__ == "__main__":
-    port = int(os.getenv("MEMORY_SYSTEM_MCP_PORT", "8778"))
-    host = os.getenv("MEMORY_SYSTEM_MCP_HOST", "127.0.0.1")
-
-    print(f"🚀 MEMG Core MCP Server (Production) v{__version__} on {host}:{port}")
-    print(f"📋 YAML: {os.getenv('MEMG_YAML_SCHEMA', 'NOT CONFIGURED')}")
-    print(f"💾 DB: {os.getenv('MEMG_DB_PATH', 'NOT CONFIGURED')}")
-    print(f"🏥 Health: http://{host}:{port}/health")
-
-    try:
-        print(f"🌐 Starting server on {host}:{port}")
-        mcp_app.run(transport="http", host=host, port=port)
-    except KeyboardInterrupt:
-        print("\n🛑 Shutting down...")
-    except Exception as e:
-        logger.error(f"❌ Server error: {e}")
-        raise
-    finally:
-        print("🔌 Closing client...")
-        close_client()
-        print("✅ Shutdown completed")
