@@ -189,7 +189,9 @@ def register_search_tools(app: FastMCP) -> None:
         hops: int = Field(1, description="Graph traversal depth (default: 1)"),
         score_threshold: Optional[float] = Field(None, description="Minimum similarity score threshold (0.0-1.0)"),
         decay_rate: Optional[float] = Field(None, description="Score decay factor per hop (1.0 = no decay)"),
-        decay_threshold: Optional[float] = Field(None, description="Explicit neighbor score threshold")
+        decay_threshold: Optional[float] = Field(None, description="Explicit neighbor score threshold"),
+        include_details: str = Field("self", description="Detail level: 'self' (seeds full, neighbors anchor), 'all' (both full), 'none' (both anchor)"),
+        datetime_format: Optional[str] = Field(None, description="Datetime format string (e.g., '%Y-%m-%d %H:%M:%S')")
     ) -> Dict[str, Any]:
         """Search memories - direct API call."""
 
@@ -215,7 +217,9 @@ def register_search_tools(app: FastMCP) -> None:
                 hops=hops,
                 score_threshold=score_threshold,
                 decay_rate=decay_rate,
-                decay_threshold=decay_threshold
+                decay_threshold=decay_threshold,
+                include_details=include_details,
+                datetime_format=datetime_format
             )
 
             logger.info(f"Search result: {len(result.memories)} memories, {len(result.neighbors)} neighbors")
