@@ -88,6 +88,92 @@ def close_client() -> None:
             _client = None
             _yaml_translator = None
 
+# ========================= YAML SCHEMA HELPERS =========================
+
+def _get_entity_description(memory_type: str, yaml_translator: YamlTranslator) -> str:
+    """Get entity description from YAML schema."""
+    try:
+        entities_map = yaml_translator._entities_map()
+        entity_spec = entities_map.get(memory_type.lower())
+        if entity_spec and "description" in entity_spec:
+            return f"Add a {memory_type}: {entity_spec['description']}"
+    except Exception:
+        pass
+    return f"Add a {memory_type} memory"
+
+def _get_entity_field_info(memory_type: str, yaml_translator: YamlTranslator) -> str:
+    """Get field information for entity from YAML schema."""
+    try:
+        entities_map = yaml_translator._entities_map()
+        entity_spec = entities_map.get(memory_type.lower())
+        if not entity_spec:
+            return f"Data fields for {memory_type}"
+
+        # Get all fields including inherited ones
+        all_fields = yaml_translator._resolve_inherited_fields(entity_spec)
+        system_fields = yaml_translator._get_system_fields(entity_spec)
+
+        # Filter out system fields for user payload
+        user_fields = []
+        for field_name, field_def in all_fields.items():
+            if field_name not in system_fields:
+                field_info = f"{field_name}"
+                if isinstance(field_def, dict):
+                    field_type = field_def.get("type", "string")
+                    required = field_def.get("required", False)
+                    choices = field_def.get("choices")
+                    default = field_def.get("default")
+
+                    # Build field description
+                    parts = [f"({field_type}"]
+                    if required:
+                        parts.append("required")
+                    if choices:
+                        parts.append(f"choices: {choices}")
+                    if default is not None:
+                        parts.append(f"default: {default}")
+                    parts.append(")")
+
+                    field_info += " " + "".join(parts)
+
+                user_fields.append(field_info)
+
+        if user_fields:
+            return f"Data fields for {memory_type}: {', '.join(user_fields)}"
+    except Exception as e:
+        logger.warning(f"Failed to get field info for {memory_type}: {e}")
+
+    return f"Data fields for {memory_type}"
+
+def _get_valid_predicates_for_relationship(from_type: str, to_type: str, yaml_translator: YamlTranslator) -> list[str]:
+    """Get valid predicates between two entity types from YAML schema."""
+    try:
+        relations = yaml_translator.get_relations_for_source(from_type)
+        valid_predicates = []
+        for rel in relations:
+            if rel['target'] == to_type.lower():
+                valid_predicates.append(rel['predicate'])
+        return valid_predicates
+    except Exception as e:
+        logger.warning(f"Failed to get valid predicates for {from_type} -> {to_type}: {e}")
+        return []
+
+def _get_all_valid_predicates_for_entity(entity_type: str, yaml_translator: YamlTranslator) -> Dict[str, list[str]]:
+    """Get all valid predicates for an entity type, organized by target type."""
+    try:
+        relations = yaml_translator.get_relations_for_source(entity_type)
+        predicates_by_target = {}
+        for rel in relations:
+            target = rel['target']
+            predicate = rel['predicate']
+            if target not in predicates_by_target:
+                predicates_by_target[target] = []
+            predicates_by_target[target].append(predicate)
+        return predicates_by_target
+    except Exception as e:
+        logger.warning(f"Failed to get all predicates for {entity_type}: {e}")
+        return {}
+
 # ========================= TOOL REGISTRATION =========================
 
 def register_search_tools(app: FastMCP) -> None:
@@ -312,20 +398,14 @@ def _register_add_tool(app: FastMCP, memory_type: str, yaml_translator: YamlTran
 
     tool_name = f"add_{memory_type}"
 
-    # Get description from YAML
-    try:
-        entities_map = yaml_translator._entities_map()
-        entity_spec = entities_map.get(memory_type.lower())
-        description = f"Add a {memory_type}"
-        if entity_spec and "description" in entity_spec:
-            description = f"Add a {memory_type}: {entity_spec['description']}"
-    except Exception:
-        description = f"Add a {memory_type} memory"
+    # Get dynamic description and field info from YAML
+    description = _get_entity_description(memory_type, yaml_translator)
+    field_info = _get_entity_field_info(memory_type, yaml_translator)
 
     @app.tool(tool_name, description=description)
     def add_tool(
         user_id: str = Field(..., description="User identifier - separates user's memories from each other"),
-        data: Dict[str, Any] = Field(..., description=f"Data fields for {memory_type}")
+        data: Dict[str, Any] = Field(..., description=field_info)
     ) -> Dict[str, Any]:
         """Add memory - direct API call."""
 
@@ -449,7 +529,6 @@ def register_other_tools(app: FastMCP) -> None:
         from_memory_type: str = Field(..., description="Source entity type"),
         to_memory_type: str = Field(..., description="Target entity type"),
         user_id: str = Field(..., description="User identifier"),
-        properties: Optional[Dict[str, Any]] = Field(None, description="Additional relationship properties (optional)")
     ) -> Dict[str, Any]:
         """Add relationship - direct API call."""
 
@@ -472,7 +551,6 @@ def register_other_tools(app: FastMCP) -> None:
                 from_memory_type=from_memory_type.strip(),
                 to_memory_type=to_memory_type.strip(),
                 user_id=user_id.strip(),
-                properties=properties
             )
 
             return {
@@ -484,12 +562,43 @@ def register_other_tools(app: FastMCP) -> None:
 
         except Exception as e:
             logger.error(f"Add relationship failed: {e}", exc_info=True)
-            return {
-                "error": f"Failed to add relationship: {str(e)}",
+
+            # Enhanced error message with valid predicates
+            error_msg = str(e)
+            enhanced_error = {
+                "error": f"Failed to add relationship: {error_msg}",
                 "from_hrid": from_memory_hrid,
                 "to_hrid": to_memory_hrid,
                 "relation_type": relation_type
             }
+
+            # If it's a validation error, provide helpful suggestions
+            if "Invalid relationship predicate" in error_msg or "predicate" in error_msg.lower():
+                try:
+                    yaml_translator = get_yaml_translator()
+
+                    # Get valid predicates for this specific relationship
+                    valid_predicates = _get_valid_predicates_for_relationship(
+                        from_memory_type.strip(), to_memory_type.strip(), yaml_translator
+                    )
+
+                    if valid_predicates:
+                        enhanced_error["valid_predicates_for_this_relationship"] = valid_predicates
+                        enhanced_error["suggestion"] = f"Valid predicates from {from_memory_type} to {to_memory_type}: {', '.join(valid_predicates)}"
+                    else:
+                        # No direct relationship exists, show all possible relationships for source type
+                        all_predicates = _get_all_valid_predicates_for_entity(from_memory_type.strip(), yaml_translator)
+                        if all_predicates:
+                            enhanced_error["valid_relationships_for_source"] = all_predicates
+                            enhanced_error["suggestion"] = f"No direct relationship allowed from {from_memory_type} to {to_memory_type}. Valid relationships for {from_memory_type}: {dict(all_predicates)}"
+                        else:
+                            enhanced_error["suggestion"] = f"Entity type '{from_memory_type}' has no outgoing relationships defined in the schema"
+
+                except Exception as schema_error:
+                    logger.warning(f"Failed to get relationship suggestions: {schema_error}")
+                    enhanced_error["suggestion"] = "Check the YAML schema for valid relationship types between these entity types"
+
+            return enhanced_error
 
     @app.tool("delete_relationship", description="Delete a relationship between two memories.")
     def delete_relationship(
