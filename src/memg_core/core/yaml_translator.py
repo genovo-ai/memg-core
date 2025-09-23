@@ -284,6 +284,46 @@ class YamlTranslator:
             # Fall back to anchor field if any error
             return self.get_anchor_field(entity_name)
 
+    def get_force_display_fields(self, entity_name: str) -> list[str]:
+        """Get the list of fields that should always be displayed from YAML schema.
+
+        Args:
+            entity_name: Entity type name.
+
+        Returns:
+            list[str]: List of field names to always include in display.
+        """
+        try:
+            entity_spec = self._resolve_entity_with_inheritance(entity_name)
+            override_section = entity_spec.get("override", {})
+            force_display = override_section.get("force_display", [])
+
+            if isinstance(force_display, list):
+                return force_display
+            return []
+        except Exception:
+            return []
+
+    def get_exclude_display_fields(self, entity_name: str) -> list[str]:
+        """Get the list of fields that should never be displayed from YAML schema.
+
+        Args:
+            entity_name: Entity type name.
+
+        Returns:
+            list[str]: List of field names to always exclude from display.
+        """
+        try:
+            entity_spec = self._resolve_entity_with_inheritance(entity_name)
+            override_section = entity_spec.get("override", {})
+            exclude_display = override_section.get("exclude_display", [])
+
+            if isinstance(exclude_display, list):
+                return exclude_display
+            return []
+        except Exception:
+            return []
+
     def get_display_text(self, memory) -> str:
         """Get display text for a memory, using YAML-defined display field.
 

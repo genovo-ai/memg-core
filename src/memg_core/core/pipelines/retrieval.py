@@ -70,28 +70,35 @@ class PayloadProjector:
         # Get anchor field from YAML schema - crash if missing
         anchor_field = self.yaml_translator.get_anchor_field(memory_type)
 
-        # Get override field lists
-        force_display_fields = payload.get("force_display", [])
-        exclude_display_fields = payload.get("exclude_display", [])
+        # Get override field lists from YAML schema (not from payload)
+        force_display_fields = self.yaml_translator.get_force_display_fields(memory_type)
+        exclude_display_fields = self.yaml_translator.get_exclude_display_fields(memory_type)
 
-        # Ensure they are lists
-        if not isinstance(force_display_fields, list):
-            force_display_fields = []
-        if not isinstance(exclude_display_fields, list):
-            exclude_display_fields = []
+        # Get display field from YAML (e.g., "title" instead of "statement")
+        display_field = self.yaml_translator.get_display_field_name(memory_type)
 
         if include_details == "none":
             # Start with anchor field only
             result = {anchor_field: payload[anchor_field]}
         else:
-            # include_details in ["self", "all"] - start with full payload
-            result = dict(payload)
+            # include_details in ["self", "all"] - build payload with display field first
+            result = {}
+
+            # 1. Add display field first (gives it prominence in UI)
+            if display_field in payload:
+                result[display_field] = payload[display_field]
+
+            # 2. Add other fields (avoid duplicating display field)
+            for key, value in payload.items():
+                if key != display_field:
+                    result[key] = value
 
             # Apply projection filtering if provided
             if projection and memory_type in projection:
                 allowed_fields = set(projection[memory_type])
-                # Always include anchor field
+                # Always include anchor field and display field
                 allowed_fields.add(anchor_field)
+                allowed_fields.add(display_field)
                 result = {k: v for k, v in result.items() if k in allowed_fields}
 
         # Apply force_display: add any fields from the force list that exist in payload
@@ -106,17 +113,6 @@ class PayloadProjector:
         # Always ensure anchor field is present (unless explicitly excluded)
         if anchor_field not in exclude_display_fields and anchor_field in payload:
             result[anchor_field] = payload[anchor_field]
-
-        # Add computed display_text field using YAML-defined display field
-        # This prioritizes the field specified in YAML override.display_name over anchor field
-        if "display_text" not in exclude_display_fields:
-            display_field = self.yaml_translator.get_display_field_name(memory_type)
-            display_text = payload.get(display_field)
-
-            if display_text and isinstance(display_text, str) and display_text.strip():
-                result["display_text"] = display_text.strip()
-            elif anchor_field in payload:
-                result["display_text"] = payload[anchor_field]
 
         return result
 

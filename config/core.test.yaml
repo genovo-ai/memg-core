@@ -23,10 +23,6 @@ entities:
       created_at:  { type: datetime, required: true, system: true }
       updated_at:  { type: datetime, system: true }
       vector:      { type: vector, anchored_to: statement, system: true }
-    override:
-      display_name: statement  # Use 'statement' field for display (same as anchor - no change)
-      force_display: { type: list, required: false }
-      exclude_display: { type: list, required: false }
     relations:
       memo:
         - name: memo_related
@@ -34,87 +30,33 @@ entities:
           predicate: RELATED_TO
           directed: false
 
-  - name: note
-    parent: memo
-    description: "General note or observation to memorize"
-    fields:
-      project: { type: string }  # Optional project namespace for filtering
-      origin: { type: enum, choices: [system, user], default: system } # source of the note
-    relations:
-      note:
-        - name: note_related_to_note
-          description: "Generic relation between notes"
-          predicate: RELATED_TO
-          directed: false
-      document:
-        - name: note_annotates_document
-          description: "Note providing context to a document"
-          predicate: ANNOTATES
-          directed: true
-      task:
-        - name: note_annotates_task
-          description: "Note associated with a task"
-          predicate: ANNOTATES
-          directed: true
-
+  # Test entity 1: Document with details-based display and force/exclude rules
   - name: document
     parent: memo
-    description: "Document-like memo with extended content"
+    description: "Document for testing display_name override"
     fields:
-      project: { type: string }  # Optional project namespace for filtering
+      title: { type: string, required: true, max_length: 200 }
       details: { type: string, required: true }
-      url:     { type: string }  # Reference URL for external docs
-    relations:
-      note:
-        - name: document_referenced_by_note
-          description: "Document referenced by a note"
-          predicate: REFERENCED_BY
-          directed: true
-      task:
-        - name: document_supports_task
-          description: "Document providing details or requirements for a task"
-          predicate: SUPPORTS
-          directed: true
+      project: { type: string }
+      draft: { type: string }  # Field to test exclusion
+    override:
+      display_name: title  # Display uses 'title' field instead of 'statement'
+      force_display: [details]  # Always show details field
+      exclude_display: [draft]  # Never show draft field
+    # Note: vectorization still uses 'statement' (inherited anchor field)
 
-  - name: task
-    parent: memo
-    description: "Test task or work item"
-    fields:
-      project:     { type: string }  # Optional project namespace for filtering
-      details:     { type: string }
-      status:      { type: enum, choices: [todo, in_progress, done, cancelled], default: todo }
-      priority:    { type: enum, choices: [low, medium, high, urgent], default: medium }
-      assignee:    { type: string }  # Optional assignee
-    relations:
-      task:
-        - name: task_blocks_task
-          description: "Task blocking another task"
-          predicate: BLOCKS
-          directed: true
-        - name: task_depends_on_task
-          description: "Task depending on another task"
-          predicate: DEPENDS_ON
-          directed: true
-      document:
-        - name: task_references_document
-          description: "Task references a document for context"
-          predicate: REFERENCES
-          directed: true
-      note:
-        - name: task_relates_to_note
-          description: "Task is related to a note"
-          predicate: RELATES_TO
-          directed: true
-
-  # Test entity: Article with title for display, statement for vectorization
+  # Test entity 2: Article with comprehensive override testing
   - name: article
     parent: memo
-    description: "Article with title-based display for testing override functionality"
+    description: "Article for testing complex override scenarios"
     fields:
       title: { type: string, required: true, max_length: 200 }
       summary: { type: string, required: false, max_length: 1000 }
-      project: { type: string }  # Optional project namespace
+      author: { type: string }
+      internal_notes: { type: string }  # Field to test exclusion
+      tags: { type: string }
     override:
       display_name: title  # Display uses 'title' field
-      force_display: ['summary']  # Also show summary
+      force_display: [summary, author]  # Always show these fields
+      exclude_display: [internal_notes]  # Never show internal notes
     # Note: vectorization still uses 'statement' (inherited anchor field)

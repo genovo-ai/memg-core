@@ -22,8 +22,8 @@ class TestYamlSchemaEssentials:
         # Test creating each entity type with minimal required fields
         test_cases = [
             ("memo", {"statement": "Test memo"}),
-            ("note", {"statement": "Test note"}),
-            ("document", {"statement": "Test doc", "details": "Test details"}),
+            ("document", {"statement": "Test doc", "title": "Test Title", "details": "Test details"}),
+            ("article", {"statement": "Test article", "title": "Test Article Title"}),
         ]
 
         for memory_type, payload in test_cases:
@@ -34,39 +34,41 @@ class TestYamlSchemaEssentials:
             assert memory.payload["statement"] == payload["statement"]
 
     def test_inheritance_works(self, test_yaml_path: str):
-        """Test that note inherits from memo (essential inheritance test)."""
+        """Test that document inherits from memo (essential inheritance test)."""
         translator = YamlTranslator(yaml_path=test_yaml_path)
 
-        # Note should inherit memo fields and add its own
-        note = translator.create_memory_from_yaml(
-            memory_type="note",
-            payload={"statement": "Test note", "project": "test-project"},
+        # Document should inherit memo fields and add its own
+        document = translator.create_memory_from_yaml(
+            memory_type="document",
+            payload={"statement": "Test document", "title": "Test Title", "details": "Test details", "project": "test-project"},
             user_id="test_user",
         )
 
-        # Should have inherited 'statement' and added 'project'
-        assert note.payload["statement"] == "Test note"
-        assert note.payload["project"] == "test-project"
+        # Should have inherited 'statement' and added document-specific fields
+        assert document.payload["statement"] == "Test document"
+        assert document.payload["title"] == "Test Title"
+        assert document.payload["details"] == "Test details"
+        assert document.payload["project"] == "test-project"
 
     def test_required_vs_optional_fields(self, test_yaml_path: str):
         """Test required field validation (essential validation test)."""
         translator = YamlTranslator(yaml_path=test_yaml_path)
 
-        # Document requires 'details' - should fail without it
+        # Document requires 'title' and 'details' - should fail without them
         try:
             translator.create_memory_from_yaml(
                 memory_type="document",
-                payload={"statement": "Test doc"},  # missing 'details'
+                payload={"statement": "Test doc"},  # missing 'title' and 'details'
                 user_id="test_user",
             )
-            raise AssertionError("Should have failed without required 'details' field")
+            raise AssertionError("Should have failed without required fields")
         except Exception:
             pass  # Expected to fail
 
-        # Should work with required field
+        # Should work with all required fields
         doc = translator.create_memory_from_yaml(
             memory_type="document",
-            payload={"statement": "Test doc", "details": "Required details"},
+            payload={"statement": "Test doc", "title": "Test Title", "details": "Required details"},
             user_id="test_user",
         )
         assert doc.payload["details"] == "Required details"
@@ -76,7 +78,7 @@ class TestYamlSchemaEssentials:
         translator = YamlTranslator(yaml_path=test_yaml_path)
 
         memory = translator.create_memory_from_yaml(
-            memory_type="note",
+            memory_type="memo",
             payload={"statement": "This will be the anchor text"},
             user_id="test_user",
         )
