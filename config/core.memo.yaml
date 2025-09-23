@@ -11,6 +11,7 @@ defaults:
   timestamps:
     auto_create: true
     auto_update: true
+  datetime_format: "%Y-%m-%d %H:%M:%S"  # Default format for all datetime output
 
 entities:
   - name: memo # base entity - all other entities are derived from this
@@ -22,6 +23,10 @@ entities:
       created_at:  { type: datetime, required: true, system: true }
       updated_at:  { type: datetime, system: true }
       vector:      { type: vector, anchored_to: statement, system: true }
+    override:
+      display_name: statement  # Use 'statement' field for display (same as anchor - no change)
+      force_display: { type: list, required: false }
+      exclude_display: { type: list, required: false }
     relations:
       memo:
         - name: memo_related

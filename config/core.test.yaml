@@ -11,6 +11,7 @@ defaults:
   timestamps:
     auto_create: true
     auto_update: true
+  datetime_format: "%Y-%m-%d %H:%M:%S"  # Default format for test consistency
 
 entities:
   - name: memo # base entity - all other entities are derived from this
@@ -22,6 +23,10 @@ entities:
       created_at:  { type: datetime, required: true, system: true }
       updated_at:  { type: datetime, system: true }
       vector:      { type: vector, anchored_to: statement, system: true }
+    override:
+      display_name: statement  # Use 'statement' field for display (same as anchor - no change)
+      force_display: { type: list, required: false }
+      exclude_display: { type: list, required: false }
     relations:
       memo:
         - name: memo_related
@@ -100,3 +105,16 @@ entities:
           description: "Task is related to a note"
           predicate: RELATES_TO
           directed: true
+
+  # Test entity: Article with title for display, statement for vectorization
+  - name: article
+    parent: memo
+    description: "Article with title-based display for testing override functionality"
+    fields:
+      title: { type: string, required: true, max_length: 200 }
+      summary: { type: string, required: false, max_length: 1000 }
+      project: { type: string }  # Optional project namespace
+    override:
+      display_name: title  # Display uses 'title' field
+      force_display: ['summary']  # Also show summary
+    # Note: vectorization still uses 'statement' (inherited anchor field)
