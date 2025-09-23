@@ -303,6 +303,38 @@ class TypeRegistry:
                     Field(default=None),
                 )
 
+        # Add override fields if present (only those that are actual field definitions)
+        override_fields = entity.get("override", {})
+        for field_name, field_def in override_fields.items():
+            # Skip configuration values like display_name that point to existing fields
+            if field_name == "display_name" and isinstance(field_def, str):
+                continue  # This is a field reference, not a field definition
+
+            # Only process actual field definitions
+            if isinstance(field_def, dict) and "type" in field_def:
+                field_type = field_def["type"]
+                required = field_def.get("required", False)
+                default_value = field_def.get("default")
+
+                # Handle field requirements and defaults for override fields
+                if required:
+                    model_fields[field_name] = (
+                        self._get_python_type(field_type, field_def),
+                        Field(...),
+                    )
+                elif default_value is not None:
+                    # Use YAML-defined default
+                    model_fields[field_name] = (
+                        self._get_python_type(field_type, field_def),
+                        Field(default=default_value),
+                    )
+                else:
+                    # Optional field with None default
+                    model_fields[field_name] = (
+                        self._get_python_type(field_type, field_def),
+                        Field(default=None),
+                    )
+
         return model_fields
 
     def _get_python_type(self, yaml_type: str, field_def: dict[str, Any]) -> Any:
@@ -313,6 +345,8 @@ class TypeRegistry:
             return str
         if yaml_type == "datetime":
             return datetime
+        if yaml_type == "list":
+            return list
         if yaml_type == "enum":
             choices = field_def.get("choices")
             if not choices:

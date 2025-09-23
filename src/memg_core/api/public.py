@@ -62,6 +62,7 @@ class MemgClient:
         score_threshold: float | None = None,
         decay_rate: float | None = None,
         decay_threshold: float | None = None,
+        datetime_format: str | None = None,
         **kwargs,
     ) -> SearchResult:
         """Search memories with explicit seed/neighbor separation.
@@ -74,6 +75,7 @@ class MemgClient:
             score_threshold: Minimum similarity score threshold (0.0-1.0).
             decay_rate: Score decay factor per hop (default: 1.0 = no decay).
             decay_threshold: Explicit neighbor score threshold (overrides decay_rate).
+            datetime_format: Optional datetime format string (e.g., "%Y-%m-%d %H:%M:%S").
             **kwargs: Additional search parameters.
 
         Returns:
@@ -89,6 +91,7 @@ class MemgClient:
             score_threshold=score_threshold,
             decay_rate=decay_rate,
             decay_threshold=decay_threshold,
+            datetime_format=datetime_format,
             **kwargs,
         )
 
@@ -308,6 +311,7 @@ def search(
     score_threshold: float | None = None,
     decay_rate: float | None = None,
     decay_threshold: float | None = None,
+    datetime_format: str | None = None,
     **kwargs,
 ) -> SearchResult:
     """Search memories using environment-based client.
@@ -320,6 +324,7 @@ def search(
         score_threshold: Minimum similarity score threshold (0.0-1.0).
         decay_rate: Score decay factor per hop (default: 1.0 = no decay).
         decay_threshold: Explicit neighbor score threshold (overrides decay_rate).
+        datetime_format: Optional datetime format string (e.g., "%Y-%m-%d %H:%M:%S").
         **kwargs: Additional search parameters.
 
     Returns:
@@ -334,6 +339,7 @@ def search(
         score_threshold=score_threshold,
         decay_rate=decay_rate,
         decay_threshold=decay_threshold,
+        datetime_format=datetime_format,
         **kwargs,
     )
 

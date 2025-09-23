@@ -58,7 +58,7 @@ class PayloadProjector:
         Args:
             memory_type: Entity type for YAML anchor field lookup.
             payload: Original payload dict.
-            include_details: "none" (anchor only) or "self" (full payload).
+            include_details: "none" (anchor only), "self" (full payload for seeds), or "all" (full payload for both seeds and neighbors).
             projection: Optional per-type field allowlist.
 
         Returns:
@@ -70,21 +70,55 @@ class PayloadProjector:
         # Get anchor field from YAML schema - crash if missing
         anchor_field = self.yaml_translator.get_anchor_field(memory_type)
 
+        # Get override field lists
+        force_display_fields = payload.get("force_display", [])
+        exclude_display_fields = payload.get("exclude_display", [])
+
+        # Ensure they are lists
+        if not isinstance(force_display_fields, list):
+            force_display_fields = []
+        if not isinstance(exclude_display_fields, list):
+            exclude_display_fields = []
+
         if include_details == "none":
-            # Return only anchor field - crash if missing
-            return {anchor_field: payload[anchor_field]}
+            # Start with anchor field only
+            result = {anchor_field: payload[anchor_field]}
+        else:
+            # include_details in ["self", "all"] - start with full payload
+            result = dict(payload)
 
-        # include_details == "self" - apply projection if provided
-        result_payload = dict(payload)
+            # Apply projection filtering if provided
+            if projection and memory_type in projection:
+                allowed_fields = set(projection[memory_type])
+                # Always include anchor field
+                allowed_fields.add(anchor_field)
+                result = {k: v for k, v in result.items() if k in allowed_fields}
 
-        # Apply projection filtering if provided
-        if projection and memory_type in projection:
-            allowed_fields = set(projection[memory_type])
-            # Always include anchor field
-            allowed_fields.add(anchor_field)
-            result_payload = {k: v for k, v in result_payload.items() if k in allowed_fields}
+        # Apply force_display: add any fields from the force list that exist in payload
+        for field_name in force_display_fields:
+            if field_name in payload:
+                result[field_name] = payload[field_name]
 
-        return result_payload
+        # Apply exclude_display: remove any fields from the exclude list
+        for field_name in exclude_display_fields:
+            result.pop(field_name, None)
+
+        # Always ensure anchor field is present (unless explicitly excluded)
+        if anchor_field not in exclude_display_fields and anchor_field in payload:
+            result[anchor_field] = payload[anchor_field]
+
+        # Add computed display_text field using YAML-defined display field
+        # This prioritizes the field specified in YAML override.display_name over anchor field
+        if "display_text" not in exclude_display_fields:
+            display_field = self.yaml_translator.get_display_field_name(memory_type)
+            display_text = payload.get(display_field)
+
+            if display_text and isinstance(display_text, str) and display_text.strip():
+                result["display_text"] = display_text.strip()
+            elif anchor_field in payload:
+                result["display_text"] = payload[anchor_field]
+
+        return result
 
 
 class MemorySerializer:
@@ -228,44 +262,111 @@ class MemorySerializer:
             hrid=memory_hrid,  # HRID for external API
         )
 
-    def to_memory_seed(self, memory: Memory, score: float) -> MemorySeed:
+    def to_memory_seed(
+        self, memory: Memory, score: float, datetime_format: str | None = None
+    ) -> MemorySeed:
         """Convert Memory object to MemorySeed.
 
         Args:
             memory: Memory object to convert.
             score: Relevance score for this seed.
+            datetime_format: Optional datetime format string for timestamps.
 
         Returns:
             MemorySeed: Seed object for search results.
         """
+        # Format datetime fields if custom format is provided
+        created_at = memory.created_at
+        updated_at = memory.updated_at
+
+        if datetime_format:
+            # Convert datetime objects to formatted strings
+            created_at_str = (
+                _format_datetime(memory.created_at, datetime_format) if memory.created_at else None
+            )
+            updated_at_str = (
+                _format_datetime(memory.updated_at, datetime_format) if memory.updated_at else None
+            )
+
+            # Create a modified payload with formatted timestamps
+            formatted_payload = dict(memory.payload)
+            if created_at_str:
+                formatted_payload["created_at"] = created_at_str
+            if updated_at_str:
+                formatted_payload["updated_at"] = updated_at_str
+
+            return MemorySeed(
+                user_id=memory.user_id,
+                hrid=memory.hrid or memory.id,
+                memory_type=memory.memory_type,
+                created_at=created_at_str,  # Use formatted string
+                updated_at=updated_at_str,  # Use formatted string
+                payload=formatted_payload,
+                score=score,
+                relationships=[],  # Will be populated by graph expansion
+            )
+
         return MemorySeed(
             user_id=memory.user_id,
             hrid=memory.hrid or memory.id,
             memory_type=memory.memory_type,
-            created_at=memory.created_at,
-            updated_at=memory.updated_at,
+            created_at=created_at,
+            updated_at=updated_at,
             payload=memory.payload,
             score=score,
             relationships=[],  # Will be populated by graph expansion
         )
 
-    def to_memory_neighbor(self, memory: Memory, score: float) -> MemoryNeighbor:
+    def to_memory_neighbor(
+        self, memory: Memory, score: float, datetime_format: str | None = None
+    ) -> MemoryNeighbor:
         """Convert Memory object to MemoryNeighbor.
 
         Args:
             memory: Memory object to convert.
             score: Relevance score for this neighbor.
+            datetime_format: Optional datetime format string for timestamps.
 
         Returns:
             MemoryNeighbor: Neighbor object for search results.
         """
+        # Format datetime fields if custom format is provided
+        created_at = memory.created_at
+        updated_at = memory.updated_at
+
+        if datetime_format:
+            # Convert datetime objects to formatted strings
+            created_at_str = (
+                _format_datetime(memory.created_at, datetime_format) if memory.created_at else None
+            )
+            updated_at_str = (
+                _format_datetime(memory.updated_at, datetime_format) if memory.updated_at else None
+            )
+
+            # Create a modified payload with formatted timestamps
+            formatted_payload = dict(memory.payload)
+            if created_at_str:
+                formatted_payload["created_at"] = created_at_str
+            if updated_at_str:
+                formatted_payload["updated_at"] = updated_at_str
+
+            return MemoryNeighbor(
+                user_id=memory.user_id,
+                hrid=memory.hrid or memory.id,
+                memory_type=memory.memory_type,
+                created_at=created_at_str,  # Use formatted string
+                updated_at=updated_at_str,  # Use formatted string
+                payload=formatted_payload,
+                score=score,
+            )
+
         return MemoryNeighbor(
             user_id=memory.user_id,
             hrid=memory.hrid or memory.id,
             memory_type=memory.memory_type,
-            created_at=memory.created_at,
-            updated_at=memory.updated_at,
-            payload=memory.payload,  # Should already be projected to anchor-only
+            created_at=created_at,
+            updated_at=updated_at,
+            payload=memory.payload,  # Should already be projected
             score=score,
         )
 
@@ -283,6 +384,26 @@ def _parse_datetime(date_str: str) -> datetime:
         ValueError: If datetime string is invalid.
     """
     return datetime.fromisoformat(date_str)
+
+
+def _format_datetime(dt: datetime, format_string: str | None = None) -> str:
+    """Format datetime object to string using specified format.
+
+    Args:
+        dt: Datetime object to format.
+        format_string: Format string (e.g., "%Y-%m-%d %H:%M:%S"). If None, uses ISO format.
+
+    Returns:
+        str: Formatted datetime string.
+    """
+    if format_string is None:
+        return dt.isoformat()
+
+    try:
+        return dt.strftime(format_string)
+    except (ValueError, TypeError):
+        # Fall back to ISO format if custom format fails
+        return dt.isoformat()
 
 
 class VectorSearchHandler:
@@ -320,6 +441,7 @@ class VectorSearchHandler:
         projection: dict[str, list[str]] | None = None,
         score_threshold: float | None = None,
         include_details: str = "self",
+        datetime_format: str | None = None,
     ) -> list[MemorySeed]:
         """Search for vector seeds using Qdrant.
 
@@ -377,7 +499,9 @@ class VectorSearchHandler:
             )
 
             # Convert to MemorySeed
-            seed_result = self.memory_serializer.to_memory_seed(memory, float(point["score"]))
+            seed_result = self.memory_serializer.to_memory_seed(
+                memory, float(point["score"]), datetime_format
+            )
             seeds.append(seed_result)
 
         return seeds
@@ -460,6 +584,8 @@ class GraphExpansionHandler:
         hops: int = 1,
         projection: dict[str, list[str]] | None = None,
         neighbor_threshold: float | None = None,
+        include_details: str = "self",
+        datetime_format: str | None = None,
     ) -> list[MemoryNeighbor]:
         """Expand neighbors from Kuzu graph with progressive score decay.
 
@@ -471,9 +597,10 @@ class GraphExpansionHandler:
             hops: Number of hops to expand (progressive score decay).
             projection: Optional field projection.
             neighbor_threshold: Minimum score threshold for neighbors (None = no filtering).
+            include_details: Detail level for neighbor payloads ("self" = anchor only, "all" = full payload).
 
         Returns:
-            list[MemoryNeighbor]: Neighbors with anchor-only payloads and populated seed relationships.
+            list[MemoryNeighbor]: Neighbors with payloads based on include_details setting and populated seed relationships.
         """
         all_neighbors: list[MemoryNeighbor] = []  # Collect all neighbors
         current_hop_seeds = seeds
@@ -540,11 +667,13 @@ class GraphExpansionHandler:
                     # Build neighbor Memory object using full entity data
                     neighbor_memory = self.memory_serializer.from_kuzu_row(entity_rows[0])
 
-                    # Project to anchor-only payload for neighbors
+                    # Project payload based on include_details setting
+                    # For neighbors: "self" means anchor-only, "all" means full payload
+                    neighbor_detail_level = "none" if include_details == "self" else include_details
                     neighbor_memory.payload = self.payload_projector.project(
                         neighbor_memory.memory_type,
                         neighbor_memory.payload,
-                        include_details="none",
+                        include_details=neighbor_detail_level,
                         projection=projection,
                     )
 
@@ -576,7 +705,7 @@ class GraphExpansionHandler:
 
                     # Create MemoryNeighbor object using utility method
                     neighbor_result = self.memory_serializer.to_memory_neighbor(
-                        neighbor_memory, neighbor_score
+                        neighbor_memory, neighbor_score, datetime_format
                     )
                     next_hop_results.append(neighbor_result)
 
@@ -784,6 +913,7 @@ class SearchService:
         score_threshold: float | None = None,
         decay_rate: float | None = None,
         decay_threshold: float | None = None,
+        datetime_format: str | None = None,
     ) -> SearchResult:
         """GraphRAG search orchestration: vector seeds → graph expansion → result composition.
 
@@ -797,17 +927,21 @@ class SearchService:
             relation_names: Specific relations to expand (None = all relations).
             neighbor_limit: Max neighbors per seed (default: 5).
             hops: Number of graph hops to expand (default: 1).
-            include_details: "self" (full payload) or "none" (anchor only) for seeds.
+            include_details: "self" (full payload for seeds, anchor only for neighbors), "all" (full payload for both), or "none" (anchor only for both).
             modified_within_days: Filter by recency (e.g., last 7 days).
             filters: Custom field-based filtering (e.g., {"project": "memg-core"}).
             projection: Control which fields to return per memory type.
             score_threshold: Minimum similarity score threshold (0.0-1.0).
             decay_rate: Score decay factor per hop (default: 1.0 = no decay).
             decay_threshold: Explicit neighbor score threshold (overrides decay_rate).
+            datetime_format: Optional datetime format string. If None, uses YAML schema default.
 
         Returns:
             SearchResult: Search result with explicit seed/neighbor separation.
         """
+        # Use YAML default datetime format if none provided
+        if datetime_format is None:
+            datetime_format = self.yaml_translator.get_default_datetime_format()
         # 1. Get seeds from vector search using handler
         seeds = self.vector_handler.search_seeds(
             query=query,
@@ -819,6 +953,7 @@ class SearchService:
             projection=projection,
             score_threshold=score_threshold,
             include_details=include_details,
+            datetime_format=datetime_format,
         )
 
         if not seeds:
@@ -840,6 +975,8 @@ class SearchService:
                 hops=hops,
                 projection=projection,
                 neighbor_threshold=neighbor_threshold,
+                include_details=include_details,
+                datetime_format=datetime_format,
             )
 
         # Compose final SearchResult with seeds and neighbors
@@ -890,6 +1027,7 @@ class SearchService:
         hops: int = 1,
         relation_types: list[str] | None = None,
         neighbor_limit: int = 5,
+        datetime_format: str | None = None,
     ) -> SearchResult | None:
         """Get a single memory by HRID with optional neighbor expansion.
 
@@ -901,11 +1039,15 @@ class SearchService:
             hops: Number of hops for neighbor expansion (default 1).
             relation_types: Filter by specific relationship types (None = all relations).
             neighbor_limit: Maximum neighbors to return per hop (default 5).
+            datetime_format: Optional datetime format string. If None, uses YAML schema default.
 
         Returns:
             SearchResult | None: SearchResult with single memory as seed and optional neighbors, or None if not found.
         """
         try:
+            # Use YAML default datetime format if none provided
+            if datetime_format is None:
+                datetime_format = self.yaml_translator.get_default_datetime_format()
             # Infer memory type from HRID if not provided
             if memory_type is None:
                 memory_type = "_".join(hrid.split("_")[:-1])
@@ -930,7 +1072,7 @@ class SearchService:
 
             # Convert to MemorySeed using existing infrastructure
             memory_seed = self.memory_serializer.to_memory_seed(
-                memory, 1.0
+                memory, 1.0, datetime_format
             )  # Score 1.0 for direct retrieval
 
             # Handle neighbor expansion if requested
@@ -944,6 +1086,7 @@ class SearchService:
                     hops=hops,
                     projection=None,  # No projection needed for get_memory
                     neighbor_threshold=None,  # No threshold filtering
+                    include_details="all",  # Full details for get_memory neighbors
                 )
 
             # Return unified SearchResult
@@ -964,6 +1107,7 @@ class SearchService:
         offset: int = 0,
         include_neighbors: bool = False,
         hops: int = 1,
+        datetime_format: str | None = None,
     ) -> SearchResult:
         """Get multiple memories with filtering and optional graph expansion.
 
@@ -975,11 +1119,15 @@ class SearchService:
             offset: Number of memories to skip for pagination (default 0).
             include_neighbors: Whether to include neighbor nodes via graph traversal.
             hops: Number of hops for neighbor expansion (default 1).
+            datetime_format: Optional datetime format string. If None, uses YAML schema default.
 
         Returns:
             SearchResult: SearchResult with memories as seeds and optional neighbors.
         """
         try:
+            # Use YAML default datetime format if none provided
+            if datetime_format is None:
+                datetime_format = self.yaml_translator.get_default_datetime_format()
             # Use KuzuInterface to get nodes with filtering
             results = self.kuzu.get_nodes(
                 user_id=user_id,
@@ -1003,7 +1151,7 @@ class SearchService:
 
                 # Convert to MemorySeed using existing infrastructure
                 memory_seed = self.memory_serializer.to_memory_seed(
-                    memory, 1.0
+                    memory, 1.0, datetime_format
                 )  # Score 1.0 for direct retrieval
                 memory_seeds.append(memory_seed)
 
@@ -1018,6 +1166,7 @@ class SearchService:
                     hops=hops,
                     projection=None,
                     neighbor_threshold=None,  # No threshold filtering
+                    include_details="all",  # Full details for get_memories neighbors
                 )
 
             # Return unified SearchResult

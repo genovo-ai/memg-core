@@ -261,6 +261,72 @@ class YamlTranslator:
             f"Entity '{entity_name}' has no vector field with 'anchored_to' property"
         )
 
+    def get_display_field_name(self, entity_name: str) -> str:
+        """Get the field name to use for display from YAML schema override section.
+
+        Args:
+            entity_name: Entity type name.
+
+        Returns:
+            str: Field name to use for display, or anchor field if no override.
+        """
+        try:
+            entity_spec = self._resolve_entity_with_inheritance(entity_name)
+            override_section = entity_spec.get("override", {})
+            display_field = override_section.get("display_name")
+
+            if display_field and isinstance(display_field, str):
+                return display_field
+
+            # Fall back to anchor field
+            return self.get_anchor_field(entity_name)
+        except Exception:
+            # Fall back to anchor field if any error
+            return self.get_anchor_field(entity_name)
+
+    def get_display_text(self, memory) -> str:
+        """Get display text for a memory, using YAML-defined display field.
+
+        Args:
+            memory: Memory object containing payload data.
+
+        Returns:
+            str: Display text for the memory.
+
+        Raises:
+            YamlTranslatorError: If display field is missing or invalid.
+        """
+        mem_type = getattr(memory, "memory_type", None)
+        if not mem_type:
+            raise YamlTranslatorError(
+                "Memory object missing 'memory_type' field",
+                operation="get_display_text",
+            )
+
+        # Get display field name from YAML schema
+        display_field = self.get_display_field_name(mem_type)
+
+        # Try to get display text from the specified field
+        display_text = None
+        if hasattr(memory, "payload") and isinstance(memory.payload, dict):
+            display_text = memory.payload.get(display_field)
+
+        if isinstance(display_text, str) and display_text.strip():
+            return display_text.strip()
+
+        # If display field is missing or empty, fall back to anchor field
+        return self.build_anchor_text(memory)
+
+    def get_default_datetime_format(self) -> str | None:
+        """Get the default datetime format from YAML schema.
+
+        Returns:
+            str | None: Datetime format string from schema defaults, or None if not set.
+        """
+        schema = self.schema
+        defaults = schema.get("defaults", {})
+        return defaults.get("datetime_format")
+
     def _resolve_entity_with_inheritance(self, entity_name: str) -> dict[str, Any]:
         """Resolve entity specification with full inheritance chain."""
         name_l = entity_name.lower()
@@ -431,6 +497,10 @@ class YamlTranslator:
         # Add/override with current entity's fields
         current_fields = spec.get("fields") or {}
         all_fields.update(current_fields)
+
+        # Add override fields if present
+        override_fields = spec.get("override", {})
+        all_fields.update(override_fields)
 
         return all_fields
 
