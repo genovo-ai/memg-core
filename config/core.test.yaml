@@ -30,12 +30,48 @@ entities:
           predicate: RELATED_TO
           directed: false
 
+  - name: note
+    parent: memo
+    description: "General note or observation to memorize"
+    fields:
+      origin: { type: string }  # Optional origin field for testing
+      project: { type: string }  # Optional project namespace for filtering
+    relations:
+      note:
+        - name: note_related_to_note
+          description: "Generic relation between notes"
+          predicate: RELATED_TO
+          directed: false
+      task:
+        - name: note_annotates_task
+          description: "Note providing context to a task"
+          predicate: ANNOTATES
+          directed: true
+
+  - name: task
+    parent: memo
+    description: "Development task or work item"
+    fields:
+      project: { type: string }  # Optional project namespace for filtering
+      details: { type: string }
+      status: { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled], default: backlog }
+      priority: { type: enum, choices: [low, medium, high, critical], default: medium }
+      due_date: { type: datetime }
+    override:
+      display_field: details  # Display uses details instead of statement
+    relations:
+      task:
+        - name: task_blocks_task
+          description: "Task blocking another task"
+          predicate: BLOCKS
+          directed: true
+
   # Test entity 1: Document with details-based display and force/exclude rules
   - name: document
     parent: memo
     description: "Document for testing display_field override"
     fields:
-      title: { type: string, required: true, max_length: 200 }
+      title: { type: string, max_length: 200 }
       details: { type: string, required: true }
       project: { type: string }
       draft: { type: string }  # Field to test exclusion
@@ -44,13 +80,19 @@ entities:
       force_display: [details]  # Always show details field
       exclude_display: [draft]  # Never show draft field
     # Note: vectorization still uses 'statement' (inherited anchor field)
+    relations:
+      task:
+        - name: document_supports_task
+          description: "Document providing details or requirements for a task"
+          predicate: SUPPORTS
+          directed: true
 
   # Test entity 2: Article with comprehensive override testing
   - name: article
     parent: memo
     description: "Article for testing complex override scenarios"
     fields:
-      title: { type: string, required: true, max_length: 200 }
+      title: { type: string, max_length: 200 }
       summary: { type: string, required: false, max_length: 1000 }
       author: { type: string }
       internal_notes: { type: string }  # Field to test exclusion

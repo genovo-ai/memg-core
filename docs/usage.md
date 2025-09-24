@@ -228,28 +228,39 @@ for seed in results.memories:
     print(f"Updated: {seed.updated_at}")
 ```
 
-#### Controlling Detail Levels
+#### Enhanced Search Control (v0.7.4+)
+
+Control result detail levels with the `include_details` parameter:
 
 ```python
-# Show only anchor text (minimal)
+# "none": Show only display fields (minimal, fastest)
 results = search(
     query="tasks",
     user_id="user123",
-    include_details="none"
+    include_details="none"  # Shows display_field or anchor field only
 )
 
-# Show full details for seeds, anchor only for neighbors (default)
+# "self": Full payload for seeds, minimal for neighbors (default)
 results = search(
     query="tasks",
     user_id="user123",
-    include_details="self"
+    include_details="self"  # Balanced detail level
 )
 
-# Show full details for both seeds and neighbors
+# "all": Full payload for both seeds and neighbors (maximum detail)
 results = search(
     query="tasks",
     user_id="user123",
-    include_details="all"
+    include_details="all"   # Complete information
+)
+
+# With graph expansion - control neighbor detail levels
+results = search(
+    query="authentication",
+    user_id="user123",
+    include_details="all",  # Full details for seeds AND neighbors
+    hops=2,                 # Expand 2 levels in knowledge graph
+    neighbor_limit=5        # Max 5 neighbors per seed
 )
 
 # Access neighbors with full payloads when include_details="all"

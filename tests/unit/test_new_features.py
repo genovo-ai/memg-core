@@ -79,9 +79,9 @@ class TestForceExcludeDisplay:
         # Even with include_details="none", details should be forced by YAML
         result = self.projector.project("document", payload, include_details="none")
 
-        assert "statement" in result  # Anchor field always included
+        assert "title" in result  # Display field always included
         assert "details" in result  # Forced by YAML config
-        assert "title" not in result  # Not forced, not anchor
+        assert "statement" not in result  # Anchor field not shown in display
         assert "project" not in result  # Not forced, not anchor
 
     def test_document_exclude_display_from_yaml(self):
@@ -116,10 +116,10 @@ class TestForceExcludeDisplay:
         # Test with include_details="none" - force should still work
         result = self.projector.project("article", payload, include_details="none")
 
-        assert "statement" in result  # Anchor field
+        assert "title" in result  # Display field
         assert "summary" in result  # Forced by YAML
         assert "author" in result  # Forced by YAML
-        assert "title" not in result  # Not forced, not anchor
+        assert "statement" not in result  # Anchor field not shown in display
         assert "internal_notes" not in result  # Excluded by YAML
         assert "tags" not in result  # Not forced, not anchor
 
@@ -256,9 +256,9 @@ class TestDisplayNamePriority:
 
         result = projector.project("document", payload, include_details="self")
 
-        # Title should appear first (display field)
-        result_keys = list(result.keys())
-        assert result_keys[0] == "title"
+        # Title should be present (display field)
+        assert "title" in result
+        assert "statement" in result  # All fields present in "self" mode
         assert result["title"] == "Document Title"
         assert result["statement"] == "Document statement for vectorization"
 
@@ -278,9 +278,9 @@ class TestDisplayNamePriority:
         # Even with include_details="none", details should be forced
         result = projector.project("document", payload, include_details="none")
 
-        assert "statement" in result  # Anchor always present
+        assert "title" in result  # Display field always present
         assert "details" in result  # Force displayed from YAML
-        assert "title" not in result  # Not forced, not anchor
+        assert "statement" not in result  # Anchor field not shown in display
         assert "project" not in result
 
     def test_exclude_display_from_yaml(self):
@@ -320,9 +320,9 @@ class TestDisplayNamePriority:
 
         result = projector.project("article", payload, include_details="self")
 
-        # Title should appear first (display field)
-        result_keys = list(result.keys())
-        assert result_keys[0] == "title"
+        # Title should be present (display field)
+        assert "title" in result
+        assert "statement" in result  # All fields present in "self" mode
         assert result["title"] == "Article Title"
 
         # Force display fields should be present
@@ -338,8 +338,8 @@ class TestDisplayNamePriority:
 
         # Test with include_details="none" - force_display should still work
         result_none = projector.project("article", payload, include_details="none")
-        assert "statement" in result_none  # Anchor
+        assert "title" in result_none  # Display field
         assert "summary" in result_none  # Forced
         assert "author" in result_none  # Forced
-        assert "title" not in result_none  # Not forced, not anchor
+        assert "statement" not in result_none  # Anchor field not shown in display
         assert "internal_notes" not in result_none  # Excluded
