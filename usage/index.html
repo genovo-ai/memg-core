@@ -468,6 +468,48 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#schema-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Schema Features
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Schema Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#default-datetime-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default Datetime Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#override-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Override Fields
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-override-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using Override Fields
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -498,6 +540,39 @@
       Searching Memories
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-search-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Search Options
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Search Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-datetime-formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Custom Datetime Formatting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enhanced-search-control-v074" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enhanced Search Control (v0.7.4+)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -862,6 +937,48 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#schema-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Schema Features
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Schema Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#default-datetime-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default Datetime Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#override-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Override Fields
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-override-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using Override Fields
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -892,6 +1009,39 @@
       Searching Memories
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-search-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Search Options
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Search Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-datetime-formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Custom Datetime Formatting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enhanced-search-control-v074" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enhanced Search Control (v0.7.4+)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1120,6 +1270,50 @@ export YAML_PATH=&quot;config/software_dev.yaml&quot;
 # Test schema
 export YAML_PATH=&quot;config/core.test.yaml&quot;
 </code></pre>
+<h3 id="schema-features">Schema Features</h3>
+<h4 id="default-datetime-format">Default Datetime Format</h4>
+<p>Configure a default datetime format in your YAML schema:</p>
+<pre><code class="language-yaml">defaults:
+  datetime_format: &quot;%Y-%m-%d %H:%M:%S&quot;  # Clean format: &quot;2025-09-23 14:30:45&quot;
+</code></pre>
+<h4 id="override-fields">Override Fields</h4>
+<p>Add display customization and field control to any entity:</p>
+<pre><code class="language-yaml">entities:
+  - name: task
+    fields:
+      statement: { type: string, required: true }
+      priority: { type: enum, choices: [low, medium, high], default: medium }
+      status: { type: enum, choices: [todo, in_progress, done], default: todo }
+    override:
+      display_field: { type: string, required: false }    # Custom display text
+      force_display: { type: list, required: false }     # Always show these fields
+      exclude_display: { type: list, required: false }   # Never show these fields
+</code></pre>
+<h4 id="using-override-fields">Using Override Fields</h4>
+<pre><code class="language-python"># Add memory with custom display and field control
+add_memory(
+    memory_type=&quot;task&quot;,
+    payload={
+        &quot;statement&quot;: &quot;Implement user authentication&quot;,  # Used for vectorization
+        &quot;priority&quot;: &quot;high&quot;,
+        &quot;status&quot;: &quot;in_progress&quot;,
+        &quot;display_field&quot;: &quot;🔐 Auth Implementation&quot;,  # Custom display text
+        &quot;force_display&quot;: [&quot;priority&quot;, &quot;status&quot;],   # Always show these
+        &quot;exclude_display&quot;: [&quot;internal_notes&quot;]      # Never show these
+    },
+    user_id=&quot;user123&quot;
+)
+
+# Search results will include a computed 'display_text' field
+results = search(query=&quot;authentication&quot;, user_id=&quot;user123&quot;)
+for seed in results.memories:
+    print(f&quot;Display: {seed.payload['display_text']}&quot;)  # &quot;🔐 Auth Implementation&quot;
+    print(f&quot;Anchor: {seed.payload['statement']}&quot;)      # &quot;Implement user authentication&quot;
+</code></pre>
+<p><strong>Key Points:</strong>
+- <strong>Vectorization</strong>: Always uses the anchor field (<code>statement</code>) for embedding
+- <strong>Display</strong>: The <code>display_text</code> field prioritizes <code>display_field</code> over anchor field
+- <strong>Separation</strong>: Vectorization and display are completely separate concerns</p>
 <h2 id="basic-operations">Basic Operations</h2>
 <h3 id="adding-memories">Adding Memories</h3>
 <pre><code class="language-python">from memg_core.api.public import add_memory
@@ -1170,10 +1364,9 @@ results = search(
     limit=10
 )
 
-for result in results:
-    memory = result.memory
-    print(f&quot;[{memory.memory_type}] {memory.hrid}: {memory.payload['statement']}&quot;)
-    print(f&quot;Score: {result.score:.3f}&quot;)
+for seed in results.memories:
+    print(f&quot;[{seed.memory_type}] {seed.hrid}: {seed.payload['statement']}&quot;)
+    print(f&quot;Score: {seed.score:.3f}&quot;)
     print(&quot;---&quot;)
 
 # Search with memory type filtering
@@ -1191,6 +1384,55 @@ project_results = search(
     project=&quot;backend-auth&quot;,
     limit=10
 )
+</code></pre>
+<h3 id="advanced-search-options">Advanced Search Options</h3>
+<h4 id="custom-datetime-formatting">Custom Datetime Formatting</h4>
+<pre><code class="language-python"># Use custom datetime format
+results = search(
+    query=&quot;recent tasks&quot;,
+    user_id=&quot;user123&quot;,
+    datetime_format=&quot;%B %d, %Y at %I:%M %p&quot;
+)
+
+for seed in results.memories:
+    print(f&quot;Created: {seed.created_at}&quot;)  # &quot;September 23, 2025 at 02:30 PM&quot;
+    print(f&quot;Updated: {seed.updated_at}&quot;)
+</code></pre>
+<h4 id="enhanced-search-control-v074">Enhanced Search Control (v0.7.4+)</h4>
+<p>Control result detail levels with the <code>include_details</code> parameter:</p>
+<pre><code class="language-python"># &quot;none&quot;: Show only display fields (minimal, fastest)
+results = search(
+    query=&quot;tasks&quot;,
+    user_id=&quot;user123&quot;,
+    include_details=&quot;none&quot;  # Shows display_field or anchor field only
+)
+
+# &quot;self&quot;: Full payload for seeds, minimal for neighbors (default)
+results = search(
+    query=&quot;tasks&quot;,
+    user_id=&quot;user123&quot;,
+    include_details=&quot;self&quot;  # Balanced detail level
+)
+
+# &quot;all&quot;: Full payload for both seeds and neighbors (maximum detail)
+results = search(
+    query=&quot;tasks&quot;,
+    user_id=&quot;user123&quot;,
+    include_details=&quot;all&quot;   # Complete information
+)
+
+# With graph expansion - control neighbor detail levels
+results = search(
+    query=&quot;authentication&quot;,
+    user_id=&quot;user123&quot;,
+    include_details=&quot;all&quot;,  # Full details for seeds AND neighbors
+    hops=2,                 # Expand 2 levels in knowledge graph
+    neighbor_limit=5        # Max 5 neighbors per seed
+)
+
+# Access neighbors with full payloads when include_details=&quot;all&quot;
+for neighbor in results.neighbors:
+    print(f&quot;Neighbor: {neighbor.payload}&quot;)  # Full payload available
 </code></pre>
 <h3 id="deleting-memories">Deleting Memories</h3>
 <pre><code class="language-python">from memg_core.api.public import delete_memory

@@ -502,6 +502,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#technical-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      Technical Details
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -536,7 +545,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#technical-details" class="md-nav__link">
+  <a href="#technical-details_1" class="md-nav__link">
     <span class="md-ellipsis">
       Technical Details
     </span>
@@ -611,6 +620,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#technical-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      Technical Details
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -645,7 +663,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#technical-details" class="md-nav__link">
+  <a href="#technical-details_1" class="md-nav__link">
     <span class="md-ellipsis">
       Technical Details
     </span>
@@ -684,6 +702,23 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]</h2>
 <h3 id="added">Added</h3>
 <ul>
+<li><strong>Enhanced Search Control</strong>: New <code>include_details</code> parameter with "none", "self", and "all" options</li>
+<li>"none": Show only anchor text for both seeds and neighbors (minimal)</li>
+<li>"self": Show full payload for seeds, anchor only for neighbors (default)</li>
+<li>"all": Show full payload for both seeds and neighbors (maximum detail)</li>
+<li><strong>YAML-Based Datetime Formatting</strong>: Configure default datetime format in YAML schema</li>
+<li>Automatic application of format without per-request configuration</li>
+<li>Custom format override still available per search request</li>
+<li>Clean, consistent datetime output across all operations</li>
+<li><strong>Override Fields System</strong>: New YAML schema section for display customization</li>
+<li><code>display_field</code>: Custom display text that overrides anchor field</li>
+<li><code>force_display</code>: List of fields to always include in results</li>
+<li><code>exclude_display</code>: List of fields to never include in results</li>
+<li>Proper precedence: exclude &gt; force &gt; include_details &gt; anchor protection</li>
+<li><strong>Computed <code>display_text</code> field</strong>: Automatically added to search results, prioritizes <code>display_field</code> over anchor field</li>
+<li><strong>Vectorization separation</strong>: Anchor field always used for embedding, <code>display_field</code> only affects display</li>
+<li><strong>Enhanced Models</strong>: Updated Pydantic models to support both datetime objects and formatted strings</li>
+<li><strong>Comprehensive Test Suite</strong>: 16 new tests covering all new functionality</li>
 <li>MkDocs documentation site with Material theme</li>
 <li>Comprehensive API reference documentation</li>
 <li>Usage guide with examples and configuration details</li>
@@ -691,8 +726,18 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="changed">Changed</h3>
 <ul>
+<li><strong>API Enhancement</strong>: Added <code>datetime_format</code> parameter to search functions</li>
+<li><strong>Model Updates</strong>: <code>MemorySeed</code> and <code>MemoryNeighbor</code> now accept <code>datetime | str</code> for timestamps</li>
+<li><strong>Documentation</strong>: Updated usage guide with new features and examples</li>
 <li>Improved README with badges and better structure</li>
 <li>Enhanced project metadata for PyPI integration</li>
+</ul>
+<h3 id="technical-details">Technical Details</h3>
+<ul>
+<li><strong>Backward Compatibility</strong>: All existing APIs continue to work unchanged</li>
+<li><strong>Performance</strong>: No performance impact - new features are opt-in</li>
+<li><strong>Type Safety</strong>: Strong typing maintained throughout with proper annotations</li>
+<li><strong>Error Handling</strong>: Graceful handling of invalid override field types</li>
 </ul>
 <h2 id="010-2024-01-xx">[0.1.0] - 2024-01-XX</h2>
 <h3 id="added_1">Added</h3>
@@ -719,7 +764,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><strong>Reliability</strong>: Deterministic behavior with comprehensive error handling</li>
 <li><strong>Developer Experience</strong>: Clean API, good documentation, extensive testing</li>
 </ul>
-<h3 id="technical-details">Technical Details</h3>
+<h3 id="technical-details_1">Technical Details</h3>
 <ul>
 <li>Python 3.11+ support</li>
 <li>FastEmbed for local embeddings (no API keys required)</li>
