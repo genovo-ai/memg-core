@@ -280,17 +280,14 @@ class MemorySerializer:
 
         if datetime_format:
             # Convert datetime objects to formatted strings
-            created_at_str = (
-                _format_datetime(memory.created_at, datetime_format) if memory.created_at else None
-            )
+            created_at_str = _format_datetime(memory.created_at, datetime_format)
             updated_at_str = (
                 _format_datetime(memory.updated_at, datetime_format) if memory.updated_at else None
             )
 
             # Create a modified payload with formatted timestamps
             formatted_payload = dict(memory.payload)
-            if created_at_str:
-                formatted_payload["created_at"] = created_at_str
+            formatted_payload["created_at"] = created_at_str
             if updated_at_str:
                 formatted_payload["updated_at"] = updated_at_str
 
@@ -335,17 +332,14 @@ class MemorySerializer:
 
         if datetime_format:
             # Convert datetime objects to formatted strings
-            created_at_str = (
-                _format_datetime(memory.created_at, datetime_format) if memory.created_at else None
-            )
+            created_at_str = _format_datetime(memory.created_at, datetime_format)
             updated_at_str = (
                 _format_datetime(memory.updated_at, datetime_format) if memory.updated_at else None
             )
 
             # Create a modified payload with formatted timestamps
             formatted_payload = dict(memory.payload)
-            if created_at_str:
-                formatted_payload["created_at"] = created_at_str
+            formatted_payload["created_at"] = created_at_str
             if updated_at_str:
                 formatted_payload["updated_at"] = updated_at_str
 
