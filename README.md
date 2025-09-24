@@ -23,6 +23,10 @@ It's designed for AI agents that build, debug, and improve themselves — and fo
 
 - **Vector Search**: Fast semantic search with Qdrant
 - **Graph Storage**: Optional relationship analysis with Kuzu
+- **Enhanced Search Control**: Granular control over result detail levels (`none`, `self`, `all`)
+- **Display Field Overrides**: Custom display fields that override anchor fields for better UX
+- **YAML-Based Datetime Formatting**: Consistent datetime formatting across all operations
+- **Force/Exclude Display**: Fine-grained control over which fields are always shown or hidden
 - **Offline-First**: 100% local embeddings with FastEmbed - no API keys needed
 - **Type-Agnostic**: Configurable memory types via YAML schemas
 - **See Also Discovery**: Knowledge graph-style associative memory retrieval
@@ -105,6 +109,24 @@ note_results = search(
     limit=10
 )
 
+# Enhanced search control (v0.7.4+)
+# Control result detail levels: "none" (minimal), "self" (default), "all" (maximum)
+minimal_results = search(
+    query="postgres docker",
+    user_id="demo_user",
+    include_details="none",  # Shows only display fields
+    limit=5
+)
+
+# Search with graph expansion and full details
+expanded_results = search(
+    query="postgres setup",
+    user_id="demo_user",
+    include_details="all",    # Shows full payload for both seeds and neighbors
+    hops=2,                   # Expand 2 levels in the knowledge graph
+    limit=3
+)
+
 # Delete a memory using HRID
 success = delete_memory(hrid=note_hrid, user_id="demo_user")
 print(f"Deletion successful: {success}")
@@ -126,6 +148,38 @@ export YAML_PATH="config/core.memo.yaml"  # Basic schema
 export YAML_PATH="config/software_dev.yaml"  # Enhanced with bug/solution types
 # or
 export YAML_PATH="config/core.test.yaml"  # For testing
+```
+
+#### New v0.7.4 YAML Features
+
+**Display Field Overrides**: Customize what field is shown in search results
+```yaml
+- name: task
+  parent: memo
+  fields:
+    details: { type: string }
+    status: { type: enum, choices: [todo, done] }
+  override:
+    display_field: details  # Show 'details' instead of 'statement' in results
+```
+
+**Force/Exclude Display**: Control field visibility
+```yaml
+- name: document
+  parent: memo
+  fields:
+    title: { type: string }
+    content: { type: string }
+    internal_notes: { type: string }
+  override:
+    force_display: [title]        # Always show title, even in minimal mode
+    exclude_display: [internal_notes]  # Never show internal notes
+```
+
+**YAML-Based Datetime Formatting**: Consistent timestamps
+```yaml
+defaults:
+  datetime_format: "%Y-%m-%d %H:%M:%S"  # Applied to all datetime fields
 ```
 
 ## Embedding Configuration

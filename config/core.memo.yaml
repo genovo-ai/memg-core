@@ -11,6 +11,7 @@ defaults:
   timestamps:
     auto_create: true
     auto_update: true
+  datetime_format: "%Y-%m-%d %H:%M:%S"  # Default format for all datetime output
 
 entities:
   - name: memo # base entity - all other entities are derived from this

@@ -76,6 +76,63 @@ export YAML_PATH="config/software_dev.yaml"
 export YAML_PATH="config/core.test.yaml"
 ```
 
+### Schema Features
+
+#### Default Datetime Format
+
+Configure a default datetime format in your YAML schema:
+
+```yaml
+defaults:
+  datetime_format: "%Y-%m-%d %H:%M:%S"  # Clean format: "2025-09-23 14:30:45"
+```
+
+#### Override Fields
+
+Add display customization and field control to any entity:
+
+```yaml
+entities:
+  - name: task
+    fields:
+      statement: { type: string, required: true }
+      priority: { type: enum, choices: [low, medium, high], default: medium }
+      status: { type: enum, choices: [todo, in_progress, done], default: todo }
+    override:
+      display_field: { type: string, required: false }    # Custom display text
+      force_display: { type: list, required: false }     # Always show these fields
+      exclude_display: { type: list, required: false }   # Never show these fields
+```
+
+#### Using Override Fields
+
+```python
+# Add memory with custom display and field control
+add_memory(
+    memory_type="task",
+    payload={
+        "statement": "Implement user authentication",  # Used for vectorization
+        "priority": "high",
+        "status": "in_progress",
+        "display_field": "🔐 Auth Implementation",  # Custom display text
+        "force_display": ["priority", "status"],   # Always show these
+        "exclude_display": ["internal_notes"]      # Never show these
+    },
+    user_id="user123"
+)
+
+# Search results will include a computed 'display_text' field
+results = search(query="authentication", user_id="user123")
+for seed in results.memories:
+    print(f"Display: {seed.payload['display_text']}")  # "🔐 Auth Implementation"
+    print(f"Anchor: {seed.payload['statement']}")      # "Implement user authentication"
+```
+
+**Key Points:**
+- **Vectorization**: Always uses the anchor field (`statement`) for embedding
+- **Display**: The `display_text` field prioritizes `display_field` over anchor field
+- **Separation**: Vectorization and display are completely separate concerns
+
 ## Basic Operations
 
 ### Adding Memories
@@ -132,10 +189,9 @@ results = search(
     limit=10
 )
 
-for result in results:
-    memory = result.memory
-    print(f"[{memory.memory_type}] {memory.hrid}: {memory.payload['statement']}")
-    print(f"Score: {result.score:.3f}")
+for seed in results.memories:
+    print(f"[{seed.memory_type}] {seed.hrid}: {seed.payload['statement']}")
+    print(f"Score: {seed.score:.3f}")
     print("---")
 
 # Search with memory type filtering
@@ -153,6 +209,63 @@ project_results = search(
     project="backend-auth",
     limit=10
 )
+```
+
+### Advanced Search Options
+
+#### Custom Datetime Formatting
+
+```python
+# Use custom datetime format
+results = search(
+    query="recent tasks",
+    user_id="user123",
+    datetime_format="%B %d, %Y at %I:%M %p"
+)
+
+for seed in results.memories:
+    print(f"Created: {seed.created_at}")  # "September 23, 2025 at 02:30 PM"
+    print(f"Updated: {seed.updated_at}")
+```
+
+#### Enhanced Search Control (v0.7.4+)
+
+Control result detail levels with the `include_details` parameter:
+
+```python
+# "none": Show only display fields (minimal, fastest)
+results = search(
+    query="tasks",
+    user_id="user123",
+    include_details="none"  # Shows display_field or anchor field only
+)
+
+# "self": Full payload for seeds, minimal for neighbors (default)
+results = search(
+    query="tasks",
+    user_id="user123",
+    include_details="self"  # Balanced detail level
+)
+
+# "all": Full payload for both seeds and neighbors (maximum detail)
+results = search(
+    query="tasks",
+    user_id="user123",
+    include_details="all"   # Complete information
+)
+
+# With graph expansion - control neighbor detail levels
+results = search(
+    query="authentication",
+    user_id="user123",
+    include_details="all",  # Full details for seeds AND neighbors
+    hops=2,                 # Expand 2 levels in knowledge graph
+    neighbor_limit=5        # Max 5 neighbors per seed
+)
+
+# Access neighbors with full payloads when include_details="all"
+for neighbor in results.neighbors:
+    print(f"Neighbor: {neighbor.payload}")  # Full payload available
 ```
 
 ### Deleting Memories

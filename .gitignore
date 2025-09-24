@@ -114,9 +114,7 @@ experiments/fastapi/local_memory_data_*/
 *.zip
 
 # Test artifacts
-test_*
 !tests/
-tests/*tmp*
 
 # python venvs
 **/venv*

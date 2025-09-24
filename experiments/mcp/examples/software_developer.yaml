@@ -11,6 +11,7 @@ defaults:
   timestamps:
     auto_create: true
     auto_update: true
+  datetime_format: "%Y-%m-%d %H:%M:%S"  # Default format for all datetime output
 
 entities:
   - name: memo # base entity - all other entities are derived from this
@@ -99,6 +100,8 @@ entities:
       status:      { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled], default: backlog }
       priority:    { type: enum, choices: [low, medium, high, critical], default: medium }
       due_date:    { type: datetime }
+    override:
+      display_field: details
     relations:
       task:
         - name: task_blocks_task
@@ -168,6 +171,8 @@ entities:
     fields:
       area:      { type: string }  # Optional project namespace for filtering
       details:      { type: string }
+    override:
+      force_display: ['details']  # Also show details
     relations:
       learning:
         - name: learning_relates_to_learning

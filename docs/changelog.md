@@ -8,14 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enhanced Search Control**: New `include_details` parameter with "none", "self", and "all" options
+  - "none": Show only anchor text for both seeds and neighbors (minimal)
+  - "self": Show full payload for seeds, anchor only for neighbors (default)
+  - "all": Show full payload for both seeds and neighbors (maximum detail)
+- **YAML-Based Datetime Formatting**: Configure default datetime format in YAML schema
+  - Automatic application of format without per-request configuration
+  - Custom format override still available per search request
+  - Clean, consistent datetime output across all operations
+- **Override Fields System**: New YAML schema section for display customization
+  - `display_field`: Custom display text that overrides anchor field
+  - `force_display`: List of fields to always include in results
+  - `exclude_display`: List of fields to never include in results
+  - Proper precedence: exclude > force > include_details > anchor protection
+  - **Computed `display_text` field**: Automatically added to search results, prioritizes `display_field` over anchor field
+  - **Vectorization separation**: Anchor field always used for embedding, `display_field` only affects display
+- **Enhanced Models**: Updated Pydantic models to support both datetime objects and formatted strings
+- **Comprehensive Test Suite**: 16 new tests covering all new functionality
 - MkDocs documentation site with Material theme
 - Comprehensive API reference documentation
 - Usage guide with examples and configuration details
 - GitHub Actions workflow for automated documentation deployment
 
 ### Changed
+- **API Enhancement**: Added `datetime_format` parameter to search functions
+- **Model Updates**: `MemorySeed` and `MemoryNeighbor` now accept `datetime | str` for timestamps
+- **Documentation**: Updated usage guide with new features and examples
 - Improved README with badges and better structure
 - Enhanced project metadata for PyPI integration
+
+### Technical Details
+- **Backward Compatibility**: All existing APIs continue to work unchanged
+- **Performance**: No performance impact - new features are opt-in
+- **Type Safety**: Strong typing maintained throughout with proper annotations
+- **Error Handling**: Graceful handling of invalid override field types
 
 ## [0.1.0] - 2024-01-XX
 

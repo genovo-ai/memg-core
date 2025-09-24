@@ -313,6 +313,8 @@ class TypeRegistry:
             return str
         if yaml_type == "datetime":
             return datetime
+        if yaml_type == "list":
+            return list
         if yaml_type == "enum":
             choices = field_def.get("choices")
             if not choices:

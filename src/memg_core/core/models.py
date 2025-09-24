@@ -169,8 +169,8 @@ class MemorySeed(BaseModel):
         user_id: Owner of the memory.
         hrid: Human-readable identifier.
         memory_type: Entity type from YAML schema.
-        created_at: Creation timestamp.
-        updated_at: Last update timestamp.
+        created_at: Creation timestamp (datetime or formatted string).
+        updated_at: Last update timestamp (datetime or formatted string).
         payload: Full entity payload.
         score: Vector similarity score to query.
         relationships: List of relationships to other memories.
@@ -179,8 +179,8 @@ class MemorySeed(BaseModel):
     user_id: str = Field(..., description="Owner of the memory")
     hrid: str = Field(..., description="Human-readable identifier")
     memory_type: str = Field(..., description="Entity type from YAML schema")
-    created_at: datetime = Field(..., description="Creation timestamp")
-    updated_at: datetime | None = Field(None, description="Last update timestamp")
+    created_at: datetime | str = Field(..., description="Creation timestamp")
+    updated_at: datetime | str | None = Field(None, description="Last update timestamp")
     payload: dict[str, Any] = Field(..., description="Full entity payload")
     score: float = Field(
         ..., ge=0.0, le=1.0 + _MAX_SCORE_TOLERANCE, description="Vector similarity score"
@@ -201,24 +201,24 @@ class MemorySeed(BaseModel):
 
 
 class MemoryNeighbor(BaseModel):
-    """Memory neighbor with anchor-only payload.
+    """Memory neighbor with configurable payload detail level.
 
     Attributes:
         user_id: Owner of the memory.
         hrid: Human-readable identifier.
         memory_type: Entity type from YAML schema.
-        created_at: Creation timestamp.
-        updated_at: Last update timestamp.
-        payload: Anchor-only payload (statement field only).
+        created_at: Creation timestamp (datetime or formatted string).
+        updated_at: Last update timestamp (datetime or formatted string).
+        payload: Payload with detail level based on include_details setting.
         score: Recursive relevance score (seed_score × neighbor_similarity).
     """
 
     user_id: str = Field(..., description="Owner of the memory")
     hrid: str = Field(..., description="Human-readable identifier")
     memory_type: str = Field(..., description="Entity type from YAML schema")
-    created_at: datetime = Field(..., description="Creation timestamp")
-    updated_at: datetime | None = Field(None, description="Last update timestamp")
-    payload: dict[str, Any] = Field(..., description="Anchor-only payload")
+    created_at: datetime | str = Field(..., description="Creation timestamp")
+    updated_at: datetime | str | None = Field(None, description="Last update timestamp")
+    payload: dict[str, Any] = Field(..., description="Payload with configurable detail level")
     score: float = Field(..., ge=0.0, le=1.0, description="Recursive relevance score")
 
 
