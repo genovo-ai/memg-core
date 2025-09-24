@@ -231,7 +231,7 @@ class TestDisplayNamePriority:
         assert display_text == "This is the statement content"
 
     def test_fallback_to_anchor(self):
-        """Test fallback to anchor field when no display_name."""
+        """Test fallback to anchor field when no display_field."""
         yaml_translator = YamlTranslator("./config/core.test.yaml")
 
         memory = Memory(
@@ -246,7 +246,7 @@ class TestDisplayNamePriority:
         yaml_translator = YamlTranslator("./config/core.test.yaml")
         projector = PayloadProjector(yaml_translator)
 
-        # Document has display_name: title in YAML
+        # Document has display_field: title in YAML
         payload = {
             "statement": "Document statement for vectorization",
             "title": "Document Title",
@@ -304,11 +304,11 @@ class TestDisplayNamePriority:
         assert "draft" not in result  # Excluded by YAML config
 
     def test_article_comprehensive_override_behavior(self):
-        """Test article entity with comprehensive override: display_name, force_display, exclude_display."""
+        """Test article entity with comprehensive override: display_field, force_display, exclude_display."""
         yaml_translator = YamlTranslator("./config/core.test.yaml")
         projector = PayloadProjector(yaml_translator)
 
-        # Article has: display_name: title, force_display: [summary, author], exclude_display: [internal_notes]
+        # Article has: display_field: title, force_display: [summary, author], exclude_display: [internal_notes]
         payload = {
             "statement": "Full article content for vectorization",
             "title": "Article Title",

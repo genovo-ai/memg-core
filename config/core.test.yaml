@@ -33,14 +33,14 @@ entities:
   # Test entity 1: Document with details-based display and force/exclude rules
   - name: document
     parent: memo
-    description: "Document for testing display_name override"
+    description: "Document for testing display_field override"
     fields:
       title: { type: string, required: true, max_length: 200 }
       details: { type: string, required: true }
       project: { type: string }
       draft: { type: string }  # Field to test exclusion
     override:
-      display_name: title  # Display uses 'title' field instead of 'statement'
+      display_field: title  # Display uses 'title' field instead of 'statement'
       force_display: [details]  # Always show details field
       exclude_display: [draft]  # Never show draft field
     # Note: vectorization still uses 'statement' (inherited anchor field)
@@ -56,7 +56,7 @@ entities:
       internal_notes: { type: string }  # Field to test exclusion
       tags: { type: string }
     override:
-      display_name: title  # Display uses 'title' field
+      display_field: title  # Display uses 'title' field
       force_display: [summary, author]  # Always show these fields
       exclude_display: [internal_notes]  # Never show internal notes
     # Note: vectorization still uses 'statement' (inherited anchor field)

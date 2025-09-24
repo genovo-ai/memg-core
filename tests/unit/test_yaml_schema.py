@@ -22,7 +22,10 @@ class TestYamlSchemaEssentials:
         # Test creating each entity type with minimal required fields
         test_cases = [
             ("memo", {"statement": "Test memo"}),
-            ("document", {"statement": "Test doc", "title": "Test Title", "details": "Test details"}),
+            (
+                "document",
+                {"statement": "Test doc", "title": "Test Title", "details": "Test details"},
+            ),
             ("article", {"statement": "Test article", "title": "Test Article Title"}),
         ]
 
@@ -40,7 +43,12 @@ class TestYamlSchemaEssentials:
         # Document should inherit memo fields and add its own
         document = translator.create_memory_from_yaml(
             memory_type="document",
-            payload={"statement": "Test document", "title": "Test Title", "details": "Test details", "project": "test-project"},
+            payload={
+                "statement": "Test document",
+                "title": "Test Title",
+                "details": "Test details",
+                "project": "test-project",
+            },
             user_id="test_user",
         )
 

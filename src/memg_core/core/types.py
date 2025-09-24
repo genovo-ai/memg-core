@@ -303,10 +303,6 @@ class TypeRegistry:
                     Field(default=None),
                 )
 
-        # Skip override section entirely - these are YAML config directives, not Pydantic fields
-        # Override values like display_name, force_display, exclude_display are read by YamlTranslator
-        # They should not become fields in the Pydantic model
-
         return model_fields
 
     def _get_python_type(self, yaml_type: str, field_def: dict[str, Any]) -> Any:

@@ -23,10 +23,6 @@ entities:
       created_at:  { type: datetime, required: true, system: true }
       updated_at:  { type: datetime, system: true }
       vector:      { type: vector, anchored_to: statement, system: true }
-    override:
-      display_name: statement  # Use 'statement' field for display (same as anchor - no change)
-      force_display: { type: list, required: false }
-      exclude_display: { type: list, required: false }
     relations:
       memo:
         - name: memo_related
@@ -104,6 +100,8 @@ entities:
       status:      { type: enum, choices: [backlog, todo, in_progress, in_review, done, cancelled], default: backlog }
       priority:    { type: enum, choices: [low, medium, high, critical], default: medium }
       due_date:    { type: datetime }
+    override:
+      display_field: details
     relations:
       task:
         - name: task_blocks_task
@@ -173,6 +171,8 @@ entities:
     fields:
       area:      { type: string }  # Optional project namespace for filtering
       details:      { type: string }
+    override:
+      force_display: ['details']  # Also show details
     relations:
       learning:
         - name: learning_relates_to_learning
@@ -184,15 +184,3 @@ entities:
           description: "Learning or knowledge which relates to a document"
           predicate: RELATES_TO
           directed: false
-
-  # Example: Article with title for display, statement for vectorization
-  - name: article
-    parent: memo
-    description: "Article with title-based display"
-    fields:
-      title: { type: string, required: true, max_length: 200 }
-      summary: { type: string, required: false, max_length: 1000 }
-    override:
-      display_name: title  # Display uses 'title' field
-      force_display: ['summary']  # Also show summary
-    # Note: vectorization still uses 'statement' (inherited anchor field)

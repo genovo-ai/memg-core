@@ -33,6 +33,13 @@ SYSTEM_FIELD_NAMES = {
     "hrid",
 }
 
+# Internal database fields that should never be exposed to users
+INTERNAL_DB_FIELDS = {
+    "_id",
+    "_label",
+    "vector",
+}
+
 
 class PayloadProjector:
     """Handles payload projection and filtering based on include_details and projection settings."""
@@ -56,13 +63,13 @@ class PayloadProjector:
         """Project payload based on include_details setting and optional projection.
 
         Args:
-            memory_type: Entity type for YAML anchor field lookup.
+            memory_type: Entity type for YAML schema lookup.
             payload: Original payload dict.
-            include_details: "none" (anchor only), "self" (full payload for seeds), or "all" (full payload for both seeds and neighbors).
+            include_details: "none" (display field only), "self" (full payload for seeds), or "all" (full payload for both seeds and neighbors).
             projection: Optional per-type field allowlist.
 
         Returns:
-            dict[str, Any]: Projected payload dict with anchor field always included.
+            dict[str, Any]: Projected payload dict with display field always included (defaults to anchor field).
         """
         if not payload:
             return {}
@@ -74,45 +81,41 @@ class PayloadProjector:
         force_display_fields = self.yaml_translator.get_force_display_fields(memory_type)
         exclude_display_fields = self.yaml_translator.get_exclude_display_fields(memory_type)
 
-        # Get display field from YAML (e.g., "title" instead of "statement")
+        # Get display field from YAML (defaults to anchor_field if not overridden)
         display_field = self.yaml_translator.get_display_field_name(memory_type)
+        if not display_field:
+            display_field = anchor_field
 
         if include_details == "none":
-            # Start with anchor field only
-            result = {anchor_field: payload[anchor_field]}
+            # Show only the display field (which is anchor_field by default)
+            result = {display_field: payload[display_field]} if display_field in payload else {}
         else:
-            # include_details in ["self", "all"] - build payload with display field first
-            result = {}
-
-            # 1. Add display field first (gives it prominence in UI)
-            if display_field in payload:
-                result[display_field] = payload[display_field]
-
-            # 2. Add other fields (avoid duplicating display field)
-            for key, value in payload.items():
-                if key != display_field:
-                    result[key] = value
+            # include_details in ["self", "all"] - show all fields except internal DB fields
+            result = {k: v for k, v in payload.items() if k not in INTERNAL_DB_FIELDS}
 
             # Apply projection filtering if provided
             if projection and memory_type in projection:
                 allowed_fields = set(projection[memory_type])
-                # Always include anchor field and display field
-                allowed_fields.add(anchor_field)
+                # Always include display field
                 allowed_fields.add(display_field)
                 result = {k: v for k, v in result.items() if k in allowed_fields}
 
-        # Apply force_display: add any fields from the force list that exist in payload
+        # Apply force_display: add any fields from the force list that exist in payload (except internal DB fields)
         for field_name in force_display_fields:
-            if field_name in payload:
+            if field_name in payload and field_name not in INTERNAL_DB_FIELDS:
                 result[field_name] = payload[field_name]
 
         # Apply exclude_display: remove any fields from the exclude list
         for field_name in exclude_display_fields:
             result.pop(field_name, None)
 
-        # Always ensure anchor field is present (unless explicitly excluded)
-        if anchor_field not in exclude_display_fields and anchor_field in payload:
-            result[anchor_field] = payload[anchor_field]
+        # Always ensure display field is present (unless explicitly excluded or internal DB field)
+        if (
+            display_field not in exclude_display_fields
+            and display_field in payload
+            and display_field not in INTERNAL_DB_FIELDS
+        ):
+            result[display_field] = payload[display_field]
 
         return result
 

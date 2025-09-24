@@ -23,10 +23,6 @@ entities:
       created_at:  { type: datetime, required: true, system: true }
       updated_at:  { type: datetime, system: true }
       vector:      { type: vector, anchored_to: statement, system: true }
-    override:
-      display_name: statement  # Use 'statement' field for display (same as anchor - no change)
-      force_display: { type: list, required: false }
-      exclude_display: { type: list, required: false }
     relations:
       memo:
         - name: memo_related

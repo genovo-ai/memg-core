@@ -273,7 +273,7 @@ class YamlTranslator:
         try:
             entity_spec = self._resolve_entity_with_inheritance(entity_name)
             override_section = entity_spec.get("override", {})
-            display_field = override_section.get("display_name")
+            display_field = override_section.get("display_field")
 
             if display_field and isinstance(display_field, str):
                 return display_field
