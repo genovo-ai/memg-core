@@ -40,9 +40,8 @@ It's designed for AI agents that build, debug, and improve themselves — and fo
 pip install memg-core
 
 # Set up environment variables for storage paths
-export QDRANT_STORAGE_PATH="/path/to/qdrant"
-export KUZU_DB_PATH="/path/to/kuzu/database"
-export YAML_PATH="config/core.memo.yaml"
+export MEMG_YAML_PATH="config/core.memo.yaml"
+export MEMG_DB_PATH="/path/to/databases"
 
 # Use the core library in your app
 # Example usage shown below in the Usage section
@@ -58,17 +57,16 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 
 # 3) Run tests
-export YAML_PATH="config/core.test.yaml"
-export QDRANT_STORAGE_PATH="$HOME/.local/share/qdrant"
-export KUZU_DB_PATH="$HOME/.local/share/kuzu/memg"
-mkdir -p "$QDRANT_STORAGE_PATH" "$HOME/.local/share/kuzu"
+export MEMG_YAML_PATH="config/core.test.yaml"
+export MEMG_DB_PATH="$HOME/.local/share/memg"
+mkdir -p "$MEMG_DB_PATH"
 PYTHONPATH=$(pwd)/src pytest -q
 ```
 
 ## Usage
 
 ```python
-from memg_core.api.public import add_memory, search, delete_memory
+from memg_core.api.public import add_memory, search, delete_memory, update_memory, get_memory, get_memories
 
 # Add a note
 note_hrid = add_memory(
@@ -98,8 +96,8 @@ results = search(
     user_id="demo_user",
     limit=5
 )
-for r in results:
-    print(f"[{r.memory.memory_type}] {r.memory.hrid}: {r.memory.payload['statement']} - Score: {r.score:.2f}")
+for memory_seed in results.memories:
+    print(f"[{memory_seed.memory_type}] {memory_seed.hrid}: {memory_seed.payload['statement']} - Score: {memory_seed.score:.2f}")
 
 # Search with memory type filtering
 note_results = search(
@@ -130,6 +128,32 @@ expanded_results = search(
 # Delete a memory using HRID
 success = delete_memory(hrid=note_hrid, user_id="demo_user")
 print(f"Deletion successful: {success}")
+
+# Update a memory
+success = update_memory(
+    hrid=doc_hrid,
+    payload_updates={"details": "Updated details"},
+    user_id="demo_user"
+)
+
+# Get a specific memory with relationships
+memory_result = get_memory(
+    hrid=doc_hrid,
+    user_id="demo_user",
+    include_neighbors=True,
+    hops=1
+)
+if memory_result:
+    print(f"Found: {memory_result.memories[0].hrid}")
+    print(f"Neighbors: {len(memory_result.neighbors)}")
+
+# Get all memories of a type
+all_notes = get_memories(
+    user_id="demo_user",
+    memory_type="note",
+    limit=20
+)
+print(f"Found {len(all_notes.memories)} notes")
 ```
 
 ### YAML Schema Examples
@@ -143,11 +167,11 @@ Core ships with example schemas under `config/`:
 Configure the schema:
 
 ```bash
-export YAML_PATH="config/core.memo.yaml"  # Basic schema
+export MEMG_YAML_PATH="config/core.memo.yaml"  # Basic schema
 # or
-export YAML_PATH="config/software_dev.yaml"  # Enhanced with bug/solution types
+export MEMG_YAML_PATH="config/software_dev.yaml"  # Enhanced with bug/solution types
 # or
-export YAML_PATH="config/core.test.yaml"  # For testing
+export MEMG_YAML_PATH="config/core.test.yaml"  # For testing
 ```
 
 #### New v0.7.4 YAML Features
@@ -199,13 +223,16 @@ export EMBEDDER_MODEL="Snowflake/snowflake-arctic-embed-xs"  # Default
 Configure via environment variables:
 
 ```bash
-# Required: Storage paths
-export QDRANT_STORAGE_PATH="$HOME/.local/share/qdrant"
-export KUZU_DB_PATH="$HOME/.local/share/kuzu/memg"
-export YAML_PATH="config/core.memo.yaml"
+# Required: Storage paths and schema
+export MEMG_YAML_PATH="config/core.memo.yaml"
+export MEMG_DB_PATH="$HOME/.local/share/memg"
 
 # Optional: Embeddings
 export EMBEDDER_MODEL="Snowflake/snowflake-arctic-embed-xs"  # Default
+
+# Optional: Advanced configuration
+export MEMG_QDRANT_COLLECTION="memg"  # Qdrant collection name
+export MEMG_KUZU_DB_PATH="kuzu_db"    # Kuzu database path (relative to MEMG_DB_PATH)
 
 # Optional: For MCP server (if using)
 export MEMORY_SYSTEM_MCP_PORT=8787
