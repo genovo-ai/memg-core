@@ -16,6 +16,7 @@ from qdrant_client.models import Distance, VectorParams
 from ..core.config import get_config
 from ..core.exceptions import DatabaseError
 from ..core.interfaces.embedder import Embedder
+from ..core.interfaces.embedder_protocol import EmbedderProtocol
 from ..core.interfaces.kuzu import KuzuInterface
 from ..core.interfaces.qdrant import QdrantInterface
 from ..core.yaml_translator import YamlTranslator
@@ -37,11 +38,13 @@ class DatabaseClients:
         yaml_translator: YAML translator instance.
     """
 
-    def __init__(self, yaml_path: str | None = None):
+    def __init__(self, yaml_path: str | None = None, embedder: EmbedderProtocol | None = None):
         """Create DDL-only database client wrapper.
 
         Args:
             yaml_path: Path to YAML schema file. User must provide - no defaults.
+            embedder: Optional custom embedder implementation. If not provided,
+                uses the default FastEmbed-based embedder.
         """
         self.qdrant_client: QdrantClient | None = None
         self.kuzu_connection: kuzu.Connection | None = None
@@ -50,6 +53,7 @@ class DatabaseClients:
         self.kuzu_path = "kuzu"
 
         self.yaml_translator = YamlTranslator(yaml_path) if yaml_path else None
+        self._embedder = embedder
 
     def init_dbs(self, db_path: str, db_name: str):
         """Initialize databases with structured paths.
@@ -180,13 +184,16 @@ class DatabaseClients:
             )
         return KuzuInterface(self.kuzu_connection)
 
-    def get_embedder(self) -> Embedder:
+    def get_embedder(self) -> EmbedderProtocol:
         """Get embedder instance.
 
         Returns:
-            Embedder: Instance for generating vectors.
+            EmbedderProtocol: Instance for generating vectors. Either the custom
+                embedder provided during initialization or the default FastEmbed-based embedder.
         """
-        return Embedder()
+        if self._embedder is None:
+            self._embedder = Embedder()
+        return self._embedder
 
     def get_yaml_translator(self) -> YamlTranslator:
         """Get the YAML translator used for schema operations.

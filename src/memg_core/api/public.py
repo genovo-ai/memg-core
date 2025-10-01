@@ -10,6 +10,7 @@ import os
 from typing import Any
 
 from ..core.config import get_config
+from ..core.interfaces.embedder_protocol import EmbedderProtocol
 from ..core.models import SearchResult
 from ..core.pipelines.indexer import MemoryService, create_memory_service
 from ..core.pipelines.retrieval import SearchService, create_search_service
@@ -23,14 +24,17 @@ class MemgClient:
     Provides a clean interface for memory operations with explicit resource management.
     """
 
-    def __init__(self, yaml_path: str, db_path: str):
+    def __init__(self, yaml_path: str, db_path: str, embedder: EmbedderProtocol | None = None):
         """Initialize client for long-running server usage.
 
         Args:
             yaml_path: Path to YAML schema configuration file.
             db_path: Base directory path for database storage.
+            embedder: Optional custom embedder. If provided, will be used instead
+                of the default FastEmbed-based embedder. Must implement EmbedderProtocol
+                (get_embedding and get_embeddings methods).
         """
-        self._db_clients = DatabaseClients(yaml_path=yaml_path)
+        self._db_clients = DatabaseClients(yaml_path=yaml_path, embedder=embedder)
         config = get_config()
         self._db_clients.init_dbs(db_path=db_path, db_name=config.memg.qdrant_collection_name)
 
