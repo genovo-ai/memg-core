@@ -184,13 +184,62 @@ defaults:
 
 ## Embedding Configuration
 
-MEMG Core uses FastEmbed for 100% offline, local embeddings. By default, it uses the highly efficient Snowflake Arctic model:
+### Default: FastEmbed (Offline, No API Keys)
+
+MEMG Core uses FastEmbed by default for 100% offline, local embeddings:
 
 ```bash
 # Optional: Configure a different FastEmbed model
 export EMBEDDER_MODEL="Snowflake/snowflake-arctic-embed-xs"  # Default
 # Other options: intfloat/e5-small, BAAI/bge-small-en-v1.5, etc.
 ```
+
+### Custom Embedders
+
+You can provide your own embedder (OpenAI, Cohere, custom models, etc.) by implementing a simple protocol:
+
+```python
+from memg_core import MemgClient, EmbedderProtocol
+
+class OpenAIEmbedder:
+    """Example: Use OpenAI embeddings instead of FastEmbed."""
+
+    def __init__(self, api_key: str, model: str = "text-embedding-3-small"):
+        import openai
+        self.client = openai.OpenAI(api_key=api_key)
+        self.model = model
+
+    def get_embedding(self, text: str) -> list[float]:
+        """Generate embedding for a single text."""
+        response = self.client.embeddings.create(input=[text], model=self.model)
+        return response.data[0].embedding
+
+    def get_embeddings(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings for multiple texts."""
+        response = self.client.embeddings.create(input=texts, model=self.model)
+        return [item.embedding for item in response.data]
+
+# Use your custom embedder
+embedder = OpenAIEmbedder(api_key="your-api-key")
+client = MemgClient(
+    yaml_path="config/core.memo.yaml",
+    db_path="/path/to/db",
+    embedder=embedder
+)
+
+# Now all memory operations use your custom embedder
+hrid = client.add_memory(
+    memory_type="note",
+    payload={"statement": "Using OpenAI embeddings"},
+    user_id="user123"
+)
+```
+
+The embedder protocol is simple - just implement two methods:
+- `get_embedding(text: str) -> list[float]` - for single text
+- `get_embeddings(texts: list[str]) -> list[list[float]]` - for batch processing
+
+**Note:** When using custom embedders, ensure the vector dimension matches your Qdrant configuration (default: 384 for FastEmbed's arctic-xs model).
 
 
 
