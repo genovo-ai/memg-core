@@ -311,6 +311,12 @@ class TypeRegistry:
 
         if yaml_type == "string":
             return str
+        if yaml_type in ("int", "integer"):
+            return int
+        if yaml_type in ("float", "number"):
+            return float
+        if yaml_type in ("bool", "boolean"):
+            return bool
         if yaml_type == "datetime":
             return datetime
         if yaml_type == "list":

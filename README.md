@@ -182,6 +182,20 @@ defaults:
   datetime_format: "%Y-%m-%d %H:%M:%S"  # Applied to all datetime fields
 ```
 
+**Supported Field Types**: Rich type system
+```yaml
+- name: product
+  fields:
+    name: { type: string }          # Text
+    price: { type: float }           # Decimal numbers
+    quantity: { type: int }          # Integers (also: integer)
+    in_stock: { type: bool }         # Booleans (also: boolean)
+    created_at: { type: datetime }   # Timestamps
+    tags: { type: list }             # Lists
+    category: { type: enum, choices: [A, B, C] }  # Enumerations
+    embedding: { type: vector }      # Embedding vectors
+```
+
 ## Embedding Configuration
 
 ### Default: FastEmbed (Offline, No API Keys)
