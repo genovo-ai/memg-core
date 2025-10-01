@@ -82,10 +82,10 @@ def test_optional_numeric_fields():
     result = get_memory(hrid=hrid, user_id="test_user")
     memory = result.memories[0]
 
-    # Optional numeric fields not required (may be absent or None)
-    assert "estimated_hours" not in memory.payload or memory.payload["estimated_hours"] is None
-    assert "story_points" not in memory.payload or memory.payload["story_points"] is None
-    # completed field may not be in payload if not provided (default doesn't auto-populate)
-    assert "completed" not in memory.payload or memory.payload["completed"] is False
+    # Optional numeric fields should be absent when not provided
+    # Note: memg-core doesn't auto-populate defaults from YAML schema
+    assert "estimated_hours" not in memory.payload
+    assert "story_points" not in memory.payload
+    assert "completed" not in memory.payload
 
     delete_memory(hrid=hrid, user_id="test_user")

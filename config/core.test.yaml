@@ -59,7 +59,7 @@ entities:
       due_date: { type: datetime }
       estimated_hours: { type: float }  # Numeric type: estimated hours to complete
       story_points: { type: int }  # Numeric type: story points for task
-      completed: { type: bool, default: false }  # Numeric type: completion flag
+      completed: { type: bool }  # Numeric type: completion flag
     override:
       display_field: details  # Display uses details instead of statement
     relations:
