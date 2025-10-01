@@ -309,25 +309,30 @@ class TypeRegistry:
         """Convert YAML type to Python type - crash on unknown types."""
         yaml_type = yaml_type.lower()
 
-        if yaml_type == "string":
-            return str
-        if yaml_type in ("int", "integer"):
-            return int
-        if yaml_type in ("float", "number"):
-            return float
-        if yaml_type in ("bool", "boolean"):
-            return bool
-        if yaml_type == "datetime":
-            return datetime
-        if yaml_type == "list":
-            return list
+        # Type mapping with aliases
+        type_map = {
+            "string": str,
+            "int": int,
+            "integer": int,
+            "float": float,
+            "number": float,
+            "bool": bool,
+            "boolean": bool,
+            "datetime": datetime,
+            "list": list,
+            "vector": list[float],
+        }
+
+        # Check simple type mappings first
+        if yaml_type in type_map:
+            return type_map[yaml_type]
+
+        # Handle enum separately (requires additional validation)
         if yaml_type == "enum":
             choices = field_def.get("choices")
             if not choices:
                 raise ValueError(f"Enum field missing 'choices': {field_def}")
             return Literal[tuple(choices)]
-        if yaml_type == "vector":
-            return list[float]
 
         raise ValueError(f"Unknown YAML type: {yaml_type}")
 
