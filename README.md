@@ -186,7 +186,7 @@ defaults:
 ```yaml
 - name: product
   fields:
-    name: { type: string }          # Text
+    name: { type: string, required: true }  # Text (required)
     price: { type: float }           # Decimal numbers
     quantity: { type: int }          # Integers (also: integer)
     in_stock: { type: bool }         # Booleans (also: boolean)
@@ -195,6 +195,17 @@ defaults:
     category: { type: enum, choices: [A, B, C] }  # Enumerations
     embedding: { type: vector }      # Embedding vectors
 ```
+
+**Currently Enforced Constraints:**
+- ✅ `required: true` - Field must be present
+- ✅ `type: <type>` - Type must match (string, int, float, bool, datetime, list, enum, vector)
+- ✅ `enum` with `choices: [...]` - Value must be one of the specified choices
+- ✅ `system: true` - System fields (id, user_id, timestamps) handled automatically
+
+**Not Yet Implemented** (tracked in [#issue]):
+- ⚠️ `default: value` - Defaults are not auto-applied (fields absent if not provided)
+- ⚠️ `max_length: N` - String length validation not enforced
+- ⚠️ Other Pydantic-style constraints (min_value, pattern, etc.)
 
 ## Embedding Configuration
 
